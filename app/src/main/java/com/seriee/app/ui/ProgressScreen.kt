@@ -1,0 +1,370 @@
+package com.seriee.app.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.seriee.app.data.MediaItem
+import com.seriee.app.data.MediaType
+import com.seriee.app.data.WatchStatus
+import com.seriee.app.reminder.ReminderScheduler
+
+@Composable
+fun ProgressScreen(
+    list: List<MediaItem>,
+    padding: PaddingValues,
+    onOpen: (MediaItem) -> Unit,
+    onIncrement: (String) -> Unit
+) {
+    val p = LocalPalette.current
+    var query by rememberSaveable { mutableStateOf("") }
+    var filter by rememberSaveable { mutableIntStateOf(0) }
+
+    val filterOptions = listOf(
+        "All" to list.size,
+        "Watching" to list.count { it.status == WatchStatus.Watching },
+        "Completed" to list.count { it.status == WatchStatus.Completed },
+        "Coming Soon" to list.count { it.status == WatchStatus.ComingSoon }
+    )
+
+    val filtered = list
+        .filter { it.title.contains(query.trim(), ignoreCase = true) }
+        .filter {
+            when (filter) {
+                1 -> it.status == WatchStatus.Watching
+                2 -> it.status == WatchStatus.Completed
+                3 -> it.status == WatchStatus.ComingSoon
+                else -> true
+            }
+        }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(padding)
+    ) {
+        Column(
+            Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                "Active Progress",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = p.text
+            )
+            Text(
+                "Lacak perkembangan episode dan jadwal tayang series / film",
+                fontSize = 12.sp,
+                color = p.muted
+            )
+
+            SField(
+                value = query,
+                onChange = { query = it },
+                placeholder = "Cari progress serial atau film...",
+                leading = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                trailing = if (query.isNotBlank()) {
+                    {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Hapus pencarian",
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clickable { query = "" },
+                            tint = p.muted
+                        )
+                    }
+                } else null
+            )
+
+            // Top Status Filter Bar for All, Watching, Completed, Coming Soon
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                filterOptions.forEachIndexed { index, (label, count) ->
+                    FilterChip(
+                        label = "$label ($count)",
+                        selected = filter == index,
+                        onClick = { filter = index }
+                    )
+                }
+            }
+        }
+
+        if (filtered.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
+                Text(
+                    if (query.isNotBlank()) "Tidak ada hasil pencarian \"$query\"" else "Tidak ada tayangan.",
+                    color = p.muted,
+                    fontSize = 14.sp
+                )
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(320.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(filtered, key = { it.id }) { item ->
+                    ProgressCard(item, onClick = { onOpen(item) }, onIncrement = { onIncrement(item.id) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -> Unit) {
+    val p = LocalPalette.current
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(p.card)
+            .border(1.dp, p.border, shape)
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.size(width = 68.dp, height = 86.dp)) {
+            Poster(item.poster, Modifier.fillMaxSize())
+            if (item.status == WatchStatus.ComingSoon) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(3.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(SerieColors.Orange)
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                ) {
+                    Text(
+                        ReminderScheduler.countdownShortBadge(item.releaseDate),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                }
+            }
+            if (item.rating > 0) {
+                StarRatingBadge(
+                    rating = item.rating,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(3.dp)
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+
+        Column(Modifier.weight(1f)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    if (item.type == MediaType.Series) "Season ${item.season}" else "Movie",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (item.status == WatchStatus.ComingSoon) SerieColors.Orange else SerieColors.Blue400
+                )
+                Text(relativeTime(item.updatedAt), fontSize = 10.sp, color = p.muted)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    item.title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = p.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (item.rating > 0) {
+                    Spacer(Modifier.width(6.dp))
+                    StarRatingBadge(rating = item.rating)
+                }
+            }
+
+            if (item.tags.isNotEmpty()) {
+                Spacer(Modifier.height(3.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item.tags.take(3).forEach { tag ->
+                        GenreTagBadge(tag)
+                    }
+                }
+            }
+            if (item.status == WatchStatus.ComingSoon) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.HourglassTop,
+                            contentDescription = null,
+                            tint = SerieColors.Orange,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            ReminderScheduler.countdownBadgeText(item.releaseDate),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SerieColors.Orange
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(SerieColors.Orange.copy(alpha = 0.2f))
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            ReminderScheduler.countdownShortBadge(item.releaseDate),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = SerieColors.Orange
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                val daysLeft = ReminderScheduler.daysUntilRelease(item.releaseDate)
+                val visualProgress = ((30 - daysLeft).coerceIn(1, 30) / 30f)
+                LinearProgressIndicator(
+                    progress = { visualProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(50)),
+                    color = SerieColors.Orange,
+                    trackColor = SerieColors.Orange.copy(alpha = 0.15f)
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    ReminderScheduler.countdownDetailedText(item.releaseDate),
+                    fontSize = 11.sp,
+                    color = p.muted
+                )
+            } else {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Episode ${item.currentEp} / ${item.totalEp}", fontSize = 12.sp, color = p.muted)
+                    Text("${item.percent}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = p.text)
+                }
+                Spacer(Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { item.fraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(50)),
+                    color = SerieColors.Blue500,
+                    trackColor = p.chip
+                )
+            }
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        if (item.status == WatchStatus.ComingSoon) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (item.reminderEnabled) SerieColors.Orange.copy(alpha = 0.2f) else p.chip),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (item.reminderEnabled) Icons.Filled.NotificationsActive else Icons.Filled.Alarm,
+                    contentDescription = "Pengingat",
+                    tint = if (item.reminderEnabled) SerieColors.Orange else p.muted,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        } else if (item.currentEp < item.totalEp) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SerieColors.Blue600.copy(alpha = 0.2f))
+                    .clickable(onClick = onIncrement),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Tambah 1 Episode", tint = SerieColors.Blue400, modifier = Modifier.size(18.dp))
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SerieColors.Emerald.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Check, contentDescription = "Selesai", tint = SerieColors.Emerald, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
