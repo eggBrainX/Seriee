@@ -173,7 +173,7 @@ fun BackupRestoreDialog(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "Cadangkan ke File JSON",
+                            stringResource(R.string.backup_to_json_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = p.text
@@ -181,7 +181,7 @@ fun BackupRestoreDialog(
                     }
 
                     Text(
-                        "Simpan seluruh daftar series, episode, poster cover, dan jadwal tayang ke file JSON di penyimpanan internal perangkat Anda.",
+                        stringResource(R.string.backup_to_json_desc),
                         fontSize = 12.sp,
                         color = p.muted,
                         lineHeight = 17.sp
@@ -347,6 +347,53 @@ fun BackupRestoreDialog(
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
                         )
+                    }
+                }
+
+                // TMDB API key
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(p.card)
+                        .border(1.dp, p.border, RoundedCornerShape(16.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.tmdb_api_key_title),
+                        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.text
+                    )
+                    Text(
+                        stringResource(R.string.tmdb_api_key_hint),
+                        fontSize = 12.sp, color = p.muted
+                    )
+                    var keyInput by remember { mutableStateOf(vm.tmdbKey) }
+                    SField(keyInput, { keyInput = it }, placeholder = "API key")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SerieColors.Blue600)
+                                .clickable {
+                                    vm.setTmdbKey(keyInput)
+                                    android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_save), android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 9.dp)
+                        ) { Text(stringResource(R.string.tmdb_api_key_save), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White) }
+                        if (vm.tmdbKey.isNotBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(p.chip)
+                                    .clickable {
+                                        vm.setTmdbKey("")
+                                        keyInput = ""
+                                        android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 9.dp)
+                            ) { Text(stringResource(R.string.delete), fontSize = 12.sp, color = p.muted) }
+                        }
                     }
                 }
             }

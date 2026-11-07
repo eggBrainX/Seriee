@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,7 +36,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,11 +70,18 @@ fun DetailDialog(
     onToggleReminder: (() -> Unit)? = null,
     onTestReminder: (() -> Unit)? = null,
     onUpdateReleaseDate: ((Long) -> Unit)? = null,
-    onUpdateRating: ((Int) -> Unit)? = null
+    onUpdateRating: ((Int) -> Unit)? = null,
+    onSelectEpisode: ((Int, Int) -> Unit)? = null
 ) {
     val p = LocalPalette.current
     val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
+    var selectedSeasonIdx by remember { mutableIntStateOf(0) }
+    val seasons = item.effectiveSeasons
+    LaunchedEffect(seasons.size) {
+        if (selectedSeasonIdx >= seasons.size) selectedSeasonIdx = 0
+    }
+    val safeSeasonIdx = selectedSeasonIdx.coerceIn(0, (seasons.size - 1).coerceAtLeast(0))
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -119,11 +131,14 @@ fun DetailDialog(
                         }
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            stringResource(R.string.episode_colon, item.currentEp, item.totalEp),
+                            stringResource(R.string.episode_colon, item.watchedEpisodes, item.totalEpisodes),
                             fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text
                         )
                         if (item.type == MediaType.Series) {
-                            Text(stringResource(R.string.season_format, item.season), fontSize = 12.sp, color = p.muted)
+                            val active = seasons.getOrNull(safeSeasonIdx) ?: seasons.firstOrNull()
+                            if (active != null) {
+                                Text(stringResource(R.string.season_format, active.number), fontSize = 12.sp, color = p.muted)
+                            }
                         }
                         Spacer(Modifier.height(8.dp))
                         StarRatingBar(
@@ -148,6 +163,15 @@ fun DetailDialog(
                             GenreTagBadge(tag)
                         }
                     }
+                }
+
+                if (item.description.isNotBlank()) {
+                    Spacer(Modifier.height(12.dp))
+                    SectionTitle(stringResource(R.string.description_label))
+                    Text(
+                        item.description,
+                        fontSize = 12.sp, color = p.text, lineHeight = 17.sp
+                    )
                 }
 
                 if (item.status == WatchStatus.ComingSoon || item.releaseDate != null) {
@@ -315,29 +339,128 @@ fun DetailDialog(
                     }
                 }
 
-                if (item.videoPath.isNotBlank() || item.videoUri.isNotBlank()) {
+                val hasOffline = seasons.any { it.episodes.isNotEmpty() } || item.videoUri.isNotBlank() || item.videoPath.isNotBlank()
+                if (hasOffline) {
                     Spacer(Modifier.height(16.dp))
                     SectionTitle(stringResource(R.string.offline_player))
-                    Text(
-                        stringResource(R.string.file_label, item.videoPath.ifBlank { "video" }),
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = SerieColors.Blue400,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(8.dp))
+
+                    if (item.type == MediaType.Series && seasons.size > 1) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            seasons.forEachIndexed { idx, s ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(100.dp))
+                                        .background(if (idx == safeSeasonIdx) SerieColors.Blue600 else p.chip)
+                                        .clickable { selectedSeasonIdx = idx }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        stringResource(R.string.season_format, s.number),
+                                        fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                        color = if (idx == safeSeasonIdx) Color.White else p.muted
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    if (item.type == MediaType.Series) {
+                        val season = seasons.getOrNull(safeSeasonIdx) ?: seasons.firstOrNull()
+                        if (season != null) {
+                            // Map lookup avoids O(n^2) find-in-loop for 1000+ ep shows.
+                            val episodeByNumber = remember(season.episodes) {
+                                season.episodes.associateBy { it.number }
+                            }
+                            val totalEpSafe = season.totalEp.coerceAtLeast(1)
+                            val epListState = rememberLazyListState()
+                            // Start at current episode instead of E1.
+                            LaunchedEffect(season.number, season.currentEp, totalEpSafe) {
+                                val targetIdx = (season.currentEp - 1).coerceIn(0, (totalEpSafe - 1).coerceAtLeast(0))
+                                epListState.scrollToItem(targetIdx)
+                            }
+                            Text(
+                                stringResource(R.string.select_episode_title),
+                                fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.muted
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            // LazyRow composes only visible chips — smooth for 100+ / 1000+ episodes.
+                            LazyRow(
+                                state = epListState,
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(count = totalEpSafe, key = { "ep$it" }, contentType = { 0 }) { idx ->
+                                    val ep = idx + 1
+                                    val file = episodeByNumber[ep]
+                                    val isCurrent = ep == season.currentEp
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(
+                                                when {
+                                                    isCurrent -> SerieColors.Blue600
+                                                    file != null -> p.chip
+                                                    else -> p.chip.copy(alpha = 0.5f)
+                                                }
+                                            )
+                                            .clickable {
+                                                if (file != null) {
+                                                    onSelectEpisode?.invoke(season.number, ep)
+                                                    openVideoUri(context, file.uri, null)
+                                                } else {
+                                                    android.widget.Toast.makeText(context, context.getString(R.string.file_not_picked), android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                            .padding(horizontal = 11.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(
+                                            "E$ep",
+                                            fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                            color = if (isCurrent) Color.White else if (file != null) p.text else p.muted
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            val currentFile = episodeByNumber[season.currentEp]
+                            Text(
+                                "S${season.number}E${season.currentEp} — ${currentFile?.displayName ?: stringResource(R.string.episode_missing)}",
+                                fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = SerieColors.Blue400,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+                    } else {
+                        Text(
+                            stringResource(R.string.file_label, item.videoPath.ifBlank { "video" }),
+                            fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = SerieColors.Blue400,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    // Player buttons operate on currently displayed episode (series) or single file (movie)
+                    val playUri = if (item.type == MediaType.Series) {
+                        val season = seasons.getOrNull(safeSeasonIdx) ?: seasons.firstOrNull()
+                        season?.episodes?.find { it.number == season.currentEp }?.uri ?: item.videoUri
+                    } else item.videoUri
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         PlayerButton("VLC Player", SerieColors.Orange, Modifier.weight(1f)) {
-                            openVideo(context, item, VLC_PACKAGE)
+                            openVideoUri(context, playUri, VLC_PACKAGE)
                         }
                         PlayerButton("MX Player", SerieColors.Indigo500, Modifier.weight(1f)) {
-                            openVideo(context, item, MX_PACKAGE)
+                            openVideoUri(context, playUri, MX_PACKAGE)
                         }
                     }
                     Spacer(Modifier.height(8.dp))
                     PlayerButton(stringResource(R.string.open_with_other_player), p.muted, Modifier.fillMaxWidth()) {
-                        openVideo(context, item, null)
+                        openVideoUri(context, playUri, null)
                     }
                 }
 

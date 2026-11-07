@@ -25,7 +25,12 @@ fun openUrl(context: Context, url: String) {
 
 /** Opens the picked offline video in an external player. [pkg] = null shows the system chooser. */
 fun openVideo(context: Context, item: MediaItem, pkg: String?) {
-    if (item.videoUri.isBlank()) {
+    // Prefer per-episode file if available, else legacy single file
+    val uriStr = item.effectiveSeasons
+        .flatMap { it.episodes }
+        .firstOrNull { it.number == item.currentEp }?.uri
+        ?: item.videoUri
+    if (uriStr.isBlank()) {
         Toast.makeText(
             context,
             context.getString(R.string.pick_file_first),
@@ -33,7 +38,15 @@ fun openVideo(context: Context, item: MediaItem, pkg: String?) {
         ).show()
         return
     }
-    val uri = Uri.parse(item.videoUri)
+    openVideoUri(context, uriStr, pkg)
+}
+
+fun openVideoUri(context: Context, uriString: String, pkg: String?) {
+    if (uriString.isBlank()) {
+        Toast.makeText(context, context.getString(R.string.pick_file_first), Toast.LENGTH_LONG).show()
+        return
+    }
+    val uri = Uri.parse(uriString)
     val intent = Intent(Intent.ACTION_VIEW).apply {
         setDataAndType(uri, "video/*")
         clipData = ClipData.newRawUri("", uri)
@@ -52,6 +65,28 @@ fun openVideo(context: Context, item: MediaItem, pkg: String?) {
         Toast.makeText(context, context.getString(R.string.player_not_installed), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         Toast.makeText(context, context.getString(R.string.failed_open_video), Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Auto-detect (season, episode) from a filename. Null if not detectable. */
+object EpisodeFileParser {
+    private val sxe = Regex("""S(\d+)[^E0-9]*E(\d+)""", RegexOption.IGNORE_CASE)
+    private val epRegex = Regex("""E(?:P|PISODE)?\s*0*(\d+)""", RegexOption.IGNORE_CASE)
+    private val trailing = Regex("""[-_\s]0*(\d{1,3})\.[A-Za-z0-9]+${'$'}""")
+
+    fun parseSeasonEpisode(filename: String): Pair<Int, Int>? {
+        sxe.find(filename)?.let { m ->
+            val s = m.groupValues[1].toIntOrNull() ?: 1
+            val e = m.groupValues[2].toIntOrNull() ?: return@let null
+            return s to e
+        }
+        return null
+    }
+
+    fun parseEpisode(filename: String): Int? {
+        epRegex.find(filename)?.let { return it.groupValues[1].toIntOrNull() }
+        trailing.find(filename)?.let { return it.groupValues[1].toIntOrNull() }
+        return null
     }
 }
 

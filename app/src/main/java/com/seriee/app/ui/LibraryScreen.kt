@@ -37,9 +37,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,25 +82,28 @@ fun LibraryScreen(
         stringResource(R.string.type_movie)
     )
 
-    val filtered = list
-        .filter { it.title.contains(query.trim(), ignoreCase = true) }
-        .filter {
-            when (typeFilter) {
-                1 -> it.type == MediaType.Series
-                2 -> it.type == MediaType.Movie
-                else -> true
-            }
+    val filtered by remember(list, query, typeFilter, statusFilter) {
+        derivedStateOf {
+            list.filter { it.title.contains(query.trim(), ignoreCase = true) }
+                .filter {
+                    when (typeFilter) {
+                        1 -> it.type == MediaType.Series
+                        2 -> it.type == MediaType.Movie
+                        else -> true
+                    }
+                }
+                .filter {
+                    when (statusFilter) {
+                        1 -> it.status == WatchStatus.Watching
+                        2 -> it.status == WatchStatus.Completed
+                        3 -> it.status == WatchStatus.ComingSoon
+                        4 -> it.status == WatchStatus.PlanToWatch
+                        else -> true
+                    }
+                }
+                .sortedByDescending { it.pinned }
         }
-        .filter {
-            when (statusFilter) {
-                1 -> it.status == WatchStatus.Watching
-                2 -> it.status == WatchStatus.Completed
-                3 -> it.status == WatchStatus.ComingSoon
-                4 -> it.status == WatchStatus.PlanToWatch
-                else -> true
-            }
-        }
-        .sortedByDescending { it.pinned }
+    }
 
     Column(
         Modifier
@@ -194,7 +199,7 @@ fun LibraryScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(filtered, key = { it.id }) { item ->
+                items(filtered, key = { it.id }, contentType = { it.status }) { item ->
                     GridItem(item, onClick = { onOpen(item) }, onPin = { onPin(item.id) })
                 }
             }
@@ -203,7 +208,7 @@ fun LibraryScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(filtered, key = { it.id }) { item ->
+                items(filtered, key = { it.id }, contentType = { it.status }) { item ->
                     ListItem(item, onClick = { onOpen(item) }, onPin = { onPin(item.id) })
                 }
             }
@@ -230,6 +235,11 @@ private fun ViewToggle(selected: Boolean, onClick: () -> Unit, icon: @Composable
 private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
     val p = LocalPalette.current
     val context = LocalContext.current
+    val gradientBrush = remember {
+        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))
+    }
+    val badgeShort = remember(item.releaseDate) { ReminderScheduler.countdownShortBadge(context, item.releaseDate) }
+    val badgeText = remember(item.releaseDate) { ReminderScheduler.countdownBadgeText(context, item.releaseDate) }
     Column(Modifier.clickable(onClick = onClick)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
             Poster(item.poster, Modifier.fillMaxSize(), RoundedCornerShape(16.dp))
@@ -249,7 +259,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                             Spacer(Modifier.width(2.dp))
                         }
                         Text(
-                            ReminderScheduler.countdownShortBadge(context, item.releaseDate),
+                            badgeShort,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White
@@ -263,11 +273,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
-                            )
-                        )
+                        .background(gradientBrush)
                         .padding(horizontal = 6.dp, vertical = 5.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -283,7 +289,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                         )
                         Spacer(Modifier.width(3.dp))
                         Text(
-                            ReminderScheduler.countdownBadgeText(context, item.releaseDate),
+                            badgeText,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
@@ -346,7 +352,13 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
 private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
     val p = LocalPalette.current
     val context = LocalContext.current
-    val shape = RoundedCornerShape(16.dp)
+    val shape = remember { RoundedCornerShape(16.dp) }
+    val detailedCountdown = remember(item.releaseDate) {
+        ReminderScheduler.countdownDetailedText(context, item.releaseDate)
+    }
+    val shortBadge = remember(item.releaseDate) {
+        ReminderScheduler.countdownShortBadge(context, item.releaseDate)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -403,7 +415,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        "${stringResource(item.type.labelRes)} • ${ReminderScheduler.countdownDetailedText(context, item.releaseDate)}",
+                        "${stringResource(item.type.labelRes)} • $detailedCountdown",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = SerieColors.Orange
@@ -411,7 +423,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                 }
             } else {
                 Text(
-                    "${stringResource(item.type.labelRes)} • ${stringResource(R.string.episode_progress, item.currentEp, item.totalEp)}",
+                    "${stringResource(item.type.labelRes)} • ${stringResource(R.string.episode_progress, item.watchedEpisodes, item.totalEpisodes)}",
                     fontSize = 12.sp,
                     color = p.muted
                 )
@@ -441,8 +453,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                     Spacer(Modifier.width(4.dp))
                 }
                 Text(
-                    if (item.status == WatchStatus.ComingSoon)
-                        ReminderScheduler.countdownShortBadge(context, item.releaseDate)
+                    if (item.status == WatchStatus.ComingSoon) shortBadge
                     else stringResource(item.status.labelRes),
                     fontSize = 11.sp,
                     fontWeight = if (item.status == WatchStatus.ComingSoon) FontWeight.Bold else FontWeight.Normal,
