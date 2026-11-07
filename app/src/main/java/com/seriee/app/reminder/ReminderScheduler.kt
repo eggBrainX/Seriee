@@ -20,8 +20,8 @@ object ReminderScheduler {
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Pengingat Series & Film"
-            val descriptionText = "Notifikasi saat series atau film baru mulai tayang"
+            val name = context.getString(R.string.notification_channel_name)
+            val descriptionText = context.getString(R.string.notification_channel_desc)
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
                 description = descriptionText
@@ -42,7 +42,7 @@ object ReminderScheduler {
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra(ReminderReceiver.EXTRA_ID, item.id)
             putExtra(ReminderReceiver.EXTRA_TITLE, item.title)
-            putExtra(ReminderReceiver.EXTRA_TYPE, item.type.label)
+            putExtra(ReminderReceiver.EXTRA_TYPE, item.type.name)
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
@@ -96,7 +96,7 @@ object ReminderScheduler {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("🔔 Pengingat: $title")
+            .setContentTitle(context.getString(R.string.reminder_title_prefix, title))
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -111,31 +111,31 @@ object ReminderScheduler {
         }
     }
 
-    fun formatReleaseDate(ts: Long?): String {
-        if (ts == null || ts <= 0) return "Belum diatur"
-        val sdf = SimpleDateFormat("EEEE, dd MMM yyyy • HH:mm", Locale("id", "ID"))
+    fun formatReleaseDate(context: Context, ts: Long?): String {
+        if (ts == null || ts <= 0) return context.getString(R.string.date_not_set)
+        val sdf = SimpleDateFormat("EEEE, dd MMM yyyy • HH:mm", Locale.getDefault())
         return sdf.format(ts)
     }
 
-    fun formatShortDate(ts: Long?): String {
+    fun formatShortDate(context: Context, ts: Long?): String {
         if (ts == null || ts <= 0) return ""
-        val sdf = SimpleDateFormat("dd MMM yyyy", Locale("id", "ID"))
+        val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
         return sdf.format(ts)
     }
 
-    fun timeUntilRelease(ts: Long?): String {
-        if (ts == null || ts <= 0) return "Belum ada jadwal"
+    fun timeUntilRelease(context: Context, ts: Long?): String {
+        if (ts == null || ts <= 0) return context.getString(R.string.no_schedule)
         val diff = ts - System.currentTimeMillis()
-        if (diff <= 0) return "Sudah tayang"
+        if (diff <= 0) return context.getString(R.string.already_aired)
         val minutes = diff / (60 * 1000)
         val hours = minutes / 60
         val days = hours / 24
 
         return when {
-            days > 0 -> "Tayang dalam $days hari lagi"
-            hours > 0 -> "Tayang dalam $hours jam lagi"
-            minutes > 0 -> "Tayang dalam $minutes menit lagi"
-            else -> "Segera tayang"
+            days > 0 -> context.getString(R.string.airs_in_days, days)
+            hours > 0 -> context.getString(R.string.airs_in_hours, hours)
+            minutes > 0 -> context.getString(R.string.airs_in_minutes, minutes)
+            else -> context.getString(R.string.airs_soon)
         }
     }
 
@@ -146,47 +146,48 @@ object ReminderScheduler {
         return ((diff + 86400000L - 1) / 86400000L).toInt()
     }
 
-    fun countdownShortBadge(ts: Long?): String {
-        if (ts == null || ts <= 0) return "SOON"
+    fun countdownShortBadge(context: Context, ts: Long?): String {
+        if (ts == null || ts <= 0) return context.getString(R.string.badge_soon)
         val diff = ts - System.currentTimeMillis()
-        if (diff <= 0) return "HARI INI"
+        if (diff <= 0) return context.getString(R.string.badge_today)
         val days = diff / (86400 * 1000)
         return when {
-            days > 0 -> "D-$days"
+            days > 0 -> context.getString(R.string.badge_d_days, days)
             else -> {
                 val hours = (diff / (3600 * 1000)).coerceAtLeast(1)
-                "${hours}J LAGI"
+                context.getString(R.string.badge_hours_left, hours)
             }
         }
     }
 
-    fun countdownBadgeText(ts: Long?): String {
-        if (ts == null || ts <= 0) return "Coming Soon"
+    fun countdownBadgeText(context: Context, ts: Long?): String {
+        if (ts == null || ts <= 0) return context.getString(R.string.status_coming_soon)
         val diff = ts - System.currentTimeMillis()
-        if (diff <= 0) return "Tayang Hari Ini"
+        if (diff <= 0) return context.getString(R.string.countdown_today)
         val days = diff / (86400 * 1000)
         val hours = (diff / (3600 * 1000))
         return when {
-            days > 1 -> "$days Hari Lagi"
-            days == 1L -> "1 Hari Lagi"
-            hours > 0 -> "$hours Jam Lagi"
-            else -> "< 1 Jam Lagi"
+            days > 1 -> context.getString(R.string.countdown_days, days)
+            days == 1L -> context.getString(R.string.countdown_one_day)
+            hours > 0 -> context.getString(R.string.countdown_hours, hours)
+            else -> context.getString(R.string.countdown_under_hour)
         }
     }
 
-    fun countdownDetailedText(ts: Long?): String {
-        if (ts == null || ts <= 0) return "Jadwal belum ditentukan"
+    fun countdownDetailedText(context: Context, ts: Long?): String {
+        if (ts == null || ts <= 0) return context.getString(R.string.schedule_not_set)
         val diff = ts - System.currentTimeMillis()
-        if (diff <= 0) return "Sudah Rilis / Tayang Hari Ini"
+        if (diff <= 0) return context.getString(R.string.released_today)
         val totalHours = diff / (3600 * 1000)
         val days = diff / (86400 * 1000)
         val remainingHours = totalHours % 24
         val minutes = (diff / (60 * 1000)) % 60
 
         return when {
-            days > 0 -> if (remainingHours > 0) "$days hari $remainingHours jam lagi" else "$days hari lagi"
-            totalHours > 0 -> "$totalHours jam $minutes mnt lagi"
-            else -> "$minutes menit lagi"
+            days > 0 -> if (remainingHours > 0) context.getString(R.string.detailed_days_hours, days, remainingHours)
+            else context.getString(R.string.detailed_days, days)
+            totalHours > 0 -> context.getString(R.string.detailed_hours_minutes, totalHours, minutes)
+            else -> context.getString(R.string.detailed_minutes, minutes)
         }
     }
 
@@ -225,14 +226,14 @@ object ReminderScheduler {
                     cal.get(java.util.Calendar.MINUTE),
                     true
                 )
-                timePicker.setTitle("Pilih Jam Tayang")
+                timePicker.setTitle(context.getString(R.string.pick_airing_time))
                 timePicker.show()
             },
             cal.get(java.util.Calendar.YEAR),
             cal.get(java.util.Calendar.MONTH),
             cal.get(java.util.Calendar.DAY_OF_MONTH)
         )
-        datePicker.setTitle("Pilih Tanggal Rilis")
+        datePicker.setTitle(context.getString(R.string.pick_release_date_title))
         datePicker.show()
     }
 }

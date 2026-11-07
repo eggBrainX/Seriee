@@ -43,12 +43,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.seriee.app.R
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
 import com.seriee.app.data.WatchStatus
@@ -112,7 +114,7 @@ fun MediaFormDialog(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (initial == null) "Tambah Ke Seriee" else "Edit Media",
+                        if (initial == null) stringResource(R.string.add_to_seriee) else stringResource(R.string.edit_media),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = p.text,
@@ -125,27 +127,27 @@ fun MediaFormDialog(
                             .clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = "Tutup", tint = p.muted)
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = p.muted)
                     }
                 }
 
                 Column {
-                    FieldLabel("Judul Film / Serial *")
-                    SField(title, { title = it }, placeholder = "Contoh: Arcane")
+                    FieldLabel(stringResource(R.string.title_label))
+                    SField(title, { title = it }, placeholder = stringResource(R.string.title_placeholder))
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     DropdownField(
-                        label = "Tipe",
-                        valueLabel = type.label,
-                        options = MediaType.values().map { it to it.label },
+                        label = stringResource(R.string.type_label),
+                        valueLabel = stringResource(type.labelRes),
+                        options = MediaType.entries.map { it to stringResource(it.labelRes) },
                         onSelect = { type = it },
                         modifier = Modifier.weight(1f)
                     )
                     DropdownField(
-                        label = "Status",
-                        valueLabel = status.label,
-                        options = WatchStatus.values().map { it to it.label },
+                        label = stringResource(R.string.status_label),
+                        valueLabel = stringResource(status.labelRes),
+                        options = WatchStatus.entries.map { it to stringResource(it.labelRes) },
                         onSelect = {
                             status = it
                             if (it == WatchStatus.ComingSoon) {
@@ -169,7 +171,7 @@ fun MediaFormDialog(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    FieldLabel("Rating Series / Film")
+                    FieldLabel(stringResource(R.string.rating_label))
                     StarRatingBar(
                         rating = rating,
                         onRatingChange = { rating = it },
@@ -213,13 +215,13 @@ fun MediaFormDialog(
                                 Spacer(Modifier.width(10.dp))
                                 Column {
                                     Text(
-                                        "Alarm Pengingat Tayang",
+                                        stringResource(R.string.release_reminder_title),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = p.text
                                     )
                                     Text(
-                                        if (reminderEnabled) "Notifikasi aktif saat waktu tayang tiba" else "Notifikasi alarm mati",
+                                        if (reminderEnabled) stringResource(R.string.reminder_on_desc) else stringResource(R.string.reminder_off_desc),
                                         fontSize = 11.sp,
                                         color = p.muted
                                     )
@@ -242,7 +244,7 @@ fun MediaFormDialog(
 
                         if (reminderEnabled || status == WatchStatus.ComingSoon) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Jadwal & Tanggal Rilis:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.muted)
+                                Text(stringResource(R.string.schedule_release_date), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.muted)
 
                                 // Tombol Pilih Tanggal di Kalender
                                 Row(
@@ -269,7 +271,7 @@ fun MediaFormDialog(
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        "Pilih Tanggal Rilis di Kalender",
+                                        stringResource(R.string.pick_release_date),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = SerieColors.Orange
@@ -280,12 +282,12 @@ fun MediaFormDialog(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Preset:", fontSize = 11.sp, color = p.muted)
+                                    Text(stringResource(R.string.preset), fontSize = 11.sp, color = p.muted)
                                     val now = System.currentTimeMillis()
-                                    PresetChip("Besok") { releaseDate = now + 86400000L }
-                                    PresetChip("3 Hari") { releaseDate = now + 3 * 86400000L }
-                                    PresetChip("1 Minggu") { releaseDate = now + 7 * 86400000L }
-                                    PresetChip("1 Bulan") { releaseDate = now + 30 * 86400000L }
+                                    PresetChip(stringResource(R.string.preset_tomorrow)) { releaseDate = now + 86400000L }
+                                    PresetChip(stringResource(R.string.preset_3_days)) { releaseDate = now + 3 * 86400000L }
+                                    PresetChip(stringResource(R.string.preset_1_week)) { releaseDate = now + 7 * 86400000L }
+                                    PresetChip(stringResource(R.string.preset_1_month)) { releaseDate = now + 30 * 86400000L }
                                 }
 
                                 if (releaseDate != null) {
@@ -305,20 +307,20 @@ fun MediaFormDialog(
                                     ) {
                                         Icon(
                                             Icons.Filled.EditCalendar,
-                                            contentDescription = "Ganti Tanggal",
+                                            contentDescription = stringResource(R.string.change_date),
                                             tint = SerieColors.Orange,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(Modifier.width(8.dp))
                                         Column(Modifier.weight(1f)) {
                                             Text(
-                                                ReminderScheduler.formatReleaseDate(releaseDate),
+                                                ReminderScheduler.formatReleaseDate(context, releaseDate),
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = p.text
                                             )
                                             Text(
-                                                "Ketuk untuk ubah tanggal/jam rilis",
+                                                stringResource(R.string.tap_to_change_release),
                                                 fontSize = 10.sp,
                                                 color = p.muted
                                             )
@@ -330,7 +332,7 @@ fun MediaFormDialog(
                                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                                         ) {
                                             Text(
-                                                ReminderScheduler.timeUntilRelease(releaseDate),
+                                                ReminderScheduler.timeUntilRelease(context, releaseDate),
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = SerieColors.Orange
@@ -344,22 +346,22 @@ fun MediaFormDialog(
                 }
 
                 Column {
-                    FieldLabel("URL Poster Cover (Opsional)")
+                    FieldLabel(stringResource(R.string.poster_url_optional))
                     SField(poster, { poster = it }, placeholder = "https://...", keyboardType = KeyboardType.Uri)
                 }
 
                 if (type == MediaType.Series) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
-                            FieldLabel("Season")
+                            FieldLabel(stringResource(R.string.season))
                             SField(season, { season = it.filter(Char::isDigit).take(3) }, keyboardType = KeyboardType.Number)
                         }
                         Column(Modifier.weight(1f)) {
-                            FieldLabel("Ep Saat Ini")
+                            FieldLabel(stringResource(R.string.current_episode))
                             SField(currentEp, { currentEp = it.filter(Char::isDigit).take(4) }, keyboardType = KeyboardType.Number)
                         }
                         Column(Modifier.weight(1f)) {
-                            FieldLabel("Total Ep")
+                            FieldLabel(stringResource(R.string.total_episodes))
                             SField(totalEp, { totalEp = it.filter(Char::isDigit).take(4) }, keyboardType = KeyboardType.Number)
                         }
                     }
@@ -367,7 +369,7 @@ fun MediaFormDialog(
 
                 // Streaming link
                 Column {
-                    FieldLabel("Link Streaming / Aplikasi (Opsional)")
+                    FieldLabel(stringResource(R.string.streaming_link_optional))
                     SField(
                         streamUrl, { streamUrl = it },
                         placeholder = "https://www.netflix.com/title/...",
@@ -378,7 +380,7 @@ fun MediaFormDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Preset:", fontSize = 11.sp, color = p.muted)
+                        Text(stringResource(R.string.preset), fontSize = 11.sp, color = p.muted)
                         PresetChip("Netflix") { streamUrl = "https://www.netflix.com" }
                         PresetChip("Bilibili") { streamUrl = "https://www.bilibili.tv" }
                         PresetChip("YouTube") { streamUrl = "https://www.youtube.com" }
@@ -387,11 +389,11 @@ fun MediaFormDialog(
 
                 // Offline file
                 Column {
-                    FieldLabel("File Video Offline / Local Path (Opsional)")
+                    FieldLabel(stringResource(R.string.offline_file_optional))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         SField(
                             videoPath, { videoPath = it },
-                            placeholder = "Nama video...",
+                            placeholder = stringResource(R.string.video_name_placeholder),
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(Modifier.width(8.dp))
@@ -406,7 +408,7 @@ fun MediaFormDialog(
                         ) {
                             Icon(Icons.Filled.FolderOpen, null, tint = SerieColors.Blue400, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Pilih File", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text)
+                            Text(stringResource(R.string.pick_file), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text)
                         }
                     }
                 }
@@ -423,7 +425,7 @@ fun MediaFormDialog(
                             .background(p.chip)
                             .clickable(onClick = onDismiss)
                             .padding(horizontal = 18.dp, vertical = 11.dp)
-                    ) { Text("Batal", color = p.muted, fontSize = 14.sp) }
+                    ) { Text(stringResource(R.string.cancel), color = p.muted, fontSize = 14.sp) }
 
                     Box(
                         Modifier
@@ -431,7 +433,7 @@ fun MediaFormDialog(
                             .background(SerieColors.Blue600)
                             .clickable {
                                 if (title.isBlank()) {
-                                    error = "Judul wajib diisi"
+                                    error = context.getString(R.string.title_required)
                                 } else {
                                     val total = if (type == MediaType.Movie) 1
                                     else (totalEp.toIntOrNull() ?: 1).coerceAtLeast(1)
@@ -463,7 +465,7 @@ fun MediaFormDialog(
                                 }
                             }
                             .padding(horizontal = 22.dp, vertical = 11.dp)
-                    ) { Text("Simpan", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                    ) { Text(stringResource(R.string.save), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 }
             }
         }

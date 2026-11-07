@@ -1,15 +1,18 @@
 package com.seriee.app.data
 
-enum class MediaType(val label: String) {
-    Series("Series"),
-    Movie("Movie")
+import androidx.annotation.StringRes
+import com.seriee.app.R
+
+enum class MediaType(@StringRes val labelRes: Int) {
+    Series(R.string.type_series),
+    Movie(R.string.type_movie)
 }
 
-enum class WatchStatus(val label: String) {
-    Watching("Watching"),
-    Completed("Completed"),
-    PlanToWatch("Plan to Watch"),
-    ComingSoon("Coming Soon")
+enum class WatchStatus(@StringRes val labelRes: Int) {
+    Watching(R.string.status_watching),
+    Completed(R.string.status_completed),
+    PlanToWatch(R.string.status_plan_to_watch),
+    ComingSoon(R.string.status_coming_soon)
 }
 
 enum class AppTheme(val label: String) {
@@ -17,6 +20,16 @@ enum class AppTheme(val label: String) {
     Amoled("AMOLED"),
     Glass("Frost Glass"),
     Light("Light")
+}
+
+enum class AppLanguage(val tag: String, val label: String) {
+    English("en", "English"),
+    Indonesian("in", "Bahasa Indonesia");
+
+    companion object {
+        fun fromTag(tag: String?): AppLanguage =
+            entries.firstOrNull { it.tag == tag } ?: English
+    }
 }
 
 data class MediaItem(

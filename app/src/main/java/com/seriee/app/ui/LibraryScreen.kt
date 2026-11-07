@@ -47,11 +47,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.seriee.app.R
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
 import com.seriee.app.data.WatchStatus
@@ -71,7 +74,11 @@ fun LibraryScreen(
     var typeFilter by rememberSaveable { mutableIntStateOf(0) }
     var statusFilter by rememberSaveable { mutableIntStateOf(0) }
 
-    val typeLabels = listOf("Semua Tipe", "Series", "Movie")
+    val typeLabels = listOf(
+        stringResource(R.string.all_types),
+        stringResource(R.string.type_series),
+        stringResource(R.string.type_movie)
+    )
 
     val filtered = list
         .filter { it.title.contains(query.trim(), ignoreCase = true) }
@@ -105,13 +112,13 @@ fun LibraryScreen(
             SField(
                 value = query,
                 onChange = { query = it },
-                placeholder = "Cari serial atau film...",
+                placeholder = stringResource(R.string.search_library_placeholder),
                 leading = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 trailing = if (query.isNotBlank()) {
                     {
                         Icon(
                             Icons.Filled.Close,
-                            contentDescription = "Hapus",
+                            contentDescription = stringResource(R.string.clear),
                             modifier = Modifier
                                 .size(18.dp)
                                 .clickable { query = "" },
@@ -138,21 +145,21 @@ fun LibraryScreen(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     ViewToggle(selected = gridView, onClick = { onSetGrid(true) }) {
-                        Icon(Icons.Filled.GridView, contentDescription = "Grid", modifier = Modifier.size(18.dp), tint = it)
+                        Icon(Icons.Filled.GridView, contentDescription = stringResource(R.string.grid), modifier = Modifier.size(18.dp), tint = it)
                     }
                     ViewToggle(selected = !gridView, onClick = { onSetGrid(false) }) {
-                        Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "List", modifier = Modifier.size(18.dp), tint = it)
+                        Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = stringResource(R.string.list), modifier = Modifier.size(18.dp), tint = it)
                     }
                 }
             }
 
             // Status filter chips: All, Watching, Completed, Coming Soon, Plan to Watch
             val statusChips = listOf(
-                "All" to list.size,
-                "Watching" to list.count { it.status == WatchStatus.Watching },
-                "Completed" to list.count { it.status == WatchStatus.Completed },
-                "Coming Soon" to list.count { it.status == WatchStatus.ComingSoon },
-                "Plan to Watch" to list.count { it.status == WatchStatus.PlanToWatch }
+                stringResource(R.string.filter_all) to list.size,
+                stringResource(R.string.filter_watching) to list.count { it.status == WatchStatus.Watching },
+                stringResource(R.string.filter_completed) to list.count { it.status == WatchStatus.Completed },
+                stringResource(R.string.filter_coming_soon) to list.count { it.status == WatchStatus.ComingSoon },
+                stringResource(R.string.filter_plan_to_watch) to list.count { it.status == WatchStatus.PlanToWatch }
             )
 
             Row(
@@ -174,7 +181,8 @@ fun LibraryScreen(
         if (filtered.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
                 Text(
-                    if (query.isNotBlank()) "Tidak ada hasil untuk \"$query\"" else "Tidak ada koleksi media.",
+                    if (query.isNotBlank()) stringResource(R.string.no_library_results, query)
+                    else stringResource(R.string.no_library_items),
                     color = p.muted,
                     fontSize = 14.sp
                 )
@@ -221,6 +229,7 @@ private fun ViewToggle(selected: Boolean, onClick: () -> Unit, icon: @Composable
 @Composable
 private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
     val p = LocalPalette.current
+    val context = LocalContext.current
     Column(Modifier.clickable(onClick = onClick)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
             Poster(item.poster, Modifier.fillMaxSize(), RoundedCornerShape(16.dp))
@@ -240,7 +249,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                             Spacer(Modifier.width(2.dp))
                         }
                         Text(
-                            ReminderScheduler.countdownShortBadge(item.releaseDate),
+                            ReminderScheduler.countdownShortBadge(context, item.releaseDate),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White
@@ -274,7 +283,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                         )
                         Spacer(Modifier.width(3.dp))
                         Text(
-                            ReminderScheduler.countdownBadgeText(item.releaseDate),
+                            ReminderScheduler.countdownBadgeText(context, item.releaseDate),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
@@ -304,7 +313,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
             ) {
                 Icon(
                     Icons.Filled.PushPin,
-                    contentDescription = "Pin",
+                    contentDescription = stringResource(R.string.pin),
                     tint = if (item.pinned) SerieColors.Amber else Color.White.copy(alpha = 0.6f),
                     modifier = Modifier.size(14.dp)
                 )
@@ -336,6 +345,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
 @Composable
 private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
     val p = LocalPalette.current
+    val context = LocalContext.current
     val shape = RoundedCornerShape(16.dp)
     Row(
         modifier = Modifier
@@ -393,7 +403,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        "${item.type.label} • ${ReminderScheduler.countdownDetailedText(item.releaseDate)}",
+                        "${stringResource(item.type.labelRes)} • ${ReminderScheduler.countdownDetailedText(context, item.releaseDate)}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = SerieColors.Orange
@@ -401,7 +411,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                 }
             } else {
                 Text(
-                    "${item.type.label} • Episode ${item.currentEp}/${item.totalEp}",
+                    "${stringResource(item.type.labelRes)} • ${stringResource(R.string.episode_progress, item.currentEp, item.totalEp)}",
                     fontSize = 12.sp,
                     color = p.muted
                 )
@@ -432,8 +442,8 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                 }
                 Text(
                     if (item.status == WatchStatus.ComingSoon)
-                        ReminderScheduler.countdownShortBadge(item.releaseDate)
-                    else item.status.label,
+                        ReminderScheduler.countdownShortBadge(context, item.releaseDate)
+                    else stringResource(item.status.labelRes),
                     fontSize = 11.sp,
                     fontWeight = if (item.status == WatchStatus.ComingSoon) FontWeight.Bold else FontWeight.Normal,
                     color = if (item.status == WatchStatus.ComingSoon) SerieColors.Orange else p.text
@@ -448,7 +458,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                Icons.Filled.PushPin, contentDescription = "Pin",
+                Icons.Filled.PushPin, contentDescription = stringResource(R.string.pin),
                 tint = if (item.pinned) SerieColors.Amber else p.muted,
                 modifier = Modifier.size(18.dp)
             )

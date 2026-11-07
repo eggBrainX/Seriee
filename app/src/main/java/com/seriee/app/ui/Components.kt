@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.seriee.app.R
 
 @Composable
 fun Poster(url: String, modifier: Modifier, shape: Shape = RoundedCornerShape(12.dp)) {
@@ -234,7 +236,7 @@ fun StarRatingBar(
                 ) {
                     Icon(
                         imageVector = icon,
-                        contentDescription = "Rating $i dari $maxStars",
+                        contentDescription = stringResource(R.string.rating_content_desc, i, maxStars),
                         tint = tint,
                         modifier = Modifier.size(starSize)
                     )
@@ -244,12 +246,12 @@ fun StarRatingBar(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = when (rating) {
-                        5 -> "5.0 (Masterpiece)"
-                        4 -> "4.0 (Sangat Bagus)"
-                        3 -> "3.0 (Bagus)"
-                        2 -> "2.0 (Biasa)"
-                        1 -> "1.0 (Kurang)"
-                        else -> "Belum Dinilai"
+                        5 -> stringResource(R.string.rating_masterpiece)
+                        4 -> stringResource(R.string.rating_great)
+                        3 -> stringResource(R.string.rating_good)
+                        2 -> stringResource(R.string.rating_okay)
+                        1 -> stringResource(R.string.rating_poor)
+                        else -> stringResource(R.string.rating_none)
                     },
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -336,7 +338,7 @@ fun TagInputField(
     }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FieldLabel("Genre / Kategori Tag (Opsional)")
+        FieldLabel(stringResource(R.string.genre_tag_label))
 
         // Tag Input Text Field with Add Button
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -351,7 +353,7 @@ fun TagInputField(
                 },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                placeholder = { Text("Ketik genre lalu tekan tambah...", fontSize = 13.sp) },
+                placeholder = { Text(stringResource(R.string.genre_placeholder), fontSize = 13.sp) },
                 leadingIcon = {
                     Icon(
                         Icons.Filled.LocalOffer,
@@ -369,7 +371,7 @@ fun TagInputField(
                                 .clickable { addTag(input) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Text("Tambah", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(stringResource(R.string.add), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 } else null,
@@ -419,7 +421,7 @@ fun TagInputField(
                             Spacer(Modifier.width(4.dp))
                             Icon(
                                 Icons.Filled.Close,
-                                contentDescription = "Hapus tag $tag",
+                                contentDescription = stringResource(R.string.remove_tag, tag),
                                 tint = SerieColors.Blue400,
                                 modifier = Modifier.size(12.dp)
                             )
@@ -431,7 +433,7 @@ fun TagInputField(
 
         // Popular Genre Suggestions
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Saran Genre Populer:", fontSize = 10.sp, color = p.muted)
+            Text(stringResource(R.string.popular_genres), fontSize = 10.sp, color = p.muted)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -3,10 +3,14 @@ package com.seriee.app
 import android.app.Application
 import android.content.Context
 import android.net.Uri
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.AndroidViewModel
+import com.seriee.app.R
+import com.seriee.app.data.AppLanguage
 import com.seriee.app.data.AppTheme
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.SerieeRepository
@@ -22,6 +26,8 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     val theme: AppTheme get() = _theme.value
     private val _gridView = mutableStateOf(repo.loadGridView())
     val gridView: Boolean get() = _gridView.value
+    private val _language = mutableStateOf(repo.loadLanguage())
+    val language: AppLanguage get() = _language.value
 
     private fun commit(newItems: List<MediaItem>) {
         items = newItems
@@ -71,10 +77,15 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun testReminder(item: MediaItem) {
+        val app = getApplication<Application>()
         com.seriee.app.reminder.ReminderScheduler.sendImmediateNotification(
-            getApplication(),
+            app,
             item.title,
-            "Pengingat aktif untuk ${item.type.label} \"${item.title}\"!",
+            app.getString(
+                R.string.reminder_test_message,
+                app.getString(item.type.labelRes),
+                item.title
+            ),
             item.id
         )
     }
@@ -105,13 +116,20 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveGridView(value)
     }
 
+    fun setLanguage(value: AppLanguage) {
+        if (_language.value == value) return
+        _language.value = value
+        repo.saveLanguage(value)
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(value.tag))
+    }
+
     fun exportBackup(context: Context, uri: Uri): Result<Int> {
         return runCatching {
             val jsonString = repo.exportBackupJson(items)
             context.contentResolver.openOutputStream(uri)?.use { out ->
                 out.write(jsonString.toByteArray(Charsets.UTF_8))
                 out.flush()
-            } ?: error("Tidak bisa membuka output stream")
+            } ?: error(getApplication<Application>().getString(R.string.error_open_output))
             items.size
         }
     }
@@ -120,9 +138,9 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         return runCatching {
             val raw = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader(Charsets.UTF_8).readText()
-            } ?: error("Tidak bisa membaca file backup")
+            } ?: error(getApplication<Application>().getString(R.string.error_read_backup))
             val imported = repo.importBackupJson(raw)
-            if (imported.isEmpty()) error("File cadangan kosong atau format tidak sesuai")
+            if (imported.isEmpty()) error(getApplication<Application>().getString(R.string.error_empty_backup))
 
             val finalItems = if (replace) {
                 imported

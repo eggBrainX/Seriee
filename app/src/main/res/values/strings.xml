@@ -1,3 +1,189 @@
 <resources>
     <string name="app_name">Seriee</string>
+
+    <!-- Navigation -->
+    <string name="nav_progress">Progress</string>
+    <string name="nav_library">Library</string>
+    <string name="add">Add</string>
+
+    <!-- Top bar -->
+    <string name="backup_restore">Backup &amp; Restore</string>
+    <string name="theme">Theme</string>
+    <string name="language">Language</string>
+
+    <!-- Common -->
+    <string name="close">Close</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="edit_details">Edit Details</string>
+
+    <!-- Media types / statuses -->
+    <string name="type_series">Series</string>
+    <string name="type_movie">Movie</string>
+    <string name="status_watching">Watching</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_plan_to_watch">Plan to Watch</string>
+    <string name="status_coming_soon">Coming Soon</string>
+
+    <!-- Progress -->
+    <string name="active_progress">Active Progress</string>
+    <string name="active_progress_subtitle">Track episode progress and release schedules for series &amp; movies</string>
+    <string name="search_progress_placeholder">Search series or movies...</string>
+    <string name="clear_search">Clear search</string>
+    <string name="filter_all">All</string>
+    <string name="filter_watching">Watching</string>
+    <string name="filter_completed">Completed</string>
+    <string name="filter_coming_soon">Coming Soon</string>
+    <string name="filter_plan_to_watch">Plan to Watch</string>
+    <string name="no_search_results">No results for "%1$s"</string>
+    <string name="no_shows">No shows.</string>
+    <string name="season_format">Season %1$d</string>
+    <string name="movie">Movie</string>
+    <string name="episode_progress">Episode %1$d / %2$d</string>
+    <string name="add_one_episode">Add 1 episode</string>
+    <string name="completed">Completed</string>
+    <string name="reminder">Reminder</string>
+
+    <!-- Library -->
+    <string name="search_library_placeholder">Search series or movies...</string>
+    <string name="clear">Clear</string>
+    <string name="grid">Grid</string>
+    <string name="list">List</string>
+    <string name="all_types">All Types</string>
+    <string name="no_library_results">No results for "%1$s"</string>
+    <string name="no_library_items">No media in your collection.</string>
+    <string name="pin">Pin</string>
+
+    <!-- Media form -->
+    <string name="add_to_seriee">Add to Seriee</string>
+    <string name="edit_media">Edit Media</string>
+    <string name="title_label">Movie / Series Title *</string>
+    <string name="title_placeholder">e.g. Arcane</string>
+    <string name="type_label">Type</string>
+    <string name="status_label">Status</string>
+    <string name="rating_label">Series / Movie Rating</string>
+    <string name="release_reminder_title">Release Reminder Alarm</string>
+    <string name="reminder_on_desc">Notification active when release time arrives</string>
+    <string name="reminder_off_desc">Alarm notification off</string>
+    <string name="schedule_release_date">Schedule &amp; Release Date:</string>
+    <string name="pick_release_date">Pick Release Date on Calendar</string>
+    <string name="preset">Preset:</string>
+    <string name="preset_tomorrow">Tomorrow</string>
+    <string name="preset_3_days">3 Days</string>
+    <string name="preset_1_week">1 Week</string>
+    <string name="preset_1_month">1 Month</string>
+    <string name="change_date">Change Date</string>
+    <string name="tap_to_change_release">Tap to change release date/time</string>
+    <string name="poster_url_optional">Poster Cover URL (Optional)</string>
+    <string name="season">Season</string>
+    <string name="current_episode">Current Ep</string>
+    <string name="total_episodes">Total Ep</string>
+    <string name="streaming_link_optional">Streaming Link / App (Optional)</string>
+    <string name="offline_file_optional">Offline Video File / Local Path (Optional)</string>
+    <string name="video_name_placeholder">Video name...</string>
+    <string name="pick_file">Pick File</string>
+    <string name="title_required">Title is required</string>
+
+    <!-- Detail dialog -->
+    <string name="status_colon">Status: %1$s</string>
+    <string name="episode_colon">Episode: %1$d / %2$d</string>
+    <string name="schedule_and_reminder">Release Schedule &amp; Reminder</string>
+    <string name="reminder_alarm_on">Reminder Alarm On</string>
+    <string name="reminder_alarm_off">Reminder Alarm Off</string>
+    <string name="calendar">Calendar</string>
+    <string name="tap_to_change_release_calendar">Tap to change release date on calendar</string>
+    <string name="turn_off_alarm">Turn Off Alarm</string>
+    <string name="turn_on_alarm">Turn On Alarm</string>
+    <string name="test_alarm_now">Test Alarm Now</string>
+    <string name="notification_sent">Reminder notification sent!</string>
+    <string name="streaming_online">Online Streaming</string>
+    <string name="offline_player">Offline Player (3rd Party)</string>
+    <string name="file_label">File: %1$s</string>
+    <string name="open_with_other_player">Open with another player</string>
+    <string name="delete_media_title">Delete media?</string>
+    <string name="delete_media_message">Delete "%1$s" from Seriee?</string>
+
+    <!-- Components -->
+    <string name="rating_content_desc">Rating %1$d of %2$d</string>
+    <string name="rating_masterpiece">5.0 (Masterpiece)</string>
+    <string name="rating_great">4.0 (Great)</string>
+    <string name="rating_good">3.0 (Good)</string>
+    <string name="rating_okay">2.0 (Okay)</string>
+    <string name="rating_poor">1.0 (Poor)</string>
+    <string name="rating_none">Not rated</string>
+    <string name="genre_tag_label">Genre / Category Tags (Optional)</string>
+    <string name="genre_placeholder">Type a genre then tap add...</string>
+    <string name="remove_tag">Remove tag %1$s</string>
+    <string name="popular_genres">Popular Genres:</string>
+
+    <!-- Actions -->
+    <string name="cannot_open_link">Could not open link</string>
+    <string name="pick_file_first">Pick a file via the "Pick File" button (Edit) so it can be opened in a player</string>
+    <string name="open_with">Open with</string>
+    <string name="player_not_installed">Player not installed</string>
+    <string name="failed_open_video">Failed to open video</string>
+    <string name="time_just_now">Just now</string>
+    <string name="time_minutes_ago">%1$d minutes ago</string>
+    <string name="time_hours_ago">%1$d hours ago</string>
+    <string name="time_yesterday">Yesterday</string>
+    <string name="time_days_ago">%1$d days ago</string>
+    <string name="time_weeks_ago">%1$d weeks ago</string>
+    <string name="time_months_ago">%1$d months ago</string>
+
+    <!-- Reminders / scheduler -->
+    <string name="notification_channel_name">Series &amp; Movie Reminders</string>
+    <string name="notification_channel_desc">Notifications when a series or movie starts airing</string>
+    <string name="reminder_title_prefix">🔔 Reminder: %1$s</string>
+    <string name="airing_today_title">🔔 %1$s Airing Today!</string>
+    <string name="airing_today_body">%1$s "%2$s" is now airing. Open Seriee to start watching!</string>
+    <string name="default_series_title">Series Airing</string>
+    <string name="date_not_set">Not set</string>
+    <string name="no_schedule">No schedule</string>
+    <string name="already_aired">Already aired</string>
+    <string name="airs_in_days">Airing in %1$d days</string>
+    <string name="airs_in_hours">Airing in %1$d hours</string>
+    <string name="airs_in_minutes">Airing in %1$d minutes</string>
+    <string name="airs_soon">Airing soon</string>
+    <string name="badge_today">TODAY</string>
+    <string name="badge_soon">SOON</string>
+    <string name="badge_d_days">D-%1$d</string>
+    <string name="badge_hours_left">%1$dH LEFT</string>
+    <string name="countdown_today">Airing Today</string>
+    <string name="countdown_days">%1$d Days Left</string>
+    <string name="countdown_one_day">1 Day Left</string>
+    <string name="countdown_hours">%1$d Hours Left</string>
+    <string name="countdown_under_hour">&lt; 1 Hour Left</string>
+    <string name="schedule_not_set">Schedule not set</string>
+    <string name="released_today">Released / Airing Today</string>
+    <string name="detailed_days_hours">%1$d days %2$d hours left</string>
+    <string name="detailed_days">%1$d days left</string>
+    <string name="detailed_hours_minutes">%1$d hours %2$d min left</string>
+    <string name="detailed_minutes">%1$d minutes left</string>
+    <string name="pick_airing_time">Pick Airing Time</string>
+    <string name="pick_release_date_title">Pick Release Date</string>
+
+    <!-- Backup & restore -->
+    <string name="current_data">📦 Current data: %1$d items saved</string>
+    <string name="backup_to_json">Back up to JSON file</string>
+    <string name="backup_description">Save your full list of series, episodes, poster covers, and release schedules to a JSON file on your device storage.</string>
+    <string name="save_backup_file">Save backup file (.json)</string>
+    <string name="restore_from_json">Restore from JSON file</string>
+    <string name="restore_description">Import a backup JSON file from your device storage. You can merge it with existing data or replace it.</string>
+    <string name="restore_method">Restore method:</string>
+    <string name="merge_data">Merge data (Recommended)</string>
+    <string name="merge_data_desc">Adds items from the file without deleting existing ones</string>
+    <string name="replace_data">Replace all data</string>
+    <string name="replace_data_desc">All current data will be replaced with the backup file contents</string>
+    <string name="pick_backup_file">Pick backup file (.json)</string>
+    <string name="backup_success">✅ Successfully backed up %1$d items to JSON!</string>
+    <string name="backup_failed">Backup failed: %1$s</string>
+    <string name="restore_success">✅ Successfully restored %1$d items from backup!</string>
+    <string name="restore_failed">Restore failed: %1$s</string>
+
+    <!-- ViewModel messages -->
+    <string name="reminder_test_message">Reminder active for %1$s "%2$s"!</string>
+    <string name="error_open_output">Could not open output stream</string>
+    <string name="error_read_backup">Could not read backup file</string>
+    <string name="error_empty_backup">Backup file is empty or format is not supported</string>
 </resources>

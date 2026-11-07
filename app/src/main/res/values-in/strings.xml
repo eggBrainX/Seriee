@@ -1,0 +1,189 @@
+<resources>
+    <string name="app_name">Seriee</string>
+
+    <!-- Navigation -->
+    <string name="nav_progress">Progres</string>
+    <string name="nav_library">Pustaka</string>
+    <string name="add">Tambah</string>
+
+    <!-- Top bar -->
+    <string name="backup_restore">Cadangkan &amp; Pulihkan</string>
+    <string name="theme">Tema</string>
+    <string name="language">Bahasa</string>
+
+    <!-- Common -->
+    <string name="close">Tutup</string>
+    <string name="cancel">Batal</string>
+    <string name="save">Simpan</string>
+    <string name="delete">Hapus</string>
+    <string name="edit_details">Edit Detail</string>
+
+    <!-- Media types / statuses -->
+    <string name="type_series">Serial</string>
+    <string name="type_movie">Film</string>
+    <string name="status_watching">Sedang Ditonton</string>
+    <string name="status_completed">Selesai</string>
+    <string name="status_plan_to_watch">Rencana Tonton</string>
+    <string name="status_coming_soon">Segera Tayang</string>
+
+    <!-- Progress -->
+    <string name="active_progress">Progres Aktif</string>
+    <string name="active_progress_subtitle">Lacak perkembangan episode dan jadwal tayang serial &amp; film</string>
+    <string name="search_progress_placeholder">Cari progres serial atau film...</string>
+    <string name="clear_search">Hapus pencarian</string>
+    <string name="filter_all">Semua</string>
+    <string name="filter_watching">Sedang Ditonton</string>
+    <string name="filter_completed">Selesai</string>
+    <string name="filter_coming_soon">Segera Tayang</string>
+    <string name="filter_plan_to_watch">Rencana Tonton</string>
+    <string name="no_search_results">Tidak ada hasil pencarian "%1$s"</string>
+    <string name="no_shows">Tidak ada tayangan.</string>
+    <string name="season_format">Musim %1$d</string>
+    <string name="movie">Film</string>
+    <string name="episode_progress">Episode %1$d / %2$d</string>
+    <string name="add_one_episode">Tambah 1 episode</string>
+    <string name="completed">Selesai</string>
+    <string name="reminder">Pengingat</string>
+
+    <!-- Library -->
+    <string name="search_library_placeholder">Cari serial atau film...</string>
+    <string name="clear">Hapus</string>
+    <string name="grid">Grid</string>
+    <string name="list">Daftar</string>
+    <string name="all_types">Semua Tipe</string>
+    <string name="no_library_results">Tidak ada hasil untuk "%1$s"</string>
+    <string name="no_library_items">Tidak ada koleksi media.</string>
+    <string name="pin">Sematkan</string>
+
+    <!-- Media form -->
+    <string name="add_to_seriee">Tambah ke Seriee</string>
+    <string name="edit_media">Edit Media</string>
+    <string name="title_label">Judul Film / Serial *</string>
+    <string name="title_placeholder">Contoh: Arcane</string>
+    <string name="type_label">Tipe</string>
+    <string name="status_label">Status</string>
+    <string name="rating_label">Rating Serial / Film</string>
+    <string name="release_reminder_title">Alarm Pengingat Tayang</string>
+    <string name="reminder_on_desc">Notifikasi aktif saat waktu tayang tiba</string>
+    <string name="reminder_off_desc">Notifikasi alarm mati</string>
+    <string name="schedule_release_date">Jadwal &amp; Tanggal Rilis:</string>
+    <string name="pick_release_date">Pilih Tanggal Rilis di Kalender</string>
+    <string name="preset">Preset:</string>
+    <string name="preset_tomorrow">Besok</string>
+    <string name="preset_3_days">3 Hari</string>
+    <string name="preset_1_week">1 Minggu</string>
+    <string name="preset_1_month">1 Bulan</string>
+    <string name="change_date">Ganti Tanggal</string>
+    <string name="tap_to_change_release">Ketuk untuk ubah tanggal/jam rilis</string>
+    <string name="poster_url_optional">URL Poster Cover (Opsional)</string>
+    <string name="season">Musim</string>
+    <string name="current_episode">Ep Saat Ini</string>
+    <string name="total_episodes">Total Ep</string>
+    <string name="streaming_link_optional">Link Streaming / Aplikasi (Opsional)</string>
+    <string name="offline_file_optional">File Video Offline / Local Path (Opsional)</string>
+    <string name="video_name_placeholder">Nama video...</string>
+    <string name="pick_file">Pilih File</string>
+    <string name="title_required">Judul wajib diisi</string>
+
+    <!-- Detail dialog -->
+    <string name="status_colon">Status: %1$s</string>
+    <string name="episode_colon">Episode: %1$d / %2$d</string>
+    <string name="schedule_and_reminder">Jadwal Tayang &amp; Pengingat</string>
+    <string name="reminder_alarm_on">Alarm Pengingat Aktif</string>
+    <string name="reminder_alarm_off">Alarm Pengingat Mati</string>
+    <string name="calendar">Kalender</string>
+    <string name="tap_to_change_release_calendar">Ketuk untuk ubah tanggal rilis di kalender</string>
+    <string name="turn_off_alarm">Matikan Alarm</string>
+    <string name="turn_on_alarm">Nyalakan Alarm</string>
+    <string name="test_alarm_now">Uji Alarm Sekarang</string>
+    <string name="notification_sent">Notifikasi pengingat dikirim!</string>
+    <string name="streaming_online">Streaming Online</string>
+    <string name="offline_player">Player Offline (Pihak Ketiga)</string>
+    <string name="file_label">File: %1$s</string>
+    <string name="open_with_other_player">Buka dengan player lain</string>
+    <string name="delete_media_title">Hapus media?</string>
+    <string name="delete_media_message">Hapus "%1$s" dari Seriee?</string>
+
+    <!-- Components -->
+    <string name="rating_content_desc">Rating %1$d dari %2$d</string>
+    <string name="rating_masterpiece">5.0 (Mahakarya)</string>
+    <string name="rating_great">4.0 (Sangat Bagus)</string>
+    <string name="rating_good">3.0 (Bagus)</string>
+    <string name="rating_okay">2.0 (Biasa)</string>
+    <string name="rating_poor">1.0 (Kurang)</string>
+    <string name="rating_none">Belum Dinilai</string>
+    <string name="genre_tag_label">Genre / Kategori Tag (Opsional)</string>
+    <string name="genre_placeholder">Ketik genre lalu tekan tambah...</string>
+    <string name="remove_tag">Hapus tag %1$s</string>
+    <string name="popular_genres">Saran Genre Populer:</string>
+
+    <!-- Actions -->
+    <string name="cannot_open_link">Tidak bisa membuka link</string>
+    <string name="pick_file_first">Pilih file lewat tombol "Pilih File" (Edit) agar bisa dibuka di player</string>
+    <string name="open_with">Buka dengan</string>
+    <string name="player_not_installed">Player tidak terpasang</string>
+    <string name="failed_open_video">Gagal membuka video</string>
+    <string name="time_just_now">Baru saja</string>
+    <string name="time_minutes_ago">%1$d menit lalu</string>
+    <string name="time_hours_ago">%1$d jam lalu</string>
+    <string name="time_yesterday">Kemarin</string>
+    <string name="time_days_ago">%1$d hari lalu</string>
+    <string name="time_weeks_ago">%1$d minggu lalu</string>
+    <string name="time_months_ago">%1$d bulan lalu</string>
+
+    <!-- Reminders / scheduler -->
+    <string name="notification_channel_name">Pengingat Serial &amp; Film</string>
+    <string name="notification_channel_desc">Notifikasi saat serial atau film baru mulai tayang</string>
+    <string name="reminder_title_prefix">🔔 Pengingat: %1$s</string>
+    <string name="airing_today_title">🔔 %1$s Tayang Hari Ini!</string>
+    <string name="airing_today_body">%1$s "%2$s" sudah mulai tayang. Buka Seriee untuk mulai menonton!</string>
+    <string name="default_series_title">Serial Tayang</string>
+    <string name="date_not_set">Belum diatur</string>
+    <string name="no_schedule">Belum ada jadwal</string>
+    <string name="already_aired">Sudah tayang</string>
+    <string name="airs_in_days">Tayang dalam %1$d hari lagi</string>
+    <string name="airs_in_hours">Tayang dalam %1$d jam lagi</string>
+    <string name="airs_in_minutes">Tayang dalam %1$d menit lagi</string>
+    <string name="airs_soon">Segera tayang</string>
+    <string name="badge_today">HARI INI</string>
+    <string name="badge_soon">SEGERA</string>
+    <string name="badge_d_days">D-%1$d</string>
+    <string name="badge_hours_left">%1$dJ LAGI</string>
+    <string name="countdown_today">Tayang Hari Ini</string>
+    <string name="countdown_days">%1$d Hari Lagi</string>
+    <string name="countdown_one_day">1 Hari Lagi</string>
+    <string name="countdown_hours">%1$d Jam Lagi</string>
+    <string name="countdown_under_hour">&lt; 1 Jam Lagi</string>
+    <string name="schedule_not_set">Jadwal belum ditentukan</string>
+    <string name="released_today">Sudah Rilis / Tayang Hari Ini</string>
+    <string name="detailed_days_hours">%1$d hari %2$d jam lagi</string>
+    <string name="detailed_days">%1$d hari lagi</string>
+    <string name="detailed_hours_minutes">%1$d jam %2$d mnt lagi</string>
+    <string name="detailed_minutes">%1$d menit lagi</string>
+    <string name="pick_airing_time">Pilih Jam Tayang</string>
+    <string name="pick_release_date_title">Pilih Tanggal Rilis</string>
+
+    <!-- Backup & restore -->
+    <string name="current_data">📦 Data Saat Ini: %1$d item tersimpan</string>
+    <string name="backup_to_json">Cadangkan ke File JSON</string>
+    <string name="backup_description">Simpan seluruh daftar serial, episode, poster cover, dan jadwal tayang ke file JSON di penyimpanan perangkat Anda.</string>
+    <string name="save_backup_file">Simpan File Backup (.json)</string>
+    <string name="restore_from_json">Pulihkan dari File JSON</string>
+    <string name="restore_description">Impor kembali file cadangan JSON dari memori HP. Anda dapat menggabungkan dengan data yang ada atau menimpanya.</string>
+    <string name="restore_method">Metode Pemulihan:</string>
+    <string name="merge_data">Gabungkan Data (Direkomendasikan)</string>
+    <string name="merge_data_desc">Menambah item dari file tanpa menghapus yang sudah ada</string>
+    <string name="replace_data">Timpa / Ganti Seluruh Data</string>
+    <string name="replace_data_desc">Semua data sekarang akan diganti dengan isi file cadangan</string>
+    <string name="pick_backup_file">Pilih File Cadangan (.json)</string>
+    <string name="backup_success">✅ Berhasil mencadangkan %1$d item ke file JSON!</string>
+    <string name="backup_failed">Gagal mencadangkan: %1$s</string>
+    <string name="restore_success">✅ Berhasil memulihkan %1$d item dari file cadangan!</string>
+    <string name="restore_failed">Gagal memulihkan: %1$s</string>
+
+    <!-- ViewModel messages -->
+    <string name="reminder_test_message">Pengingat aktif untuk %1$s "%2$s"!</string>
+    <string name="error_open_output">Tidak bisa membuka output stream</string>
+    <string name="error_read_backup">Tidak bisa membaca file backup</string>
+    <string name="error_empty_backup">File cadangan kosong atau format tidak sesuai</string>
+</resources>

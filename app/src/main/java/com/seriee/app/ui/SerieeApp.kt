@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Storage
@@ -43,11 +44,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.seriee.app.R
 import com.seriee.app.SerieeViewModel
+import com.seriee.app.data.AppLanguage
 import com.seriee.app.data.AppTheme
 
 @Composable
@@ -66,6 +70,8 @@ fun SerieeApp(vm: SerieeViewModel) {
             SerieeTopBar(
                 current = vm.theme,
                 onTheme = vm::setTheme,
+                currentLanguage = vm.language,
+                onLanguage = vm::setLanguage,
                 onOpenBackupRestore = { showBackupRestore = true }
             )
         },
@@ -82,14 +88,14 @@ fun SerieeApp(vm: SerieeViewModel) {
                     selected = tab == 0,
                     onClick = { tab = 0 },
                     icon = { Icon(Icons.Filled.Timeline, contentDescription = null) },
-                    label = { Text("Progress") },
+                    label = { Text(stringResource(R.string.nav_progress)) },
                     colors = colors
                 )
                 NavigationBarItem(
                     selected = tab == 1,
                     onClick = { tab = 1 },
                     icon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null) },
-                    label = { Text("Library") },
+                    label = { Text(stringResource(R.string.nav_library)) },
                     colors = colors
                 )
             }
@@ -107,7 +113,7 @@ fun SerieeApp(vm: SerieeViewModel) {
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Tambah", tint = Color.White)
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add), tint = Color.White)
             }
         }
     ) { padding ->
@@ -180,10 +186,13 @@ fun SerieeApp(vm: SerieeViewModel) {
 private fun SerieeTopBar(
     current: AppTheme,
     onTheme: (AppTheme) -> Unit,
+    currentLanguage: AppLanguage,
+    onLanguage: (AppLanguage) -> Unit,
     onOpenBackupRestore: () -> Unit
 ) {
     val p = LocalPalette.current
-    var menu by remember { mutableStateOf(false) }
+    var themeMenu by remember { mutableStateOf(false) }
+    var languageMenu by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -233,10 +242,40 @@ private fun SerieeTopBar(
             ) {
                 Icon(
                     Icons.Filled.Storage,
-                    contentDescription = "Cadangkan & Pulihkan",
+                    contentDescription = stringResource(R.string.backup_restore),
                     tint = p.muted,
                     modifier = Modifier.size(18.dp)
                 )
+            }
+
+            // Language switch button
+            Box {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, p.border, RoundedCornerShape(12.dp))
+                        .clickable { languageMenu = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Language, contentDescription = stringResource(R.string.language), tint = p.muted, modifier = Modifier.size(18.dp))
+                }
+                DropdownMenu(expanded = languageMenu, onDismissRequest = { languageMenu = false }) {
+                    AppLanguage.entries.forEach { lang ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    lang.label,
+                                    fontWeight = if (lang == currentLanguage) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                onLanguage(lang)
+                                languageMenu = false
+                            }
+                        )
+                    }
+                }
             }
 
             // Theme switch button
@@ -246,13 +285,13 @@ private fun SerieeTopBar(
                         .size(38.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                        .clickable { menu = true },
+                        .clickable { themeMenu = true },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Palette, contentDescription = "Tema", tint = p.muted, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.Palette, contentDescription = stringResource(R.string.theme), tint = p.muted, modifier = Modifier.size(18.dp))
                 }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    AppTheme.values().forEach { theme ->
+                DropdownMenu(expanded = themeMenu, onDismissRequest = { themeMenu = false }) {
+                    AppTheme.entries.forEach { theme ->
                         val dot = paletteFor(theme)
                         DropdownMenuItem(
                             text = {
@@ -272,7 +311,7 @@ private fun SerieeTopBar(
                             },
                             onClick = {
                                 onTheme(theme)
-                                menu = false
+                                themeMenu = false
                             }
                         )
                     }

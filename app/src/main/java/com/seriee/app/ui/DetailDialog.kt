@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.seriee.app.R
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
 import com.seriee.app.data.WatchStatus
@@ -95,7 +97,7 @@ fun DetailDialog(
                             .clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = "Tutup", tint = p.muted, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = p.muted, modifier = Modifier.size(18.dp))
                     }
                 }
 
@@ -111,17 +113,17 @@ fun DetailDialog(
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(SerieColors.Blue600.copy(alpha = 0.25f))
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
-                            ) { Text(item.type.label, fontSize = 11.sp, color = SerieColors.Blue400) }
+                            ) { Text(stringResource(item.type.labelRes), fontSize = 11.sp, color = SerieColors.Blue400) }
                             Spacer(Modifier.width(8.dp))
-                            Text("Status: ${item.status.label}", fontSize = 12.sp, color = p.muted)
+                            Text(stringResource(R.string.status_colon, stringResource(item.status.labelRes)), fontSize = 12.sp, color = p.muted)
                         }
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            "Episode: ${item.currentEp} / ${item.totalEp}",
+                            stringResource(R.string.episode_colon, item.currentEp, item.totalEp),
                             fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text
                         )
                         if (item.type == MediaType.Series) {
-                            Text("Season ${item.season}", fontSize = 12.sp, color = p.muted)
+                            Text(stringResource(R.string.season_format, item.season), fontSize = 12.sp, color = p.muted)
                         }
                         Spacer(Modifier.height(8.dp))
                         StarRatingBar(
@@ -150,7 +152,7 @@ fun DetailDialog(
 
                 if (item.status == WatchStatus.ComingSoon || item.releaseDate != null) {
                     Spacer(Modifier.height(16.dp))
-                    SectionTitle("Jadwal Tayang & Pengingat")
+                    SectionTitle(stringResource(R.string.schedule_and_reminder))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -177,7 +179,7 @@ fun DetailDialog(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    if (item.reminderEnabled) "Alarm Pengingat Aktif" else "Alarm Pengingat Mati",
+                                    if (item.reminderEnabled) stringResource(R.string.reminder_alarm_on) else stringResource(R.string.reminder_alarm_off),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (item.reminderEnabled) SerieColors.Orange else p.muted
@@ -190,7 +192,7 @@ fun DetailDialog(
                                     .padding(horizontal = 8.dp, vertical = 3.dp)
                             ) {
                                 Text(
-                                    ReminderScheduler.timeUntilRelease(item.releaseDate),
+                                    ReminderScheduler.timeUntilRelease(context, item.releaseDate),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = SerieColors.Orange
@@ -213,27 +215,27 @@ fun DetailDialog(
                         ) {
                             Icon(
                                 Icons.Filled.CalendarMonth,
-                                contentDescription = "Kalender",
+                                contentDescription = stringResource(R.string.calendar),
                                 tint = SerieColors.Orange,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    ReminderScheduler.formatReleaseDate(item.releaseDate),
+                                    ReminderScheduler.formatReleaseDate(context, item.releaseDate),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = p.text
                                 )
                                 Text(
-                                    "Ketuk untuk ubah tanggal rilis di kalender",
+                                    stringResource(R.string.tap_to_change_release_calendar),
                                     fontSize = 10.sp,
                                     color = p.muted
                                 )
                             }
                             Icon(
                                 Icons.Filled.EditCalendar,
-                                contentDescription = "Ubah Tanggal",
+                                contentDescription = stringResource(R.string.change_date),
                                 tint = SerieColors.Orange,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -254,7 +256,7 @@ fun DetailDialog(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        if (item.reminderEnabled) "Matikan Alarm" else "Nyalakan Alarm",
+                                        if (item.reminderEnabled) stringResource(R.string.turn_off_alarm) else stringResource(R.string.turn_on_alarm),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (item.reminderEnabled) p.muted else SerieColors.Orange
@@ -269,13 +271,13 @@ fun DetailDialog(
                                         .background(SerieColors.Blue600.copy(alpha = 0.18f))
                                         .clickable {
                                             onTestReminder()
-                                            android.widget.Toast.makeText(context, "Notifikasi pengingat dikirim!", android.widget.Toast.LENGTH_SHORT).show()
+                                            android.widget.Toast.makeText(context, context.getString(R.string.notification_sent), android.widget.Toast.LENGTH_SHORT).show()
                                         }
                                         .padding(vertical = 9.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        "Uji Alarm Sekarang",
+                                        stringResource(R.string.test_alarm_now),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = SerieColors.Blue400
@@ -288,7 +290,7 @@ fun DetailDialog(
 
                 if (item.streamUrl.isNotBlank()) {
                     Spacer(Modifier.height(16.dp))
-                    SectionTitle("Streaming Online")
+                    SectionTitle(stringResource(R.string.streaming_online))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -315,9 +317,9 @@ fun DetailDialog(
 
                 if (item.videoPath.isNotBlank() || item.videoUri.isNotBlank()) {
                     Spacer(Modifier.height(16.dp))
-                    SectionTitle("Player Offline (3rd Party)")
+                    SectionTitle(stringResource(R.string.offline_player))
                     Text(
-                        "File: ${item.videoPath.ifBlank { "video" }}",
+                        stringResource(R.string.file_label, item.videoPath.ifBlank { "video" }),
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         color = SerieColors.Blue400,
@@ -334,7 +336,7 @@ fun DetailDialog(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    PlayerButton("Buka dengan player lain", p.muted, Modifier.fillMaxWidth()) {
+                    PlayerButton(stringResource(R.string.open_with_other_player), p.muted, Modifier.fillMaxWidth()) {
                         openVideo(context, item, null)
                     }
                 }
@@ -354,7 +356,7 @@ fun DetailDialog(
                     ) {
                         Icon(Icons.Filled.Delete, null, tint = SerieColors.Red, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Hapus", fontSize = 12.sp, color = SerieColors.Red)
+                        Text(stringResource(R.string.delete), fontSize = 12.sp, color = SerieColors.Red)
                     }
                     Box(
                         Modifier
@@ -363,7 +365,7 @@ fun DetailDialog(
                             .clickable(onClick = onEdit)
                             .padding(horizontal = 18.dp, vertical = 10.dp)
                     ) {
-                        Text("Edit Detail", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text(stringResource(R.string.edit_details), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                     }
                 }
             }
@@ -376,16 +378,16 @@ fun DetailDialog(
             containerColor = p.surface,
             titleContentColor = p.text,
             textContentColor = p.muted,
-            title = { Text("Hapus media?") },
-            text = { Text("Hapus \"${item.title}\" dari Seriee?") },
+            title = { Text(stringResource(R.string.delete_media_title)) },
+            text = { Text(stringResource(R.string.delete_media_message, item.title)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     onDelete()
-                }) { Text("Hapus", color = SerieColors.Red) }
+                }) { Text(stringResource(R.string.delete), color = SerieColors.Red) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Batal", color = p.muted) }
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel), color = p.muted) }
             }
         )
     }

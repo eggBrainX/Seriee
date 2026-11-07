@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
+import com.seriee.app.R
 import com.seriee.app.data.MediaItem
 
 const val VLC_PACKAGE = "org.videolan.vlc"
@@ -18,7 +19,7 @@ fun openUrl(context: Context, url: String) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fixed)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     } catch (e: Exception) {
-        Toast.makeText(context, "Tidak bisa membuka link", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.cannot_open_link), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -27,7 +28,7 @@ fun openVideo(context: Context, item: MediaItem, pkg: String?) {
     if (item.videoUri.isBlank()) {
         Toast.makeText(
             context,
-            "Pilih file lewat tombol \"Pilih File\" (Edit) agar bisa dibuka di player",
+            context.getString(R.string.pick_file_first),
             Toast.LENGTH_LONG
         ).show()
         return
@@ -42,15 +43,15 @@ fun openVideo(context: Context, item: MediaItem, pkg: String?) {
     }
     try {
         if (pkg == null) {
-            val chooser = Intent.createChooser(intent, "Buka dengan").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val chooser = Intent.createChooser(intent, context.getString(R.string.open_with)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(chooser)
         } else {
             context.startActivity(intent)
         }
     } catch (e: ActivityNotFoundException) {
-        Toast.makeText(context, "Player tidak terpasang", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.player_not_installed), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
-        Toast.makeText(context, "Gagal membuka video", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.failed_open_video), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -64,18 +65,18 @@ fun displayName(context: Context, uri: Uri): String? {
     }
 }
 
-fun relativeTime(ts: Long): String {
+fun relativeTime(context: Context, ts: Long): String {
     val diff = System.currentTimeMillis() - ts
     val minutes = diff / 60_000
     val hours = minutes / 60
     val days = hours / 24
     return when {
-        minutes < 1 -> "Baru saja"
-        minutes < 60 -> "$minutes menit lalu"
-        hours < 24 -> "$hours jam lalu"
-        days < 2 -> "Kemarin"
-        days < 7 -> "$days hari lalu"
-        days < 30 -> "${days / 7} minggu lalu"
-        else -> "${days / 30} bulan lalu"
+        minutes < 1 -> context.getString(R.string.time_just_now)
+        minutes < 60 -> context.getString(R.string.time_minutes_ago, minutes)
+        hours < 24 -> context.getString(R.string.time_hours_ago, hours)
+        days < 2 -> context.getString(R.string.time_yesterday)
+        days < 7 -> context.getString(R.string.time_days_ago, days)
+        days < 30 -> context.getString(R.string.time_weeks_ago, days / 7)
+        else -> context.getString(R.string.time_months_ago, days / 30)
     }
 }

@@ -12,8 +12,11 @@ import com.seriee.app.R
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(EXTRA_ID) ?: return
-        val title = intent.getStringExtra(EXTRA_TITLE) ?: "Series Tayang"
-        val type = intent.getStringExtra(EXTRA_TYPE) ?: "Series"
+        val title = intent.getStringExtra(EXTRA_TITLE) ?: context.getString(R.string.default_series_title)
+        val typeName = intent.getStringExtra(EXTRA_TYPE)
+        val typeLabel = typeName?.let { name ->
+            runCatching { com.seriee.app.data.MediaType.valueOf(name) }.getOrNull()?.let { context.getString(it.labelRes) }
+        } ?: context.getString(R.string.type_series)
 
         ReminderScheduler.createNotificationChannel(context)
 
@@ -30,8 +33,8 @@ class ReminderReceiver : BroadcastReceiver() {
 
         val notification = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("🔔 $title Tayang Hari Ini!")
-            .setContentText("$type \"$title\" sudah mulai tayang. Buka Seriee untuk mulai menonton!")
+            .setContentTitle(context.getString(R.string.airing_today_title, title))
+            .setContentText(context.getString(R.string.airing_today_body, typeLabel, title))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(tapPending)

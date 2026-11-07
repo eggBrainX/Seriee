@@ -40,11 +40,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.seriee.app.R
 import com.seriee.app.SerieeViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -65,10 +67,10 @@ fun BackupRestoreDialog(
     ) { uri ->
         if (uri != null) {
             vm.exportBackup(context, uri).onSuccess { count ->
-                Toast.makeText(context, "✅ Berhasil mencadangkan $count series ke file JSON!", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.backup_success, count), Toast.LENGTH_LONG).show()
                 onDismiss()
             }.onFailure { err ->
-                Toast.makeText(context, "Gagal mencadangkan: ${err.localizedMessage}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.backup_failed, err.localizedMessage ?: ""), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -79,10 +81,10 @@ fun BackupRestoreDialog(
     ) { uri ->
         if (uri != null) {
             vm.importBackup(context, uri, replace = replaceMode).onSuccess { count ->
-                Toast.makeText(context, "✅ Berhasil memulihkan $count series dari file cadangan!", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.restore_success, count), Toast.LENGTH_LONG).show()
                 onDismiss()
             }.onFailure { err ->
-                Toast.makeText(context, "Gagal memulihkan: ${err.localizedMessage}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.restore_failed, err.localizedMessage ?: ""), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -118,7 +120,7 @@ fun BackupRestoreDialog(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        "Cadangkan & Pulihkan",
+                        stringResource(R.string.backup_restore),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = p.text,
@@ -131,7 +133,7 @@ fun BackupRestoreDialog(
                             .clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = "Tutup", tint = p.muted)
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = p.muted)
                     }
                 }
 
@@ -145,7 +147,7 @@ fun BackupRestoreDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "📦 Data Saat Ini: ${vm.items.size} series tersimpan",
+                        stringResource(R.string.current_data, vm.items.size),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = p.text
@@ -206,7 +208,7 @@ fun BackupRestoreDialog(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "Simpan File Backup (.json)",
+                            stringResource(R.string.save_backup_file),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
@@ -233,7 +235,7 @@ fun BackupRestoreDialog(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "Pulihkan dari File JSON",
+                            stringResource(R.string.restore_from_json),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = p.text
@@ -241,7 +243,7 @@ fun BackupRestoreDialog(
                     }
 
                     Text(
-                        "Impor kembali file cadangan JSON dari memori HP. Anda dapat menggabungkan dengan data yang ada atau menimpanya.",
+                        stringResource(R.string.restore_description),
                         fontSize = 12.sp,
                         color = p.muted,
                         lineHeight = 17.sp
@@ -257,7 +259,7 @@ fun BackupRestoreDialog(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            "Metode Pemulihan:",
+                            stringResource(R.string.restore_method),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = p.text
@@ -278,13 +280,13 @@ fun BackupRestoreDialog(
                             Spacer(Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    "Gabungkan Data (Direkomendasikan)",
+                                    stringResource(R.string.merge_data),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = p.text
                                 )
                                 Text(
-                                    "Menambah series dari file tanpa menghapus yang sudah ada",
+                                    stringResource(R.string.merge_data_desc),
                                     fontSize = 10.sp,
                                     color = p.muted
                                 )
@@ -306,13 +308,13 @@ fun BackupRestoreDialog(
                             Spacer(Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    "Timpa / Ganti Seluruh Data",
+                                    stringResource(R.string.replace_data),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = p.text
                                 )
                                 Text(
-                                    "Semua data sekarang akan diganti dengan isi file cadangan",
+                                    stringResource(R.string.replace_data_desc),
                                     fontSize = 10.sp,
                                     color = p.muted
                                 )
@@ -340,7 +342,7 @@ fun BackupRestoreDialog(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "Pilih File Cadangan (.json)",
+                            stringResource(R.string.pick_backup_file),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White

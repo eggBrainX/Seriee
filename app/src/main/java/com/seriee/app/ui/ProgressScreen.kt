@@ -42,10 +42,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.seriee.app.R
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
 import com.seriee.app.data.WatchStatus
@@ -63,10 +66,10 @@ fun ProgressScreen(
     var filter by rememberSaveable { mutableIntStateOf(0) }
 
     val filterOptions = listOf(
-        "All" to list.size,
-        "Watching" to list.count { it.status == WatchStatus.Watching },
-        "Completed" to list.count { it.status == WatchStatus.Completed },
-        "Coming Soon" to list.count { it.status == WatchStatus.ComingSoon }
+        stringResource(R.string.filter_all) to list.size,
+        stringResource(R.string.filter_watching) to list.count { it.status == WatchStatus.Watching },
+        stringResource(R.string.filter_completed) to list.count { it.status == WatchStatus.Completed },
+        stringResource(R.string.filter_coming_soon) to list.count { it.status == WatchStatus.ComingSoon }
     )
 
     val filtered = list
@@ -90,13 +93,13 @@ fun ProgressScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                "Active Progress",
+                stringResource(R.string.active_progress),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = p.text
             )
             Text(
-                "Lacak perkembangan episode dan jadwal tayang series / film",
+                stringResource(R.string.active_progress_subtitle),
                 fontSize = 12.sp,
                 color = p.muted
             )
@@ -104,13 +107,13 @@ fun ProgressScreen(
             SField(
                 value = query,
                 onChange = { query = it },
-                placeholder = "Cari progress serial atau film...",
+                placeholder = stringResource(R.string.search_progress_placeholder),
                 leading = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 trailing = if (query.isNotBlank()) {
                     {
                         Icon(
                             Icons.Filled.Close,
-                            contentDescription = "Hapus pencarian",
+                            contentDescription = stringResource(R.string.clear_search),
                             modifier = Modifier
                                 .size(18.dp)
                                 .clickable { query = "" },
@@ -140,7 +143,8 @@ fun ProgressScreen(
         if (filtered.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
                 Text(
-                    if (query.isNotBlank()) "Tidak ada hasil pencarian \"$query\"" else "Tidak ada tayangan.",
+                    if (query.isNotBlank()) stringResource(R.string.no_search_results, query)
+                    else stringResource(R.string.no_shows),
                     color = p.muted,
                     fontSize = 14.sp
                 )
@@ -163,6 +167,7 @@ fun ProgressScreen(
 @Composable
 private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -> Unit) {
     val p = LocalPalette.current
+    val context = LocalContext.current
     val shape = RoundedCornerShape(16.dp)
     Row(
         modifier = Modifier
@@ -186,7 +191,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                         .padding(horizontal = 4.dp, vertical = 1.dp)
                 ) {
                     Text(
-                        ReminderScheduler.countdownShortBadge(item.releaseDate),
+                        ReminderScheduler.countdownShortBadge(context, item.releaseDate),
                         fontSize = 8.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White
@@ -211,12 +216,13 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (item.type == MediaType.Series) "Season ${item.season}" else "Movie",
+                    if (item.type == MediaType.Series) stringResource(R.string.season_format, item.season)
+                    else stringResource(R.string.movie),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (item.status == WatchStatus.ComingSoon) SerieColors.Orange else SerieColors.Blue400
                 )
-                Text(relativeTime(item.updatedAt), fontSize = 10.sp, color = p.muted)
+                Text(relativeTime(context, item.updatedAt), fontSize = 10.sp, color = p.muted)
             }
 
             Row(
@@ -267,7 +273,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            ReminderScheduler.countdownBadgeText(item.releaseDate),
+                            ReminderScheduler.countdownBadgeText(context, item.releaseDate),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = SerieColors.Orange
@@ -280,7 +286,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                             .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            ReminderScheduler.countdownShortBadge(item.releaseDate),
+                            ReminderScheduler.countdownShortBadge(context, item.releaseDate),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = SerieColors.Orange
@@ -301,7 +307,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    ReminderScheduler.countdownDetailedText(item.releaseDate),
+                    ReminderScheduler.countdownDetailedText(context, item.releaseDate),
                     fontSize = 11.sp,
                     color = p.muted
                 )
@@ -311,7 +317,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Episode ${item.currentEp} / ${item.totalEp}", fontSize = 12.sp, color = p.muted)
+                    Text(stringResource(R.string.episode_progress, item.currentEp, item.totalEp), fontSize = 12.sp, color = p.muted)
                     Text("${item.percent}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = p.text)
                 }
                 Spacer(Modifier.height(6.dp))
@@ -339,7 +345,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
             ) {
                 Icon(
                     imageVector = if (item.reminderEnabled) Icons.Filled.NotificationsActive else Icons.Filled.Alarm,
-                    contentDescription = "Pengingat",
+                    contentDescription = stringResource(R.string.reminder),
                     tint = if (item.reminderEnabled) SerieColors.Orange else p.muted,
                     modifier = Modifier.size(18.dp)
                 )
@@ -353,7 +359,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     .clickable(onClick = onIncrement),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Tambah 1 Episode", tint = SerieColors.Blue400, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_one_episode), tint = SerieColors.Blue400, modifier = Modifier.size(18.dp))
             }
         } else {
             Box(
@@ -363,7 +369,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     .background(SerieColors.Emerald.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Check, contentDescription = "Selesai", tint = SerieColors.Emerald, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.completed), tint = SerieColors.Emerald, modifier = Modifier.size(18.dp))
             }
         }
     }
