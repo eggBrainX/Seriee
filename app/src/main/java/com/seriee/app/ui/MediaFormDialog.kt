@@ -152,15 +152,24 @@ fun MediaFormDialog(
         }
     }
 
-    fun mergePicked(files: List<Uri>, targetSeasonIdx: Int = 0) {
+    // [persistTreeUri] = tree URI returned by OpenDocumentTree() that owns these descendants.
+    // When non-null, the caller must have persisted that tree URI already (see folderPicker)
+    // and per-child persist attempts must be skipped: descendants built with
+    // buildDocumentUriUsingTree() cannot take individual persistable grants
+    // (that call throws and is swallowed, leaving no grant after reboot).
+    // When null, [files] came from OpenMultipleDocuments()/OpenDocument() and each URI
+    // can and must take its own persistable grant.
+    fun mergePicked(files: List<Uri>, targetSeasonIdx: Int = 0, persistTreeUri: Uri? = null) {
         if (files.isEmpty()) return
         // 100s/1000s of files: resolver queries + permission grants are IPC — keep off main thread.
         scope.launch {
             val parsed = withContext(Dispatchers.IO) {
                 files.map { uri ->
-                    try {
-                        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    } catch (_: Exception) {}
+                    if (persistTreeUri == null) {
+                        try {
+                            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        } catch (_: Exception) {}
+                    }
                     val name = displayName(context, uri) ?: uri.lastPathSegment ?: "video"
                     Triple(uri.toString(), name, EpisodeFileParser.parseSeasonEpisode(name) to EpisodeFileParser.parseEpisode(name))
                 }
@@ -224,6 +233,13 @@ fun MediaFormDialog(
     val folderPickerTarget = remember { mutableIntStateOf(0) }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
+            // Persist the picker-returned tree URI BEFORE enumerating/saving descendants.
+            // Descendants built with DocumentsContract.buildDocumentUriUsingTree() cannot
+            // take their own persistable grants — persistence comes from the tree grant.
+            // Without this, saved episode URIs stop opening after process death / reboot.
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
             // Enumerate video files off the main thread (folders can hold 1000+ files).
             val target = folderPickerTarget.intValue
             scope.launch {
@@ -243,7 +259,8 @@ fun MediaFormDialog(
                     } catch (_: Exception) {}
                     out
                 }
-                if (files.isNotEmpty()) mergePicked(files, target)
+                // Pass the persisted tree URI so mergePicked skips per-child persist attempts.
+                if (files.isNotEmpty()) mergePicked(files, target, persistTreeUri = uri)
             }
         }
     }
