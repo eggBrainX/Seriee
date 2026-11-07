@@ -19,7 +19,8 @@ data class MetadataResult(
     val tags: List<String>,
     val seasonEpisodeCounts: List<Int>,
     val streamCandidates: List<StreamCandidate>,
-    val year: String = ""
+    val year: String = "",
+    val type: MediaType = MediaType.Series
 )
 
 class MetadataRepository {
@@ -46,7 +47,7 @@ class MetadataRepository {
                 query (${'$'}search: String) {
                   Media(search: ${'$'}search, type: ANIME) {
                     id title { english romaji }
-                    coverImage { large } description genres episodes
+                    coverImage { large } description genres episodes format
                     startDate { year }
                     externalLinks { url site type }
                   }
@@ -66,7 +67,13 @@ class MetadataRepository {
         val genres = media.optJSONArray("genres")
         if (genres != null) for (i in 0 until genres.length()) tags.add(genres.optString(i))
         val total = media.optInt("episodes", 0)
-        val seasons = if (total > 0) listOf(total) else emptyList()
+        val isMovie = media.optString("format").equals("MOVIE", ignoreCase = true)
+        val mediaType = if (isMovie) MediaType.Movie else MediaType.Series
+        val seasons = when {
+            isMovie -> listOf(1)
+            total > 0 -> listOf(total)
+            else -> emptyList()
+        }
         val streams = mutableListOf<StreamCandidate>()
         val links = media.optJSONArray("externalLinks")
         if (links != null) for (i in 0 until links.length()) {
@@ -85,7 +92,8 @@ class MetadataRepository {
                 tags = tags,
                 seasonEpisodeCounts = seasons,
                 streamCandidates = streams,
-                year = year
+                year = year,
+                type = mediaType
             )
         )
     }
@@ -117,7 +125,8 @@ class MetadataRepository {
                         tags = tags,
                         seasonEpisodeCounts = listOf(1),
                         streamCandidates = providers,
-                        year = year
+                        year = year,
+                        type = MediaType.Movie
                     )
                 )
             }
@@ -146,7 +155,8 @@ class MetadataRepository {
                         tags = emptyList(),
                         seasonEpisodeCounts = seasons,
                         streamCandidates = providers,
-                        year = year
+                        year = year,
+                        type = MediaType.Series
                     )
                 )
             }
