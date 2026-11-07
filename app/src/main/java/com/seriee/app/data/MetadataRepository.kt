@@ -77,8 +77,14 @@ class MetadataRepository {
         val streams = mutableListOf<StreamCandidate>()
         val links = media.optJSONArray("externalLinks")
         if (links != null) for (i in 0 until links.length()) {
-            val site = links.optJSONObject(i)?.optString("site") ?: ""
-            val url = links.optJSONObject(i)?.optString("url") ?: ""
+            val link = links.optJSONObject(i) ?: continue
+            val site = link.optString("site")
+            val url = link.optString("url")
+            // AniList ExternalLinkType: INFO | STREAMING | SOCIAL.
+            // Only STREAMING links are playback candidates — INFO (wiki/official sites)
+            // or SOCIAL links must not become the item's streamUrl via applyFetch.
+            val linkType = link.optString("type")
+            if (!linkType.equals("STREAMING", ignoreCase = true)) continue
             if (url.isNotBlank()) streams.add(StreamCandidate(site.ifBlank { "Official" }, url))
         }
         val year = media.optJSONObject("startDate")?.optInt("year", 0)?.takeIf { it > 0 }?.toString() ?: ""

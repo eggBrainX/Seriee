@@ -303,6 +303,7 @@ fun MediaFormDialog(
 
     fun applyFetch(r: MetadataResult) {
         title = r.title
+        type = r.type
         if (r.posterUrl.isNotBlank()) {
             poster = r.posterUrl
             posterIsStorage = false
