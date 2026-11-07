@@ -1,16 +1,22 @@
 name: Build APK
+
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Extract source zip
+        if: github.ref_type == 'branch'
         run: |
           if [ -f seriee-src.zip ]; then
             unzip -oq seriee-src.zip
@@ -21,15 +27,34 @@ jobs:
             git commit -m "Extract project files"
             git push
           fi
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-      - run: gradle assembleDebug --stacktrace
-      - uses: actions/upload-artifact@v4
+
+      - name: Build debug APK
+        run: gradle assembleDebug --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
           name: seriee-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Berjalan hanya saat push tag (mis. v1.0.1)
+      - name: Rename APK for release
+        if: github.ref_type == 'tag'
+        run: cp app/build/outputs/apk/debug/app-debug.apk "Seriee-${{ github.ref_name }}.apk"
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Seriee ${{ github.ref_name }}
+          files: Seriee-${{ github.ref_name }}.apk
+          generate_release_notes: true
