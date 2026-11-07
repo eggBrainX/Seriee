@@ -180,6 +180,47 @@
     <string name="backup_failed">Gagal mencadangkan: %1$s</string>
     <string name="restore_success">✅ Berhasil memulihkan %1$d item dari file cadangan!</string>
     <string name="restore_failed">Gagal memulihkan: %1$s</string>
+    <string name="backup_to_json_title">Cadangkan ke File JSON</string>
+    <string name="backup_to_json_desc">Simpan seluruh daftar series, episode, poster cover, dan jadwal tayang ke file JSON di penyimpanan perangkat Anda.</string>
+
+    <!-- Fitur baru: poster, fetch, season -->
+    <string name="poster_source_storage">Upload dari perangkat</string>
+    <string name="poster_source_url">URL gambar</string>
+    <string name="fetch_metadata_title">Ambil cover &amp; info</string>
+    <string name="fetch_search_hint">Cari judul dulu...</string>
+    <string name="fetch_search_button">Cari</string>
+    <string name="fetch_no_results">Tidak ditemukan</string>
+    <string name="fetch_failed">Gagal mengambil — isi manual</string>
+    <string name="fetch_applied">Metadata diterapkan, bisa diedit</string>
+    <string name="fetch_loading">Mencari...</string>
+    <string name="tmdb_api_key_title">Kunci API TMDB (opsional)</string>
+    <string name="tmdb_api_key_hint">Tempel kunci untuk link streaming resmi</string>
+    <string name="tmdb_api_key_save">Simpan kunci</string>
+    <string name="tmdb_api_key_cleared">Kunci dihapus</string>
+    <string name="description_label">Deskripsi</string>
+    <string name="add_season">Tambah Season</string>
+    <string name="season_number_label">Season %1$d</string>
+    <string name="pick_folder">Pilih Folder</string>
+    <string name="pick_files">Pilih File</string>
+    <string name="episode_missing">Belum ada</string>
+    <string name="episode_not_matched">Tidak cocok — atur manual</string>
+    <string name="select_episode_title">Pilih Episode</string>
+    <string name="file_not_picked">File belum dipilih untuk episode ini</string>
+    <string name="remove_season">Hapus Season %1$d</string>
+    <string name="episode_picked_ok">Terisi</string>
+
+    <!-- Changelog -->
+    <string name="changelog_title">Yang Baru</string>
+    <string name="changelog_version">Versi %1$s</string>
+    <string name="changelog_got_it">Mengerti</string>
+    <string name="changelog_close">Tutup changelog</string>
+    <string name="changelog_1">Dukungan multi-season — satu judul kini bisa menampung Season 1, 2, dan seterusnya, dengan jumlah episode &amp; progres terpisah</string>
+    <string name="changelog_2">Pemilih episode — ketuk season dan nomor episode (E1, E2…) untuk langsung memutarnya di VLC / MX Player, seperti pemilih di aplikasi mereka</string>
+    <string name="changelog_3">File offline per episode — pilih satu folder penuh atau banyak file; nama seperti S02E05 dicocokkan otomatis, dan tiap episode tetap bisa diperbaiki manual</string>
+    <string name="changelog_4">Upload poster — pilih cover dari penyimpanan perangkat (disimpan di dalam aplikasi) atau tetap pakai URL</string>
+    <string name="changelog_5">Ambil info otomatis — cari di AniList (anime, tanpa kunci) dan TMDB (kunci opsional di Pengaturan Cadangan) untuk mengisi judul, poster, deskripsi, genre, dan link streaming — semuanya tetap bisa diedit</string>
+    <string name="changelog_6">Deskripsi — deskripsi hasil fetch maupun manual kini tampil di layar detail</string>
+    <string name="changelog_7">Label Bahasa Indonesia &amp; Inggris untuk semua fitur baru</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Pengingat aktif untuk %1$s "%2$s"!</string>

@@ -58,9 +58,15 @@ import com.seriee.app.R
 @Composable
 fun Poster(url: String, modifier: Modifier, shape: Shape = RoundedCornerShape(12.dp)) {
     val p = LocalPalette.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     if (url.isNotBlank()) {
+        val model: Any? = when {
+            com.seriee.app.data.PosterStore.isRemoteUrl(url) -> url
+            com.seriee.app.data.PosterStore.isLocalPath(url) -> com.seriee.app.data.PosterStore.fileFor(context, url) ?: url
+            else -> url
+        }
         AsyncImage(
-            model = url,
+            model = model,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = modifier

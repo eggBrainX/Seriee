@@ -52,6 +52,16 @@ class SerieeRepository(context: Context) {
         prefs.edit().putString(KEY_LANG, language.tag).apply()
     }
 
+    fun loadTmdbKey(): String = prefs.getString(KEY_TMDB, "") ?: ""
+    fun saveTmdbKey(key: String) {
+        prefs.edit().putString(KEY_TMDB, key.trim()).apply()
+    }
+
+    fun loadLastSeenVersionCode(): Int = prefs.getInt(KEY_LAST_SEEN_VERSION, 0)
+    fun saveLastSeenVersionCode(code: Int) {
+        prefs.edit().putInt(KEY_LAST_SEEN_VERSION, code).apply()
+    }
+
     private fun toJson(m: MediaItem): JSONObject = JSONObject().apply {
         put("id", m.id)
         put("title", m.title)
@@ -72,6 +82,27 @@ class SerieeRepository(context: Context) {
         put("tags", tagsArr)
         put("rating", m.rating)
         put("updatedAt", m.updatedAt)
+        put("description", m.description)
+        put("source", m.source)
+        put("sourceId", m.sourceId)
+        val seasonsArr = JSONArray()
+        m.seasons.forEach { s ->
+            val sj = JSONObject()
+            sj.put("number", s.number)
+            sj.put("currentEp", s.currentEp)
+            sj.put("totalEp", s.totalEp)
+            val eps = JSONArray()
+            s.episodes.forEach { ep ->
+                val ej = JSONObject()
+                ej.put("number", ep.number)
+                ej.put("uri", ep.uri)
+                ej.put("displayName", ep.displayName)
+                eps.put(ej)
+            }
+            sj.put("episodes", eps)
+            seasonsArr.put(sj)
+        }
+        put("seasons", seasonsArr)
     }
 
     private fun fromJson(o: JSONObject): MediaItem {
@@ -87,6 +118,29 @@ class SerieeRepository(context: Context) {
             else emptyList()
         }
         val parsedRating = o.optInt("rating", 0).coerceIn(0, 5)
+        val parsedSeasons: List<Season> = runCatching {
+            val arr = o.optJSONArray("seasons") ?: return@runCatching emptyList()
+            (0 until arr.length()).map { i ->
+                val sj = arr.getJSONObject(i)
+                val epsArr = sj.optJSONArray("episodes")
+                val eps = if (epsArr != null) {
+                    (0 until epsArr.length()).map { j ->
+                        val ej = epsArr.getJSONObject(j)
+                        EpisodeFile(
+                            number = ej.optInt("number", j + 1),
+                            uri = ej.optString("uri"),
+                            displayName = ej.optString("displayName")
+                        )
+                    }
+                } else emptyList()
+                Season(
+                    number = sj.optInt("number", 1),
+                    currentEp = sj.optInt("currentEp", 0),
+                    totalEp = sj.optInt("totalEp", 1),
+                    episodes = eps
+                )
+            }
+        }.getOrDefault(emptyList())
 
         return MediaItem(
             id = o.optString("id"),
@@ -105,13 +159,17 @@ class SerieeRepository(context: Context) {
             reminderEnabled = o.optBoolean("reminderEnabled", false),
             tags = parsedTags,
             rating = parsedRating,
-            updatedAt = o.optLong("updatedAt", System.currentTimeMillis())
+            updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+            seasons = parsedSeasons,
+            description = o.optString("description"),
+            source = o.optString("source"),
+            sourceId = o.optString("sourceId")
         )
     }
 
     fun exportBackupJson(items: List<MediaItem>): String {
         val root = JSONObject()
-        root.put("version", 1)
+        root.put("version", 2)
         root.put("appName", "Seriee")
         root.put("timestamp", System.currentTimeMillis())
         val arr = JSONArray()
@@ -215,5 +273,7 @@ class SerieeRepository(context: Context) {
         const val KEY_THEME = "seriee_theme"
         const val KEY_GRID = "seriee_grid"
         const val KEY_LANG = "seriee_lang"
+        const val KEY_TMDB = "tmdb_api_key"
+        const val KEY_LAST_SEEN_VERSION = "last_seen_version_code"
     }
 }

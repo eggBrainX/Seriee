@@ -28,6 +28,20 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     val gridView: Boolean get() = _gridView.value
     private val _language = mutableStateOf(repo.loadLanguage())
     val language: AppLanguage get() = _language.value
+    private val _tmdbKey = mutableStateOf(repo.loadTmdbKey())
+    val tmdbKey: String get() = _tmdbKey.value
+
+    private val _showChangelog = mutableStateOf(false)
+    val showChangelog: Boolean get() = _showChangelog.value
+
+    @Suppress("DEPRECATION")
+    val currentVersionCode: Int = runCatching {
+        val pinfo = getApplication<Application>().packageManager.getPackageInfo(getApplication<Application>().packageName, 0)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) pinfo.longVersionCode.toInt() else pinfo.versionCode
+    }.getOrDefault(0)
+    val currentVersionName: String = runCatching {
+        getApplication<Application>().packageManager.getPackageInfo(getApplication<Application>().packageName, 0).versionName ?: "1.2"
+    }.getOrDefault("1.2")
 
     private fun commit(newItems: List<MediaItem>) {
         items = newItems
@@ -36,6 +50,11 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         com.seriee.app.reminder.ReminderScheduler.createNotificationChannel(app)
+        // Show changelog once per version upgrade
+        val lastSeen = repo.loadLastSeenVersionCode()
+        if (lastSeen < currentVersionCode) {
+            _showChangelog.value = true
+        }
         // Refresh alarms for any pending items
         items.forEach { item ->
             if (item.reminderEnabled && item.releaseDate != null && item.releaseDate > System.currentTimeMillis()) {
@@ -46,7 +65,25 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun incrementEpisode(id: String) {
         commit(items.map { m ->
-            if (m.id == id && m.currentEp < m.totalEp) {
+            if (m.id != id) return@map m
+            // Multi-season path
+            if (m.seasons.isNotEmpty()) {
+                val idx = m.seasons.indexOfFirst { it.currentEp < it.totalEp }
+                val newSeasons = if (idx < 0) m.seasons else m.seasons.mapIndexed { i, s ->
+                    if (i == idx) s.copy(currentEp = (s.currentEp + 1).coerceAtMost(s.totalEp)) else s
+                }
+                val watched = newSeasons.sumOf { it.currentEp }
+                val total = newSeasons.sumOf { it.totalEp }
+                val activeSeason = newSeasons.firstOrNull { it.currentEp < it.totalEp } ?: newSeasons.lastOrNull()
+                m.copy(
+                    seasons = newSeasons,
+                    season = activeSeason?.number ?: m.season,
+                    currentEp = watched,
+                    totalEp = total.coerceAtLeast(1),
+                    status = if (watched >= total) WatchStatus.Completed else m.status,
+                    updatedAt = System.currentTimeMillis()
+                )
+            } else if (m.currentEp < m.totalEp) {
                 val next = m.currentEp + 1
                 m.copy(
                     currentEp = next,
@@ -54,6 +91,31 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
                     updatedAt = System.currentTimeMillis()
                 )
             } else m
+        })
+    }
+
+    fun setCurrentEpisode(id: String, seasonNo: Int, epNo: Int) {
+        commit(items.map { m ->
+            if (m.id != id) return@map m
+            if (m.seasons.isNotEmpty()) {
+                val newSeasons = m.seasons.map { s ->
+                    if (s.number == seasonNo) s.copy(currentEp = epNo.coerceIn(0, s.totalEp)) else s
+                }
+                val watched = newSeasons.sumOf { it.currentEp }
+                val total = newSeasons.sumOf { it.totalEp }
+                m.copy(
+                    seasons = newSeasons,
+                    season = seasonNo,
+                    currentEp = watched,
+                    totalEp = total.coerceAtLeast(1),
+                    updatedAt = System.currentTimeMillis()
+                )
+            } else {
+                m.copy(
+                    currentEp = epNo.coerceIn(0, m.totalEp),
+                    updatedAt = System.currentTimeMillis()
+                )
+            }
         })
     }
 
@@ -91,19 +153,42 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun upsert(item: MediaItem) {
-        val exists = items.any { it.id == item.id }
-        commit(if (exists) items.map { if (it.id == item.id) item else it } else listOf(item) + items)
+        val synced = if (item.seasons.isNotEmpty()) {
+            val watched = item.seasons.sumOf { it.currentEp.coerceIn(0, it.totalEp) }
+            val total = item.seasons.sumOf { it.totalEp.coerceAtLeast(1) }
+            val active = item.seasons.firstOrNull { it.currentEp < it.totalEp } ?: item.seasons.lastOrNull()
+            item.copy(season = active?.number ?: item.season, currentEp = watched, totalEp = total.coerceAtLeast(1))
+        } else item
+        val exists = items.any { it.id == synced.id }
+        commit(if (exists) items.map { if (it.id == synced.id) synced else it } else listOf(synced) + items)
 
-        if (item.reminderEnabled && item.releaseDate != null && item.releaseDate > System.currentTimeMillis()) {
-            com.seriee.app.reminder.ReminderScheduler.scheduleReminder(getApplication(), item)
+        if (synced.reminderEnabled && synced.releaseDate != null && synced.releaseDate > System.currentTimeMillis()) {
+            com.seriee.app.reminder.ReminderScheduler.scheduleReminder(getApplication(), synced)
         } else {
-            com.seriee.app.reminder.ReminderScheduler.cancelReminder(getApplication(), item.id)
+            com.seriee.app.reminder.ReminderScheduler.cancelReminder(getApplication(), synced.id)
         }
     }
 
     fun delete(id: String) {
         com.seriee.app.reminder.ReminderScheduler.cancelReminder(getApplication(), id)
+        items.find { it.id == id }?.poster?.let {
+            com.seriee.app.data.PosterStore.deleteIfLocal(getApplication(), it)
+        }
         commit(items.filterNot { it.id == id })
+    }
+
+    fun setTmdbKey(value: String) {
+        _tmdbKey.value = value.trim()
+        repo.saveTmdbKey(value.trim())
+    }
+
+    fun openChangelog() {
+        _showChangelog.value = true
+    }
+
+    fun dismissChangelog() {
+        _showChangelog.value = false
+        repo.saveLastSeenVersionCode(currentVersionCode)
     }
 
     fun setTheme(value: AppTheme) {

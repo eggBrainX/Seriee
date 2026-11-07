@@ -411,7 +411,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                 }
             } else {
                 Text(
-                    "${stringResource(item.type.labelRes)} • ${stringResource(R.string.episode_progress, item.currentEp, item.totalEp)}",
+                    "${stringResource(item.type.labelRes)} • ${stringResource(R.string.episode_progress, item.watchedEpisodes, item.totalEpisodes)}",
                     fontSize = 12.sp,
                     color = p.muted
                 )

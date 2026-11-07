@@ -317,7 +317,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(stringResource(R.string.episode_progress, item.currentEp, item.totalEp), fontSize = 12.sp, color = p.muted)
+                    Text(stringResource(R.string.episode_progress, item.watchedEpisodes, item.totalEpisodes), fontSize = 12.sp, color = p.muted)
                     Text("${item.percent}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = p.text)
                 }
                 Spacer(Modifier.height(6.dp))
@@ -350,7 +350,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     modifier = Modifier.size(18.dp)
                 )
             }
-        } else if (item.currentEp < item.totalEp) {
+        } else if (item.watchedEpisodes < item.totalEpisodes) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
