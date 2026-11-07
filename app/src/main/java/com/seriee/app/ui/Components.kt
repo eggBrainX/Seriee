@@ -60,13 +60,22 @@ fun Poster(url: String, modifier: Modifier, shape: Shape = RoundedCornerShape(12
     val p = LocalPalette.current
     val context = androidx.compose.ui.platform.LocalContext.current
     if (url.isNotBlank()) {
-        val model: Any? = when {
-            com.seriee.app.data.PosterStore.isRemoteUrl(url) -> url
-            com.seriee.app.data.PosterStore.isLocalPath(url) -> com.seriee.app.data.PosterStore.fileFor(context, url) ?: url
-            else -> url
+        val model: Any? = remember(url) {
+            when {
+                com.seriee.app.data.PosterStore.isRemoteUrl(url) -> url
+                com.seriee.app.data.PosterStore.isLocalPath(url) -> com.seriee.app.data.PosterStore.fileFor(context, url) ?: url
+                else -> url
+            }
+        }
+        val request = remember(model) {
+            coil.request.ImageRequest.Builder(context)
+                .data(model)
+                .crossfade(false)
+                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                .build()
         }
         AsyncImage(
-            model = model,
+            model = request,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = modifier

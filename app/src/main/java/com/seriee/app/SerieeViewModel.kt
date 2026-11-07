@@ -40,8 +40,8 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) pinfo.longVersionCode.toInt() else pinfo.versionCode
     }.getOrDefault(0)
     val currentVersionName: String = runCatching {
-        getApplication<Application>().packageManager.getPackageInfo(getApplication<Application>().packageName, 0).versionName ?: "1.2"
-    }.getOrDefault("1.2")
+        getApplication<Application>().packageManager.getPackageInfo(getApplication<Application>().packageName, 0).versionName ?: "1.2.1"
+    }.getOrDefault("1.2.1")
 
     private fun commit(newItems: List<MediaItem>) {
         items = newItems

@@ -221,6 +221,9 @@
     <string name="changelog_5">Auto-fetch info — search AniList (anime, no key needed) and TMDB (optional key in Backup settings) to fill title, poster, description, genres, and streaming links — all still editable</string>
     <string name="changelog_6">Descriptions — fetched and manual descriptions now show on the details screen</string>
     <string name="changelog_7">Indonesian + English labels for all the new features</string>
+    <string name="changelog_8">Smoother scrolling — posters and lists now load and scroll without jank on the Progress and Library screens</string>
+    <string name="changelog_9">Faster list filtering — search and filters update instantly while you type</string>
+    <string name="changelog_10">Bug fix — fixed list recomposition jank and countdown badge rendering on scrolling lists</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Reminder active for %1$s "%2$s"!</string>

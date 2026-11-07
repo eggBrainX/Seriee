@@ -106,7 +106,7 @@ fun SerieeApp(vm: SerieeViewModel) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .shadow(8.dp, CircleShape)
+                    .shadow(4.dp, CircleShape)
                     .clip(CircleShape)
                     .background(Brush.linearGradient(listOf(SerieColors.Blue600, SerieColors.Indigo500)))
                     .clickable {
