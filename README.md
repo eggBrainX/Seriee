@@ -1,6 +1,6 @@
 # 🎬 Seriee
 
-**Pelacak progres tontonan** untuk serial, anime, dan film. Aplikasi Android native, dibuat dengan **Kotlin + Jetpack Compose + Material 3** (tanpa WebView).
+**A watch-progress tracker** for series, anime, and movies. A native Android app built with **Kotlin + Jetpack Compose + Material 3** (no WebView).
 
 ![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
@@ -9,94 +9,94 @@
 
 ---
 
-## ✨ Fitur
+## ✨ Features
 
-### 📈 Tab Progress
-- Kartu progres episode dengan persentase.
-- Filter: **Semua / Watching / Completed**.
-- Tombol **`+`** menambah 1 episode, dan status otomatis menjadi *Completed* saat episode terakhir tercapai.
+### 📈 Progress Tab
+- Episode progress cards with completion percentage.
+- Filters: **All / Watching / Completed**.
+- The **`+`** button adds one episode and automatically sets the status to *Completed* on the last one.
 
-### 📚 Tab Library
-- Pencarian judul dan filter tipe (**Series / Movie**).
-- Tampilan **grid** (3 kolom) atau **list**.
-- **Pin** item favorit, item yang di-pin tampil paling atas.
-- Badge **rating bintang** dan **tag/genre** pada kartu.
+### 📚 Library Tab
+- Title search and type filter (**Series / Movie**).
+- **Grid** (3 columns) or **list** view.
+- **Pin** your favorites; pinned items are shown first.
+- **Star rating** and **tag/genre** badges on cards.
 
-### 📝 Kelola Media
-- Tambah, ubah, dan hapus media: judul, tipe, status, URL poster, season, episode saat ini, dan total episode.
-- Status tersedia: `Watching`, `Completed`, `Plan to Watch`, `Coming Soon`.
-- Rating, tag, dan tanggal rilis.
+### 📝 Manage Media
+- Add, edit, and delete media: title, type, status, poster URL, season, current episode, and total episodes.
+- Available statuses: `Watching`, `Completed`, `Plan to Watch`, `Coming Soon`.
+- Rating, tags, and release date.
 
-### 🔔 Pengingat Jadwal Tayang
-- Atur tanggal & jam rilis (ada preset: Besok, 3 Hari, 1 Minggu, 1 Bulan).
-- Hitung mundur tayang (misal `D-3`, "2 hari 5 jam lagi") di kartu dan detail.
-- Notifikasi pengingat saat jadwal tiba (alarm tepat waktu, tetap berbunyi saat perangkat idle).
-- Tombol uji notifikasi untuk mengecek pengingat.
+### 🔔 Release Reminders
+- Set a release date and time (presets: Tomorrow, 3 Days, 1 Week, 1 Month).
+- Countdown to release (e.g. `D-3`, "2 days 5 hours left") on cards and in the detail view.
+- Notification when the release time arrives (exact alarm, works even when the device is idle).
+- A test button to check that reminders work.
 
-### ▶️ Tonton
-- **Link streaming** dengan preset Netflix, Bilibili, dan YouTube, dibuka di aplikasi atau browser.
-- **Video offline**: pilih file dari penyimpanan, lalu buka di **VLC**, **MX Player**, atau pemutar lain.
+### ▶️ Watch
+- **Streaming link** with presets for Netflix, Bilibili, and YouTube, opened in the app or browser.
+- **Offline video**: pick a file from storage, then open it in **VLC**, **MX Player**, or any other player.
 
-### 💾 Cadangkan & Pulihkan
-- Ekspor seluruh data ke file **JSON**.
-- Impor dari file cadangan dengan dua mode:
-  - **Gabungkan** — menambah data dari file tanpa menghapus data yang ada (disarankan).
-  - **Timpa** — mengganti seluruh data dengan isi file.
-- Pengingat aktif dijadwalkan ulang otomatis setelah pemulihan.
+### 💾 Backup & Restore
+- Export all your data to a **JSON** file.
+- Import a backup file in two modes:
+  - **Merge**: adds items from the file without removing existing ones (recommended).
+  - **Replace**: overwrites all data with the contents of the file.
+- Active reminders are rescheduled automatically after a restore.
 
-### 🎨 Tema
-Empat tema: **Dark**, **AMOLED**, **Frost Glass**, dan **Light**. Pilihan tema dan mode tampilan (grid/list) tersimpan di perangkat.
+### 🎨 Themes
+Four themes: **Dark**, **AMOLED**, **Frost Glass**, and **Light**. Your theme and view mode (grid/list) are saved on the device.
 
 ---
 
-## 🛠️ Teknologi
+## 🛠️ Tech Stack
 
-| Komponen | Versi / Library |
+| Component | Version / Library |
 |---|---|
-| Bahasa | Kotlin |
+| Language | Kotlin |
 | UI | Jetpack Compose + Material 3 (Compose BOM `2024.09.00`) |
-| Arsitektur | ViewModel (`lifecycle-viewmodel-compose`) |
-| Gambar | [Coil](https://coil-kt.github.io/coil/) `2.7.0` |
-| Penyimpanan | `SharedPreferences` (data disimpan sebagai JSON, lokal di perangkat) |
+| Architecture | ViewModel (`lifecycle-viewmodel-compose`) |
+| Images | [Coil](https://coil-kt.github.io/coil/) `2.7.0` |
+| Storage | `SharedPreferences` (data stored as JSON, locally on the device) |
 | Min SDK / Target SDK | 26 (Android 8.0) / 34 |
 | Java / Gradle | 17 / 8.9 |
 
 ---
 
-## 📲 Mendapatkan APK (tanpa Android Studio)
+## 📲 Get the APK (no Android Studio needed)
 
-1. Push repo ini ke GitHub (branch `main`).
-2. Buka tab **Actions → Build APK** (berjalan otomatis saat push, atau klik **Run workflow**).
-3. Setelah selesai, unduh artifact **`seriee-debug-apk`** dari halaman run tersebut.
-4. Ekstrak dan instal `app-debug.apk` di HP.
+1. Push this repo to GitHub (branch `main`).
+2. Open **Actions → Build APK** (it runs automatically on push, or click **Run workflow**).
+3. When it finishes, download the **`seriee-debug-apk`** artifact from the run page.
+4. Extract it and install `app-debug.apk` on your phone.
 
-> Aktifkan *Install from unknown sources* jika diminta oleh Android.
+> Enable *Install from unknown sources* if Android asks for it.
 
 ---
 
-## 🔨 Build Manual
+## 🔨 Build Manually
 
 ### Android Studio
-Buka folder proyek di **Android Studio (Koala atau lebih baru)**, tunggu Gradle sync selesai, lalu tekan **Run**.
+Open the project folder in **Android Studio (Koala or newer)**, wait for Gradle sync to finish, then press **Run**.
 
-Opsional, buat Gradle wrapper sekali saja:
+Optionally, create the Gradle wrapper once:
 ```bash
 gradle wrapper --gradle-version 8.9
 ```
 
 ### Terminal
 ```bash
-gradle assembleDebug        # atau ./gradlew assembleDebug jika wrapper sudah dibuat
+gradle assembleDebug        # or ./gradlew assembleDebug if the wrapper exists
 ```
-Hasil APK: `app/build/outputs/apk/debug/app-debug.apk`
+APK output: `app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 
-## 📁 Struktur Proyek
+## 📁 Project Structure
 
 ```
 Seriee/
-├── .github/workflows/build.yml      # CI: build APK debug
+├── .github/workflows/build.yml      # CI: builds the debug APK
 ├── app/
 │   ├── build.gradle.kts
 │   └── src/main/
@@ -107,9 +107,9 @@ Seriee/
 │           ├── SerieeViewModel.kt
 │           ├── data/
 │           │   ├── Models.kt              # MediaItem, MediaType, WatchStatus, AppTheme
-│           │   └── SerieeRepository.kt    # penyimpanan lokal + backup/restore JSON
+│           │   └── SerieeRepository.kt    # local storage + JSON backup/restore
 │           ├── reminder/
-│           │   ├── ReminderScheduler.kt   # alarm, notifikasi, hitung mundur
+│           │   ├── ReminderScheduler.kt   # alarms, notifications, countdown
 │           │   └── ReminderReceiver.kt
 │           └── ui/
 │               ├── SerieeApp.kt
@@ -128,25 +128,25 @@ Seriee/
 
 ---
 
-## 🔐 Izin Aplikasi
+## 🔐 Permissions
 
-| Izin | Kegunaan |
+| Permission | Purpose |
 |---|---|
-| `INTERNET` | Memuat poster dan membuka link streaming |
-| `POST_NOTIFICATIONS` | Menampilkan notifikasi pengingat tayang |
-| `SCHEDULE_EXACT_ALARM` | Menjadwalkan pengingat tepat waktu |
-| `VIBRATE`, `WAKE_LOCK` | Getar dan membangunkan perangkat saat pengingat |
+| `INTERNET` | Load posters and open streaming links |
+| `POST_NOTIFICATIONS` | Show release reminder notifications |
+| `SCHEDULE_EXACT_ALARM` | Schedule reminders at the exact time |
+| `VIBRATE`, `WAKE_LOCK` | Vibrate and wake the device for reminders |
 
 ---
 
-## 📝 Catatan
+## 📝 Notes
 
-- Poster dimuat dari URL via Coil, jadi memerlukan koneksi internet.
-- Semua data tersimpan **lokal di perangkat**. Gunakan fitur **Cadangkan & Pulihkan** sebelum ganti HP atau menghapus aplikasi.
-- Workflow GitHub Actions menghasilkan **APK debug**. Untuk rilis ke Play Store, diperlukan build release yang ditandatangani (keystore).
+- Posters are loaded from URLs via Coil, so they need an internet connection.
+- All data is stored **locally on your device**. Use **Backup & Restore** before switching phones or uninstalling the app.
+- The GitHub Actions workflow produces a **debug APK**. A Play Store release requires a signed release build (keystore).
 
 ---
 
-## 🤝 Kontribusi
+## 🤝 Contributing
 
-Pull request dan saran sangat diterima. Silakan buka *issue* untuk melaporkan bug atau mengusulkan fitur.
+Pull requests and suggestions are welcome. Feel free to open an issue to report a bug or propose a feature.
