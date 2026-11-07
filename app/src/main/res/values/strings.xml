@@ -208,6 +208,15 @@
     <string name="file_not_picked">File not picked for this episode</string>
     <string name="remove_season">Remove Season %1$d</string>
     <string name="episode_picked_ok">Picked</string>
+    <string name="episode_picked_summary">Picked %1$d / %2$d</string>
+    <string name="episode_missing_only">Missing only</string>
+    <string name="episode_page_range">%1$d–%2$d of %3$d</string>
+    <string name="episode_go_to_hint">Go to E...</string>
+    <string name="episode_prev">Prev</string>
+    <string name="episode_next">Next</string>
+    <string name="episode_all_picked">All episodes picked</string>
+    <string name="episode_page_label">Page %1$d / %2$d</string>
+    <string name="episode_go">Go</string>
 
     <!-- Changelog -->
     <string name="changelog_title">What\'s New</string>
@@ -224,6 +233,9 @@
     <string name="changelog_8">Smoother scrolling — posters and lists now load and scroll without jank on the Progress and Library screens</string>
     <string name="changelog_9">Faster list filtering — search and filters update instantly while you type</string>
     <string name="changelog_10">Bug fix — fixed list recomposition jank and countdown badge rendering on scrolling lists</string>
+    <string name="changelog_11">Long series (100–1000+ episodes) — file picker is now paged (50 per page) with Prev/Next and Go-to, so One Piece–scale lists load and scroll instantly</string>
+    <string name="changelog_12">Missing-only filter + picked counter to spot gaps without scrolling, and the detail screen now opens at the current episode</string>
+    <string name="changelog_13">Faster bulk picking — folder / multiple-file imports now run in the background, no more freezing on large libraries</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Reminder active for %1$s "%2$s"!</string>

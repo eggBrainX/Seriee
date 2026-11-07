@@ -54,7 +54,10 @@ fun ChangelogDialog(
         stringResource(R.string.changelog_7),
         stringResource(R.string.changelog_8),
         stringResource(R.string.changelog_9),
-        stringResource(R.string.changelog_10)
+        stringResource(R.string.changelog_10),
+        stringResource(R.string.changelog_11),
+        stringResource(R.string.changelog_12),
+        stringResource(R.string.changelog_13)
     )
 
     Dialog(

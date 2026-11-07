@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,6 +70,9 @@ import com.seriee.app.reminder.ReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val EPISODES_PAGE_SIZE = 50
+private const val EPISODES_UNPAGED_LIMIT = 100
 
 private data class SeasonDraft(
     val number: Int,
@@ -122,6 +126,11 @@ fun MediaFormDialog(
         )
     }
 
+    // Per-season episode paging (season number -> state). Keeps 1000+ ep lists cheap.
+    val episodePageBySeason = remember { mutableStateMapOf<Int, Int>() }
+    val showMissingOnlyBySeason = remember { mutableStateMapOf<Int, Boolean>() }
+    val gotoEpBySeason = remember { mutableStateMapOf<Int, String>() }
+
     // fetch state
     var fetchQuery by remember { mutableStateOf(initial?.title ?: "") }
     var fetchResults by remember { mutableStateOf<List<MetadataResult>>(emptyList()) }
@@ -144,35 +153,44 @@ fun MediaFormDialog(
     }
 
     fun mergePicked(files: List<Uri>, targetSeasonIdx: Int = 0) {
-        val newDrafts = seasonsDraft.toMutableList()
-        fun ensureIndex(num: Int): Int {
-            var idx = newDrafts.indexOfFirst { it.number == num }
-            if (idx < 0) {
-                newDrafts.add(SeasonDraft(num, "12", "0"))
-                idx = newDrafts.size - 1
+        if (files.isEmpty()) return
+        // 100s/1000s of files: resolver queries + permission grants are IPC — keep off main thread.
+        scope.launch {
+            val parsed = withContext(Dispatchers.IO) {
+                files.map { uri ->
+                    try {
+                        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) {}
+                    val name = displayName(context, uri) ?: uri.lastPathSegment ?: "video"
+                    Triple(uri.toString(), name, EpisodeFileParser.parseSeasonEpisode(name) to EpisodeFileParser.parseEpisode(name))
+                }
             }
-            return idx
-        }
-        for (uri in files) {
-            try {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: Exception) {}
-            val name = displayName(context, uri) ?: uri.lastPathSegment ?: "video"
-            val sx = EpisodeFileParser.parseSeasonEpisode(name)
-            val epParsed = EpisodeFileParser.parseEpisode(name)
-            if (sx != null) {
-                val (sNum, eNum) = sx
-                val idx = ensureIndex(sNum)
-                val d = newDrafts[idx]
-                newDrafts[idx] = d.copy(episodes = d.episodes + (eNum to EpisodeFile(eNum, uri.toString(), name)))
-            } else {
-                val idx = newDrafts.getOrNull(targetSeasonIdx)?.let { targetSeasonIdx } ?: ensureIndex(1)
-                val d = newDrafts[idx]
-                val eNum = epParsed ?: (d.episodes.keys.maxOrNull()?.plus(1) ?: 1)
-                newDrafts[idx] = d.copy(episodes = d.episodes + (eNum to EpisodeFile(eNum, uri.toString(), name)))
+            // Apply on main using latest drafts (user may have edited while parsing).
+            val newDrafts = seasonsDraft.toMutableList()
+            fun ensureIndex(num: Int): Int {
+                var idx = newDrafts.indexOfFirst { it.number == num }
+                if (idx < 0) {
+                    newDrafts.add(SeasonDraft(num, "12", "0"))
+                    idx = newDrafts.size - 1
+                }
+                return idx
             }
+            for ((uriStr, name, pair) in parsed) {
+                val (sx, epParsed) = pair
+                if (sx != null) {
+                    val (sNum, eNum) = sx
+                    val idx = ensureIndex(sNum)
+                    val d = newDrafts[idx]
+                    newDrafts[idx] = d.copy(episodes = d.episodes + (eNum to EpisodeFile(eNum, uriStr, name)))
+                } else {
+                    val idx = newDrafts.getOrNull(targetSeasonIdx)?.let { targetSeasonIdx } ?: ensureIndex(1)
+                    val d = newDrafts[idx]
+                    val eNum = epParsed ?: (d.episodes.keys.maxOrNull()?.plus(1) ?: 1)
+                    newDrafts[idx] = d.copy(episodes = d.episodes + (eNum to EpisodeFile(eNum, uriStr, name)))
+                }
+            }
+            seasonsDraft = newDrafts.sortedBy { it.number }.toMutableList()
         }
-        seasonsDraft = newDrafts.sortedBy { it.number }.toMutableList()
     }
 
     // single file picker (movie / per-episode manual replace target)
@@ -206,21 +224,27 @@ fun MediaFormDialog(
     val folderPickerTarget = remember { mutableIntStateOf(0) }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
-            // Enumerate video files in the tree
-            val files = mutableListOf<Uri>()
-            try {
-                val children = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(uri, android.provider.DocumentsContract.getTreeDocumentId(uri))
-                context.contentResolver.query(children, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
-                    while (cursor.moveToNext()) {
-                        val docId = cursor.getString(0)
-                        val mime = cursor.getString(2)
-                        if (mime != null && mime.startsWith("video/")) {
-                            files.add(android.provider.DocumentsContract.buildDocumentUriUsingTree(uri, docId))
+            // Enumerate video files off the main thread (folders can hold 1000+ files).
+            val target = folderPickerTarget.intValue
+            scope.launch {
+                val files = withContext(Dispatchers.IO) {
+                    val out = mutableListOf<Uri>()
+                    try {
+                        val children = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(uri, android.provider.DocumentsContract.getTreeDocumentId(uri))
+                        context.contentResolver.query(children, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
+                            while (cursor.moveToNext()) {
+                                val docId = cursor.getString(0)
+                                val mime = cursor.getString(2)
+                                if (mime != null && mime.startsWith("video/")) {
+                                    out.add(android.provider.DocumentsContract.buildDocumentUriUsingTree(uri, docId))
+                                }
+                            }
                         }
-                    }
+                    } catch (_: Exception) {}
+                    out
                 }
-            } catch (_: Exception) {}
-            if (files.isNotEmpty()) mergePicked(files, folderPickerTarget.intValue)
+                if (files.isNotEmpty()) mergePicked(files, target)
+            }
         }
     }
 
@@ -678,48 +702,160 @@ fun MediaFormDialog(
                                         contentAlignment = Alignment.Center
                                     ) { Text(stringResource(R.string.pick_files), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.text) }
                                 }
-                                // Episode list
+                                // Episode list — paged for long shows (e.g. 1000+ eps), direct for small ones.
                                 val total = (draft.totalEpStr.toIntOrNull() ?: 1).coerceAtLeast(1)
-                                val missingCount = (1..total).count { it !in draft.episodes }
+                                val pickedCount = remember(draft.episodes, total) {
+                                    draft.episodes.count { it.key in 1..total }
+                                }
+                                val missingCount = total - pickedCount
+                                val showMissingOnly = showMissingOnlyBySeason[draft.number] == true
+                                val visibleTotal = if (showMissingOnly) missingCount else total
+                                val isPaged = visibleTotal > EPISODES_UNPAGED_LIMIT
+
+                                // Summary + missing-only filter (lets user fix gaps without scrolling 1000 rows)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        stringResource(R.string.episode_picked_summary, pickedCount, total),
+                                        fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text
+                                    )
+                                    if (draft.episodes.isNotEmpty() && missingCount in 1..(total - 1)) {
+                                        val chipSelected = showMissingOnly
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(100.dp))
+                                                .background(if (chipSelected) SerieColors.Blue600 else p.chip)
+                                                .border(1.dp, if (chipSelected) SerieColors.Blue600 else p.border, RoundedCornerShape(100.dp))
+                                                .clickable {
+                                                    showMissingOnlyBySeason[draft.number] = !chipSelected
+                                                    episodePageBySeason[draft.number] = 0
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                stringResource(R.string.episode_missing_only),
+                                                fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                                                color = if (chipSelected) Color.White else p.muted
+                                            )
+                                        }
+                                    }
+                                }
                                 if (missingCount > 0 && draft.episodes.isNotEmpty()) {
                                     Text(
                                         stringResource(R.string.episode_not_matched),
                                         fontSize = 10.sp, color = p.muted
                                     )
                                 }
-                                for (ep in 1..total) {
-                                    val file = draft.episodes[ep]
+
+                                val missingEps = if (showMissingOnly) {
+                                    remember(draft.episodes, total) {
+                                        (1..total).filter { it !in draft.episodes }
+                                    }
+                                } else emptyList()
+
+                                val pageCount = if (visibleTotal <= 0) 1 else (visibleTotal + EPISODES_PAGE_SIZE - 1) / EPISODES_PAGE_SIZE
+                                val rawPage = episodePageBySeason[draft.number] ?: 0
+                                val safePage = rawPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+
+                                val pageEps: List<Int> = if (isPaged) {
+                                    if (showMissingOnly) {
+                                        val from = (safePage * EPISODES_PAGE_SIZE).coerceIn(0, missingEps.size)
+                                        val to = (from + EPISODES_PAGE_SIZE).coerceAtMost(missingEps.size)
+                                        if (from >= to) emptyList() else missingEps.subList(from, to)
+                                    } else {
+                                        val from = safePage * EPISODES_PAGE_SIZE + 1
+                                        val to = (from + EPISODES_PAGE_SIZE - 1).coerceAtMost(total)
+                                        (from..to).toList()
+                                    }
+                                } else {
+                                    if (showMissingOnly) missingEps else (1..total).toList()
+                                }
+
+                                if (isPaged) {
+                                    val gotoText = gotoEpBySeason[draft.number] ?: ""
+                                    val goToPage: () -> Unit = {
+                                        val target = gotoText.toIntOrNull()
+                                        if (target != null) {
+                                            val clamped = target.coerceIn(1, total)
+                                            val destPage = if (showMissingOnly) {
+                                                val idx = missingEps.indexOf(clamped)
+                                                if (idx >= 0) idx / EPISODES_PAGE_SIZE else safePage
+                                            } else {
+                                                (clamped - 1) / EPISODES_PAGE_SIZE
+                                            }
+                                            episodePageBySeason[draft.number] = destPage
+                                            gotoEpBySeason[draft.number] = ""
+                                        }
+                                    }
+                                    // Pager controls
                                     Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(p.chip)
-                                            .padding(horizontal = 10.dp, vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("E$ep", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text, modifier = Modifier.width(32.dp))
-                                        Text(
-                                            file?.displayName ?: stringResource(R.string.episode_missing),
-                                            fontSize = 11.sp, color = if (file != null) SerieColors.Emerald else p.muted,
-                                            maxLines = 1, modifier = Modifier.weight(1f)
-                                        )
-                                        if (file != null) {
+                                        EpisodePagerButton(
+                                            label = stringResource(R.string.episode_prev),
+                                            enabled = safePage > 0
+                                        ) { episodePageBySeason[draft.number] = (safePage - 1).coerceAtLeast(0) }
+                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text(
-                                                stringResource(R.string.episode_picked_ok),
-                                                fontSize = 9.sp, color = SerieColors.Emerald,
-                                                modifier = Modifier.padding(end = 6.dp)
+                                                if (pageEps.isEmpty()) "0 of $visibleTotal"
+                                                else stringResource(
+                                                    R.string.episode_page_range,
+                                                    pageEps.first(), pageEps.last(), visibleTotal
+                                                ),
+                                                fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text
+                                            )
+                                            Text(
+                                                stringResource(R.string.episode_page_label, safePage + 1, pageCount),
+                                                fontSize = 9.sp, color = p.muted
                                             )
                                         }
+                                        EpisodePagerButton(
+                                            label = stringResource(R.string.episode_next),
+                                            enabled = safePage < pageCount - 1
+                                        ) { episodePageBySeason[draft.number] = (safePage + 1).coerceAtMost((pageCount - 1).coerceAtLeast(0)) }
+                                    }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        SField(
+                                            value = gotoText,
+                                            onChange = { gotoEpBySeason[draft.number] = it.filter(Char::isDigit).take(4) },
+                                            placeholder = stringResource(R.string.episode_go_to_hint),
+                                            keyboardType = KeyboardType.Number,
+                                            modifier = Modifier.weight(1f)
+                                        )
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(if (file != null) SerieColors.Emerald.copy(alpha = 0.15f) else SerieColors.Blue600.copy(alpha = 0.15f))
-                                                .clickable {
-                                                    manualTarget = sIdx to ep
-                                                    picker.launch(arrayOf("video/*"))
-                                                }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) { Text(if (file != null) "✓" else "+", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (file != null) SerieColors.Emerald else SerieColors.Blue400) }
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(SerieColors.Blue600)
+                                                .clickable(enabled = gotoText.isNotBlank(), onClick = goToPage)
+                                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(stringResource(R.string.episode_go), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        }
+                                    }
+                                }
+
+                                if (pageEps.isEmpty() && showMissingOnly) {
+                                    Text(stringResource(R.string.episode_all_picked), fontSize = 11.sp, color = SerieColors.Emerald)
+                                } else {
+                                    // Only the visible page is composed — 50 rows max even for 1000+ ep shows.
+                                    pageEps.forEach { ep ->
+                                        EpisodeAssignRow(
+                                            ep = ep,
+                                            file = draft.episodes[ep],
+                                            onPick = {
+                                                manualTarget = sIdx to ep
+                                                picker.launch(arrayOf("video/*"))
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -836,6 +972,61 @@ private fun PresetChip(label: String, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) { Text(label, fontSize = 11.sp, color = p.text) }
+}
+
+@Composable
+private fun EpisodePagerButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (enabled) p.chip else p.chip.copy(alpha = 0.5f))
+            .border(1.dp, p.border, RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (enabled) p.text else p.muted
+        )
+    }
+}
+
+@Composable
+private fun EpisodeAssignRow(ep: Int, file: EpisodeFile?, onPick: () -> Unit) {
+    val p = LocalPalette.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(p.chip)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("E$ep", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text, modifier = Modifier.width(48.dp))
+        Text(
+            file?.displayName ?: stringResource(R.string.episode_missing),
+            fontSize = 11.sp, color = if (file != null) SerieColors.Emerald else p.muted,
+            maxLines = 1, modifier = Modifier.weight(1f)
+        )
+        if (file != null) {
+            Text(
+                stringResource(R.string.episode_picked_ok),
+                fontSize = 9.sp, color = SerieColors.Emerald,
+                modifier = Modifier.padding(end = 6.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(if (file != null) SerieColors.Emerald.copy(alpha = 0.15f) else SerieColors.Blue600.copy(alpha = 0.15f))
+                .clickable(onClick = onPick)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) { Text(if (file != null) "✓" else "+", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (file != null) SerieColors.Emerald else SerieColors.Blue400) }
+    }
 }
 
 @Composable

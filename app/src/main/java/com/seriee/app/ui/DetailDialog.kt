@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -370,19 +373,31 @@ fun DetailDialog(
                     if (item.type == MediaType.Series) {
                         val season = seasons.getOrNull(safeSeasonIdx) ?: seasons.firstOrNull()
                         if (season != null) {
+                            // Map lookup avoids O(n^2) find-in-loop for 1000+ ep shows.
+                            val episodeByNumber = remember(season.episodes) {
+                                season.episodes.associateBy { it.number }
+                            }
+                            val totalEpSafe = season.totalEp.coerceAtLeast(1)
+                            val epListState = rememberLazyListState()
+                            // Start at current episode instead of E1.
+                            LaunchedEffect(season.number, season.currentEp, totalEpSafe) {
+                                val targetIdx = (season.currentEp - 1).coerceIn(0, (totalEpSafe - 1).coerceAtLeast(0))
+                                epListState.scrollToItem(targetIdx)
+                            }
                             Text(
                                 stringResource(R.string.select_episode_title),
                                 fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.muted
                             )
                             Spacer(Modifier.height(6.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
+                            // LazyRow composes only visible chips — smooth for 100+ / 1000+ episodes.
+                            LazyRow(
+                                state = epListState,
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                for (ep in 1..season.totalEp.coerceAtLeast(1)) {
-                                    val file = season.episodes.find { it.number == ep }
+                                items(count = totalEpSafe, key = { "ep$it" }, contentType = { 0 }) { idx ->
+                                    val ep = idx + 1
+                                    val file = episodeByNumber[ep]
                                     val isCurrent = ep == season.currentEp
                                     Box(
                                         modifier = Modifier
@@ -413,7 +428,7 @@ fun DetailDialog(
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            val currentFile = season.episodes.find { it.number == season.currentEp }
+                            val currentFile = episodeByNumber[season.currentEp]
                             Text(
                                 "S${season.number}E${season.currentEp} — ${currentFile?.displayName ?: stringResource(R.string.episode_missing)}",
                                 fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = SerieColors.Blue400,

@@ -208,6 +208,15 @@
     <string name="file_not_picked">File belum dipilih untuk episode ini</string>
     <string name="remove_season">Hapus Season %1$d</string>
     <string name="episode_picked_ok">Terisi</string>
+    <string name="episode_picked_summary">Terisi %1$d / %2$d</string>
+    <string name="episode_missing_only">Hanya yang kosong</string>
+    <string name="episode_page_range">%1$d–%2$d dari %3$d</string>
+    <string name="episode_go_to_hint">Ke E...</string>
+    <string name="episode_prev">Sebelumnya</string>
+    <string name="episode_next">Berikutnya</string>
+    <string name="episode_all_picked">Semua episode sudah terpilih</string>
+    <string name="episode_page_label">Halaman %1$d / %2$d</string>
+    <string name="episode_go">Ke</string>
 
     <!-- Changelog -->
     <string name="changelog_title">Yang Baru</string>
@@ -224,6 +233,9 @@
     <string name="changelog_8">Scroll lebih mulus — poster dan daftar kini dimuat dan di-scroll tanpa patah-patah di layar Progres &amp; Pustaka</string>
     <string name="changelog_9">Filter daftar lebih cepat — pencarian dan filter diperbarui langsung saat kamu mengetik</string>
     <string name="changelog_10">Perbaikan bug — memperlancar recomposition daftar dan rendering badge hitung mundur saat scrolling</string>
+    <string name="changelog_11">Serial panjang (100–1000+ episode) — pemilih file kini berhalaman (50 per halaman) dengan Sebelumnya/Berikutnya dan Lompat ke, sehingga daftar skala One Piece dimuat dan di-scroll seketika</string>
+    <string name="changelog_12">Filter hanya-yang-kosong + penghitung terisi untuk menemukan celah tanpa scroll, dan layar detail kini membuka di episode saat ini</string>
+    <string name="changelog_13">Pilih massal lebih cepat — impor folder / banyak file kini berjalan di background, tidak lagi macet di perpustakaan besar</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Pengingat aktif untuk %1$s "%2$s"!</string>
