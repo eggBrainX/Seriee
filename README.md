@@ -63,12 +63,7 @@ Four themes: **Dark**, **AMOLED**, **Frost Glass**, and **Light**. Your theme an
 
 ---
 
-## 📲 Get the APK (no Android Studio needed)
-
-1. Push this repo to GitHub (branch `main`).
-2. Open **Actions → Build APK** (it runs automatically on push, or click **Run workflow**).
-3. When it finishes, download the **`seriee-debug-apk`** artifact from the run page.
-4. Extract it and install `app-debug.apk` on your phone.
+## 📲 install the APK
 
 > Enable *Install from unknown sources* if Android asks for it.
 
