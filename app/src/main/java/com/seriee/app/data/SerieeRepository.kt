@@ -45,6 +45,13 @@ class SerieeRepository(context: Context) {
         prefs.edit().putBoolean(KEY_GRID, grid).apply()
     }
 
+    fun loadLanguage(): AppLanguage =
+        AppLanguage.fromTag(prefs.getString(KEY_LANG, AppLanguage.English.tag))
+
+    fun saveLanguage(language: AppLanguage) {
+        prefs.edit().putString(KEY_LANG, language.tag).apply()
+    }
+
     private fun toJson(m: MediaItem): JSONObject = JSONObject().apply {
         put("id", m.id)
         put("title", m.title)
@@ -207,5 +214,6 @@ class SerieeRepository(context: Context) {
         const val KEY_DATA = "seriee_data_v2"
         const val KEY_THEME = "seriee_theme"
         const val KEY_GRID = "seriee_grid"
+        const val KEY_LANG = "seriee_lang"
     }
 }
