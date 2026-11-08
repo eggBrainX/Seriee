@@ -373,8 +373,8 @@ fun BackupRestoreDialog(
                         fontSize = 12.sp, color = p.muted
                     )
                     var keyInput by remember { mutableStateOf(vm.tmdbKey) }
-                    // Hidden by default once a key is saved — eye icon toggles reveal
-                    var showKey by remember { mutableStateOf(false) }
+                    // Visible while entering a new key, hidden after save — eye icon toggles reveal
+                    var showKey by remember { mutableStateOf(vm.tmdbKey.isBlank()) }
                     val isSaved = vm.tmdbKey.isNotBlank()
                     SField(
                         value = keyInput,
