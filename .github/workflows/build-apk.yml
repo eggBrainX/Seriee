@@ -140,7 +140,6 @@ jobs:
               lines += [""]
           lines += [
               "Download the `.apk` asset below and install it directly.",
-              "(The *Actions → Artifacts* download is a `.zip`, by GitHub design.)",
               "",
           ]
           with open("release-notes.md", "w", encoding="utf-8") as fh:
