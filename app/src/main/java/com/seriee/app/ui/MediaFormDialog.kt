@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -395,6 +396,7 @@ fun MediaFormDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(max = 640.dp)
                 .padding(16.dp),
             shape = RoundedCornerShape(24.dp),
             color = p.surface,
@@ -508,29 +510,6 @@ fun MediaFormDialog(
                             }
                         }
                     }, placeholder = stringResource(R.string.title_placeholder))
-                }
-
-                // Description
-                Column {
-                    FieldLabel(stringResource(R.string.description_label))
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        placeholder = { Text("", fontSize = 14.sp) },
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = p.text,
-                            unfocusedTextColor = p.text,
-                            focusedContainerColor = p.bg,
-                            unfocusedContainerColor = p.bg,
-                            cursorColor = SerieColors.Blue500,
-                            focusedBorderColor = SerieColors.Blue500,
-                            unfocusedBorderColor = p.border
-                        )
-                    )
                 }
 
                 // Description
@@ -765,7 +744,7 @@ fun MediaFormDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                stringResource(R.string.season),
+                                stringResource(R.string.seasons),
                                 fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.muted,
                                 modifier = Modifier.weight(1f)
                             )

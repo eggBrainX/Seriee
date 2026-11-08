@@ -148,8 +148,9 @@ fun DetailDialog(
                         StarRatingBar(
                             rating = item.rating,
                             onRatingChange = onUpdateRating,
-                            starSize = 18.dp,
-                            showLabel = true
+                            starSize = 16.dp,
+                            showLabel = true,
+                            labelBelow = true
                         )
                     }
                 }

@@ -225,10 +225,20 @@ fun StarRatingBar(
     modifier: Modifier = Modifier,
     maxStars: Int = 5,
     starSize: Dp = 24.dp,
-    showLabel: Boolean = true
+    showLabel: Boolean = true,
+    labelBelow: Boolean = false
 ) {
     val p = LocalPalette.current
     val starColor = SerieColors.Amber
+    val labelText = when (rating) {
+        5 -> stringResource(R.string.rating_masterpiece)
+        4 -> stringResource(R.string.rating_great)
+        3 -> stringResource(R.string.rating_good)
+        2 -> stringResource(R.string.rating_okay)
+        1 -> stringResource(R.string.rating_poor)
+        else -> stringResource(R.string.rating_none)
+    }
+    val labelColor = if (rating > 0) starColor else p.muted
 
     Column(modifier = modifier) {
         Row(
@@ -261,22 +271,26 @@ fun StarRatingBar(
                     )
                 }
             }
-            if (showLabel) {
+            if (showLabel && !labelBelow) {
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = when (rating) {
-                        5 -> stringResource(R.string.rating_masterpiece)
-                        4 -> stringResource(R.string.rating_great)
-                        3 -> stringResource(R.string.rating_good)
-                        2 -> stringResource(R.string.rating_okay)
-                        1 -> stringResource(R.string.rating_poor)
-                        else -> stringResource(R.string.rating_none)
-                    },
+                    text = labelText,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (rating > 0) starColor else p.muted
+                    color = labelColor,
+                    maxLines = 1
                 )
             }
+        }
+        if (showLabel && labelBelow) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = labelText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = labelColor,
+                maxLines = 1
+            )
         }
     }
 }

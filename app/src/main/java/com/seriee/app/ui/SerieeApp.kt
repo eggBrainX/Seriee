@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
@@ -133,7 +134,11 @@ fun SerieeApp(vm: SerieeViewModel) {
                 padding = padding,
                 onSetGrid = vm::setGridView,
                 onOpen = { detailId = it.id },
-                onPin = vm::togglePin
+                onPin = vm::togglePin,
+                onAdd = {
+                    editingId = null
+                    showForm = true
+                }
             )
         }
     }
@@ -300,6 +305,16 @@ private fun SerieeTopBar(
                                     fontWeight = if (lang == currentLanguage) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
+                            leadingIcon = if (lang == currentLanguage) {
+                                {
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = SerieColors.Blue400,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            } else null,
                             onClick = {
                                 onLanguage(lang)
                                 languageMenu = false

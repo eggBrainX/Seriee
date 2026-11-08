@@ -79,6 +79,8 @@
     <string name="tap_to_change_release">Tap to change release date/time</string>
     <string name="poster_url_optional">Poster Cover URL (Optional)</string>
     <string name="season">Season</string>
+    <string name="seasons">Seasons</string>
+    <string name="add_first_title">Add your first title</string>
     <string name="current_episode">Current Ep</string>
     <string name="total_episodes">Total Ep</string>
     <string name="streaming_link_optional">Streaming Link / App (Optional)</string>

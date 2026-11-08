@@ -318,6 +318,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                 Spacer(Modifier.height(6.dp))
                 LinearProgressIndicator(
                     progress = { visualProgress },
+                    drawStopIndicator = {},
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)
@@ -350,6 +351,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                 Spacer(Modifier.height(6.dp))
                 LinearProgressIndicator(
                     progress = { item.fraction },
+                    drawStopIndicator = {},
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)

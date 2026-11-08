@@ -69,7 +69,8 @@ fun LibraryScreen(
     padding: PaddingValues,
     onSetGrid: (Boolean) -> Unit,
     onOpen: (MediaItem) -> Unit,
-    onPin: (String) -> Unit
+    onPin: (String) -> Unit,
+    onAdd: () -> Unit
 ) {
     val p = LocalPalette.current
     var query by rememberSaveable { mutableStateOf("") }
@@ -184,13 +185,35 @@ fun LibraryScreen(
         }
 
         if (filtered.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
-                Text(
-                    if (query.isNotBlank()) stringResource(R.string.no_library_results, query)
-                    else stringResource(R.string.no_library_items),
-                    color = p.muted,
-                    fontSize = 14.sp
-                )
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        if (query.isNotBlank()) stringResource(R.string.no_library_results, query)
+                        else stringResource(R.string.no_library_items),
+                        color = p.muted,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    if (query.isBlank() && list.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(SerieColors.Blue600)
+                                .clickable(onClick = onAdd)
+                                .padding(horizontal = 18.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                stringResource(R.string.add_first_title),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
             }
         } else if (gridView) {
             LazyVerticalGrid(

@@ -79,6 +79,8 @@
     <string name="tap_to_change_release">Ketuk untuk ubah tanggal/jam rilis</string>
     <string name="poster_url_optional">URL Poster Cover (Opsional)</string>
     <string name="season">Musim</string>
+    <string name="seasons">Semua Musim</string>
+    <string name="add_first_title">Tambah judul pertamamu</string>
     <string name="current_episode">Ep Saat Ini</string>
     <string name="total_episodes">Total Ep</string>
     <string name="streaming_link_optional">Link Streaming / Aplikasi (Opsional)</string>
