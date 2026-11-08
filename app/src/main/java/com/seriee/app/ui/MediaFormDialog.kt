@@ -63,6 +63,7 @@ import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
 import com.seriee.app.data.MetadataRepository
 import com.seriee.app.data.MetadataResult
+import com.seriee.app.data.parseSeasonNumberFromText
 import com.seriee.app.data.PosterStore
 import com.seriee.app.data.Season
 import com.seriee.app.data.WatchStatus
@@ -152,15 +153,24 @@ fun MediaFormDialog(
         }
     }
 
-    fun mergePicked(files: List<Uri>, targetSeasonIdx: Int = 0) {
+    // [persistTreeUri] = tree URI returned by OpenDocumentTree() that owns these descendants.
+    // When non-null, the caller must have persisted that tree URI already (see folderPicker)
+    // and per-child persist attempts must be skipped: descendants built with
+    // buildDocumentUriUsingTree() cannot take individual persistable grants
+    // (that call throws and is swallowed, leaving no grant after reboot).
+    // When null, [files] came from OpenMultipleDocuments()/OpenDocument() and each URI
+    // can and must take its own persistable grant.
+    fun mergePicked(files: List<Uri>, targetSeasonIdx: Int = 0, persistTreeUri: Uri? = null) {
         if (files.isEmpty()) return
         // 100s/1000s of files: resolver queries + permission grants are IPC — keep off main thread.
         scope.launch {
             val parsed = withContext(Dispatchers.IO) {
                 files.map { uri ->
-                    try {
-                        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    } catch (_: Exception) {}
+                    if (persistTreeUri == null) {
+                        try {
+                            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        } catch (_: Exception) {}
+                    }
                     val name = displayName(context, uri) ?: uri.lastPathSegment ?: "video"
                     Triple(uri.toString(), name, EpisodeFileParser.parseSeasonEpisode(name) to EpisodeFileParser.parseEpisode(name))
                 }
@@ -224,6 +234,13 @@ fun MediaFormDialog(
     val folderPickerTarget = remember { mutableIntStateOf(0) }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
+            // Persist the picker-returned tree URI BEFORE enumerating/saving descendants.
+            // Descendants built with DocumentsContract.buildDocumentUriUsingTree() cannot
+            // take their own persistable grants — persistence comes from the tree grant.
+            // Without this, saved episode URIs stop opening after process death / reboot.
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
             // Enumerate video files off the main thread (folders can hold 1000+ files).
             val target = folderPickerTarget.intValue
             scope.launch {
@@ -243,7 +260,8 @@ fun MediaFormDialog(
                     } catch (_: Exception) {}
                     out
                 }
-                if (files.isNotEmpty()) mergePicked(files, target)
+                // Pass the persisted tree URI so mergePicked skips per-child persist attempts.
+                if (files.isNotEmpty()) mergePicked(files, target, persistTreeUri = uri)
             }
         }
     }
@@ -286,6 +304,7 @@ fun MediaFormDialog(
 
     fun applyFetch(r: MetadataResult) {
         title = r.title
+        type = r.type
         if (r.posterUrl.isNotBlank()) {
             poster = r.posterUrl
             posterIsStorage = false
@@ -294,13 +313,29 @@ fun MediaFormDialog(
         source = r.source
         sourceId = r.sourceId
         if (r.tags.isNotEmpty()) tags = r.tags
+        // Season comes from the source result (AniList entry / TMDB season numbers),
+        // falling back to parsing the fetched title. This keeps "…Season 4" from
+        // saving as a Season 1 card — so Pick Folder targets Season 4.
+        val detectedSeason = r.seasonNumbers.firstOrNull()?.takeIf { it > 0 }
+            ?: parseSeasonNumberFromText(r.title)
         if (r.seasonEpisodeCounts.isNotEmpty()) {
             val drafts = r.seasonEpisodeCounts.mapIndexed { idx, total ->
-                val existing = seasonsDraft.getOrNull(idx)
-                val num = existing?.number ?: (idx + 1)
+                val num = r.seasonNumbers.getOrNull(idx)?.takeIf { it > 0 }
+                    ?: detectedSeason
+                    ?: seasonsDraft.getOrNull(idx)?.number
+                    ?: (idx + 1)
+                val existing = seasonsDraft.firstOrNull { it.number == num }
+                    ?: seasonsDraft.getOrNull(idx)
                 SeasonDraft(num, total.toString(), existing?.currentEpStr ?: "0", existing?.episodes ?: emptyMap())
             }.toMutableList()
             seasonsDraft = drafts
+        } else if (detectedSeason != null) {
+            val existing = seasonsDraft.firstOrNull { it.number == detectedSeason }
+                ?: if (seasonsDraft.size == 1) seasonsDraft.firstOrNull { it.episodes.isEmpty() } else null
+            seasonsDraft = mutableListOf(
+                existing?.copy(number = detectedSeason)
+                    ?: SeasonDraft(detectedSeason, "12", "0", emptyMap())
+            )
         }
         if (r.streamCandidates.isNotEmpty()) {
             if (streamUrl.isBlank()) streamUrl = r.streamCandidates.first().url
@@ -380,6 +415,8 @@ fun MediaFormDialog(
                         Text(stringResource(R.string.fetch_no_results), fontSize = 12.sp, color = p.muted)
                     }
                     fetchResults.forEach { r ->
+                        val resultSeason = r.seasonNumbers.firstOrNull()?.takeIf { it > 0 }
+                            ?: parseSeasonNumberFromText(r.title)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -394,7 +431,9 @@ fun MediaFormDialog(
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(r.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = p.text, maxLines = 1)
-                                Text("${r.source} ${r.year}".trim(), fontSize = 11.sp, color = p.muted)
+                                val seasonLabel = if (r.type == MediaType.Series && resultSeason != null && resultSeason > 1)
+                                    " · " + stringResource(R.string.season_format, resultSeason) else ""
+                                Text(("${r.source} ${r.year}".trim() + seasonLabel), fontSize = 11.sp, color = p.muted)
                             }
                             Box(
                                 modifier = Modifier
@@ -409,7 +448,20 @@ fun MediaFormDialog(
 
                 Column {
                     FieldLabel(stringResource(R.string.title_label))
-                    SField(title, { title = it }, placeholder = stringResource(R.string.title_placeholder))
+                    SField(title, {
+                        title = it
+                        // Manual entry (no fetch result): keep a single untouched season card
+                        // in sync with "Season N" in the title — e.g. typing
+                        // "Re:ZERO -Starting Life…- Season 4" switches Season 1 → Season 4
+                        // so Pick Folder targets the right season. Never moves picked files.
+                        val detected = parseSeasonNumberFromText(it)
+                        if (detected != null && type == MediaType.Series && seasonsDraft.size == 1) {
+                            val only = seasonsDraft.first()
+                            if (only.episodes.isEmpty() && only.number != detected) {
+                                seasonsDraft = listOf(only.copy(number = detected)).toMutableList()
+                            }
+                        }
+                    }, placeholder = stringResource(R.string.title_placeholder))
                 }
 
                 // Description
