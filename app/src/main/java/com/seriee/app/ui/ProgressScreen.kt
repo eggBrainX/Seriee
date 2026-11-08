@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -60,7 +61,10 @@ fun ProgressScreen(
     list: List<MediaItem>,
     padding: PaddingValues,
     onOpen: (MediaItem) -> Unit,
-    onIncrement: (String) -> Unit
+    onIncrement: (String) -> Unit,
+    streakDays: Int = 0,
+    bestStreak: Int = 0,
+    watchDays: Set<String> = emptySet()
 ) {
     val p = LocalPalette.current
     var query by rememberSaveable { mutableStateOf("") }
@@ -116,6 +120,8 @@ fun ProgressScreen(
                 fontSize = 12.sp,
                 color = p.muted
             )
+
+            StreakCard(streakDays = streakDays, bestStreak = bestStreak, watchDays = watchDays)
 
             SField(
                 value = query,
@@ -399,6 +405,78 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.completed), tint = SerieColors.Emerald, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun StreakCard(streakDays: Int, bestStreak: Int, watchDays: Set<String>) {
+    val p = LocalPalette.current
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(p.card)
+            .border(1.dp, p.border, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(SerieColors.Orange.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.Whatshot,
+                contentDescription = stringResource(R.string.streak_label),
+                tint = SerieColors.Orange,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.streak_label), fontSize = 11.sp, color = p.muted)
+            Text(
+                if (streakDays > 0) stringResource(R.string.streak_days, streakDays) else "—",
+                fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.text
+            )
+            Text(
+                stringResource(R.string.best_streak, bestStreak),
+                fontSize = 11.sp, color = p.muted
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            val today = remember { java.time.LocalDate.now() }
+            for (offset in 6 downTo 0) {
+                val date = today.minusDays(offset.toLong())
+                val active = watchDays.contains(date.toString())
+                val letter = date.dayOfWeek.getDisplayName(
+                    java.time.format.TextStyle.NARROW,
+                    context.resources.configuration.locales[0]
+                ).uppercase().take(1)
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (active) SerieColors.Orange else p.chip)
+                        .border(
+                            1.dp,
+                            if (date == today) SerieColors.Orange else Color.Transparent,
+                            RoundedCornerShape(50)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        letter,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (active) Color.White else p.muted
+                    )
+                }
             }
         }
     }

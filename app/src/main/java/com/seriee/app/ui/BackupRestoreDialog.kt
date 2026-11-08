@@ -156,8 +156,28 @@ fun BackupRestoreDialog(
                         stringResource(R.string.current_data, vm.items.size),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = p.text
+                        color = p.text,
+                        modifier = Modifier.weight(1f)
                     )
+                    Text(
+                        if (vm.streakDays > 0) stringResource(R.string.streak_days, vm.streakDays)
+                        else stringResource(R.string.best_streak, vm.bestStreak),
+                        fontSize = 11.sp,
+                        color = p.muted
+                    )
+                    if (vm.streakDays > 0 || vm.bestStreak > 0) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.reset_streak),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = SerieColors.Red,
+                            modifier = Modifier.clickable {
+                                vm.resetStreak()
+                                android.widget.Toast.makeText(context, context.getString(R.string.streak_reset_done), android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
                 }
 
                 // Section 1: Backup / Export

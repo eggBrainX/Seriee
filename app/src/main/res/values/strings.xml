@@ -223,6 +223,12 @@
     <string name="episode_page_label">Page %1$d / %2$d</string>
     <string name="episode_go">Go</string>
 
+    <string name="streak_label">Daily streak</string>
+    <string name="streak_days">%1$d days</string>
+    <string name="best_streak">Best: %1$d days</string>
+    <string name="reset_streak">Reset streak</string>
+    <string name="streak_reset_done">Streak reset</string>
+
     <!-- Changelog -->
     <string name="changelog_title">What\'s New</string>
     <string name="changelog_version">Version %1$s</string>
@@ -234,6 +240,8 @@
     <string name="changelog_4">Library grid — adaptive columns, real 2:3 poster shape, two-line titles, and up to two tags with a +N counter</string>
     <string name="changelog_5">Library list — 2:3 thumbnails, two-line titles, and a single-line metadata row that no longer overflows</string>
     <string name="changelog_6">One rating badge per item — the duplicate star badge next to long titles is gone, giving titles more room</string>
+    <string name="changelog_7">Daily streak — watch an episode every day to build your streak, with a flame badge, week strip, and best streak in Progress</string>
+    <string name="changelog_8">TVMaze search (free, no key) — precise next-episode airtimes for Western TV, backing up the Coming Soon countdown alongside AniList and TMDB</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Reminder active for %1$s "%2$s"!</string>

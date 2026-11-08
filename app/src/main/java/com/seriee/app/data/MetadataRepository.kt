@@ -72,6 +72,10 @@ class MetadataRepository {
             val results = mutableListOf<MetadataResult>()
             val anilist = runCatching { searchAniList(trimmed) }
             anilist.getOrNull()?.let { results.addAll(it) }
+            // TVMaze: free, no key. Best source of precise next-episode airtimes
+            // for Western TV, so it sits between AniList and TMDB.
+            val tvmaze = runCatching { searchTVMaze(trimmed) }
+            tvmaze.getOrNull()?.let { results.addAll(it) }
             if (!tmdbKey.isNullOrBlank()) {
                 val tmdb = runCatching { searchTmdb(trimmed, tmdbKey.trim(), region) }
                 tmdb.getOrNull()?.let { results.addAll(it) }
@@ -193,6 +197,97 @@ class MetadataRepository {
                 .atStartOfDay(java.time.ZoneId.systemDefault())
                 .toInstant()
                 .toEpochMilli()
+        }.getOrNull()
+    }
+
+    /**
+     * TVMaze search (free, no key): GET /search/shows?q=...
+     * For each hit we fetch /shows/{id}/episodes once to derive
+     * (a) real season/episode counts and (b) the next future airstamp —
+     * the countdown source for Coming Soon when AniList/TMDB dates are coarse.
+     */
+    private fun searchTVMaze(query: String): List<MetadataResult> {
+        val encoded = URLEncoder.encode(query, "UTF-8")
+        val array = getJsonArray("https://api.tvmaze.com/search/shows?q=$encoded")
+        val list = mutableListOf<MetadataResult>()
+        for (i in 0 until minOf(3, array.length())) {
+            val entry = array.optJSONObject(i) ?: continue
+            val show = entry.optJSONObject("show") ?: entry
+            val id = show.optString("id")
+            if (id.isBlank()) continue
+            val title = show.optString("name")
+            if (title.isBlank()) continue
+            val image = show.optJSONObject("image")
+            val poster = image?.optString("original")
+                ?: image?.optString("medium") ?: ""
+            val description = stripHtml(show.optString("summary"))
+            val tags = mutableListOf<String>()
+            val genres = show.optJSONArray("genres")
+            if (genres != null) {
+                for (g in 0 until genres.length()) {
+                    genres.optString(g).trim().takeIf { it.isNotEmpty() }?.let { tags.add(it) }
+                }
+            }
+            val status = show.optString("status")
+            val premiered = show.optString("premiered")
+            val year = if (premiered.length >= 4) premiered.take(4) else ""
+
+            // Episodes give both season structure and the next airtime.
+            val (seasonCounts, nextAir) = fetchTvmazeEpisodes(id)
+            val seasonEpisodeCounts = if (seasonCounts.isEmpty()) listOf(1) else seasonCounts.map { it.second }
+            val seasonNumbers = if (seasonCounts.isEmpty()) listOf(1) else seasonCounts.map { it.first }
+            val upcoming = status.equals("Running", ignoreCase = true) &&
+                nextAir != null && nextAir > System.currentTimeMillis()
+
+            list.add(
+                MetadataResult(
+                    source = "TVMaze",
+                    sourceId = id,
+                    title = title,
+                    posterUrl = poster,
+                    description = description,
+                    tags = tags,
+                    seasonEpisodeCounts = seasonEpisodeCounts,
+                    streamCandidates = emptyList(),
+                    year = year,
+                    type = MediaType.Series,
+                    seasonNumbers = seasonNumbers,
+                    releaseAt = nextAir,
+                    upcoming = upcoming
+                )
+            )
+        }
+        return list
+    }
+
+    /** Returns ((season, episodeCount) sorted, next future airstamp millis or null). */
+    private fun fetchTvmazeEpisodes(showId: String): Pair<List<Pair<Int, Int>>, Long?> {
+        return try {
+            val arr = getJsonArray("https://api.tvmaze.com/shows/$showId/episodes")
+            val bySeason = mutableMapOf<Int, Int>()
+            var nextAir: Long? = null
+            val now = System.currentTimeMillis()
+            for (i in 0 until arr.length()) {
+                val ep = arr.optJSONObject(i) ?: continue
+                val season = ep.optInt("season", 0)
+                // season 0 = specials; skip so Pick Folder targets regular seasons.
+                if (season > 0) bySeason[season] = (bySeason[season] ?: 0) + 1
+                val airstamp = ep.optString("airstamp")
+                if (airstamp.isNotBlank()) {
+                    val air = parseAirstampMillis(airstamp)
+                    if (air != null && air > now && (nextAir == null || air < nextAir)) nextAir = air
+                }
+            }
+            Pair(bySeason.toList().sortedBy { it.first }, nextAir)
+        } catch (_: Exception) {
+            Pair(emptyList(), null)
+        }
+    }
+
+    /** TVMaze airstamp is ISO-8601 with offset, e.g. 2027-01-17T15:00:00+00:00. */
+    private fun parseAirstampMillis(text: String): Long? {
+        return runCatching {
+            java.time.OffsetDateTime.parse(text.trim()).toInstant().toEpochMilli()
         }.getOrNull()
     }
 
@@ -332,6 +427,19 @@ class MetadataRepository {
         conn.disconnect()
         if (code !in 200..299) throw IllegalStateException("HTTP $code: $text")
         return JSONObject(text)
+    }
+
+    private fun getJsonArray(urlStr: String): JSONArray {
+        val conn = URL(urlStr).openConnection() as HttpURLConnection
+        conn.requestMethod = "GET"
+        conn.connectTimeout = 15000
+        conn.readTimeout = 15000
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        conn.disconnect()
+        if (code !in 200..299) throw IllegalStateException("HTTP $code: $text")
+        return JSONArray(text)
     }
 
     private fun postJson(urlStr: String, body: JSONObject): JSONObject {

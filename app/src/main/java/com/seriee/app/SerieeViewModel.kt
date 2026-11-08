@@ -31,6 +31,13 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     private val _tmdbKey = mutableStateOf(repo.loadTmdbKey())
     val tmdbKey: String get() = _tmdbKey.value
 
+    private val _streakDays = mutableStateOf(repo.loadStreakDays())
+    val streakDays: Int get() = _streakDays.value
+    private val _bestStreak = mutableStateOf(repo.loadBestStreak())
+    val bestStreak: Int get() = _bestStreak.value
+    private val _watchDays = mutableStateOf(repo.loadWatchDays())
+    val watchDays: Set<String> get() = _watchDays.value
+
     private val _showChangelog = mutableStateOf(false)
     val showChangelog: Boolean get() = _showChangelog.value
 
@@ -60,6 +67,7 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun incrementEpisode(id: String) {
+        val before = items.sumOf { it.watchedEpisodes }
         commit(items.map { m ->
             if (m.id != id) return@map m
             // Multi-season path
@@ -88,9 +96,11 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
                 )
             } else m
         })
+        if (items.sumOf { it.watchedEpisodes } > before) recordWatch()
     }
 
     fun setCurrentEpisode(id: String, seasonNo: Int, epNo: Int) {
+        val before = items.sumOf { it.watchedEpisodes }
         commit(items.map { m ->
             if (m.id != id) return@map m
             if (m.seasons.isNotEmpty()) {
@@ -113,10 +123,43 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
         })
+        if (items.sumOf { it.watchedEpisodes } > before) recordWatch()
     }
 
     fun togglePin(id: String) {
         commit(items.map { if (it.id == id) it.copy(pinned = !it.pinned) else it })
+    }
+
+    /**
+     * Daily streak. Watch activity is bucketed by local calendar day:
+     * same day = no change, yesterday = +1, gap = reset to 1.
+     */
+    private fun recordWatch() {
+        val today = java.time.LocalDate.now()
+        val todayStr = today.toString()
+        val last = runCatching { java.time.LocalDate.parse(repo.loadLastWatchDay()) }.getOrNull()
+        val newStreak = when (last) {
+            null -> 1
+            today -> _streakDays.value
+            today.minusDays(1) -> _streakDays.value + 1
+            else -> 1
+        }
+        val newBest = maxOf(_bestStreak.value, newStreak)
+        val cutoff = today.minusDays(6)
+        val newDays = (_watchDays.value + todayStr)
+            .filter { runCatching { java.time.LocalDate.parse(it) >= cutoff }.getOrDefault(false) }
+            .toSet()
+        _streakDays.value = newStreak
+        _bestStreak.value = newBest
+        _watchDays.value = newDays
+        repo.saveStreak(newStreak, newBest, todayStr, newDays)
+    }
+
+    fun resetStreak() {
+        _streakDays.value = 0
+        _bestStreak.value = 0
+        _watchDays.value = emptySet()
+        repo.saveStreak(0, 0, "", emptySet())
     }
 
     fun toggleReminder(id: String) {
@@ -230,6 +273,10 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
                 imported + items.filterNot { it.id in importedIds }
             }
             commit(finalItems)
+            // Import may have restored streak history (v3 backups).
+            _streakDays.value = repo.loadStreakDays()
+            _bestStreak.value = repo.loadBestStreak()
+            _watchDays.value = repo.loadWatchDays()
 
             // Reschedule active reminders
             finalItems.forEach { item ->

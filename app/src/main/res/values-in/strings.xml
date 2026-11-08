@@ -223,6 +223,12 @@
     <string name="episode_page_label">Halaman %1$d / %2$d</string>
     <string name="episode_go">Ke</string>
 
+    <string name="streak_label">Streak harian</string>
+    <string name="streak_days">%1$d hari</string>
+    <string name="best_streak">Terbaik: %1$d hari</string>
+    <string name="reset_streak">Atur ulang streak</string>
+    <string name="streak_reset_done">Streak diatur ulang</string>
+
     <!-- Changelog -->
     <string name="changelog_title">Yang Baru</string>
     <string name="changelog_version">Versi %1$s</string>
@@ -234,6 +240,8 @@
     <string name="changelog_4">Grid Pustaka — kolom adaptif, poster 2:3 yang proporsional, judul dua baris, dan maksimal dua tag plus penghitung +N</string>
     <string name="changelog_5">Daftar Pustaka — thumbnail 2:3, judul dua baris, dan baris info satu baris yang tidak lagi terpotong</string>
     <string name="changelog_6">Satu badge rating per item — badge bintang ganda di samping judul panjang dihapus, memberi ruang lebih untuk judul</string>
+    <string name="changelog_7">Streak harian — tonton satu episode setiap hari untuk membangun streak, dengan badge api, strip minggu, dan streak terbaik di Progres</string>
+    <string name="changelog_8">Pencarian TVMaze (gratis, tanpa kunci) — jadwal tayang episode berikutnya yang akurat untuk TV Barat, melengkapi hitung mundur Segera Tayang bersama AniList dan TMDB</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Pengingat aktif untuk %1$s "%2$s"!</string>

@@ -125,7 +125,10 @@ fun SerieeApp(vm: SerieeViewModel) {
                 list = vm.items,
                 padding = padding,
                 onOpen = { detailId = it.id },
-                onIncrement = vm::incrementEpisode
+                onIncrement = vm::incrementEpisode,
+                streakDays = vm.streakDays,
+                bestStreak = vm.bestStreak,
+                watchDays = vm.watchDays
             )
         } else {
             LibraryScreen(

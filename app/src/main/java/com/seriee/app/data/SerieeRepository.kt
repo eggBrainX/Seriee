@@ -60,6 +60,23 @@ class SerieeRepository(context: Context) {
         prefs.edit().putInt(KEY_LAST_SEEN_VERSION, code).apply()
     }
 
+    // Daily streak. lastWatchDay is ISO yyyy-MM-dd; watchDays holds the last 7 activity days.
+    fun loadStreakDays(): Int = prefs.getInt(KEY_STREAK_DAYS, 0)
+    fun loadBestStreak(): Int = prefs.getInt(KEY_BEST_STREAK, 0)
+    fun loadLastWatchDay(): String = prefs.getString(KEY_LAST_WATCH_DAY, "") ?: ""
+    fun loadWatchDays(): Set<String> =
+        (prefs.getString(KEY_WATCH_DAYS, "") ?: "")
+            .split(",").map { it.trim() }.filter { it.length == 10 }.toSet()
+
+    fun saveStreak(streakDays: Int, bestStreak: Int, lastWatchDay: String, watchDays: Set<String>) {
+        prefs.edit()
+            .putInt(KEY_STREAK_DAYS, streakDays)
+            .putInt(KEY_BEST_STREAK, bestStreak)
+            .putString(KEY_LAST_WATCH_DAY, lastWatchDay)
+            .putString(KEY_WATCH_DAYS, watchDays.sorted().joinToString(","))
+            .apply()
+    }
+
     private fun toJson(m: MediaItem): JSONObject = JSONObject().apply {
         put("id", m.id)
         put("title", m.title)
@@ -167,9 +184,15 @@ class SerieeRepository(context: Context) {
 
     fun exportBackupJson(items: List<MediaItem>): String {
         val root = JSONObject()
-        root.put("version", 2)
+        root.put("version", 3)
         root.put("appName", "Seriee")
         root.put("timestamp", System.currentTimeMillis())
+        root.put("streakDays", loadStreakDays())
+        root.put("bestStreak", loadBestStreak())
+        root.put("lastWatchDay", loadLastWatchDay())
+        val daysArr = JSONArray()
+        loadWatchDays().forEach { daysArr.put(it) }
+        root.put("watchDays", daysArr)
         val arr = JSONArray()
         items.forEach { arr.put(toJson(it)) }
         root.put("items", arr)
@@ -180,6 +203,18 @@ class SerieeRepository(context: Context) {
         val json = rawJson.trim()
         val itemsArray = if (json.startsWith("{")) {
             val root = JSONObject(json)
+            // Restore streak when the backup carries it (v3+); older backups keep current streak.
+            if (root.has("streakDays")) {
+                val daysArr = root.optJSONArray("watchDays")
+                val days = mutableSetOf<String>()
+                if (daysArr != null) for (i in 0 until daysArr.length()) days.add(daysArr.optString(i))
+                saveStreak(
+                    root.optInt("streakDays", 0),
+                    root.optInt("bestStreak", 0),
+                    root.optString("lastWatchDay"),
+                    days
+                )
+            }
             root.optJSONArray("items") ?: JSONArray()
         } else {
             JSONArray(json)
@@ -194,5 +229,9 @@ class SerieeRepository(context: Context) {
         const val KEY_LANG = "seriee_lang"
         const val KEY_TMDB = "tmdb_api_key"
         const val KEY_LAST_SEEN_VERSION = "last_seen_version_code"
+        const val KEY_STREAK_DAYS = "streak_days"
+        const val KEY_BEST_STREAK = "best_streak"
+        const val KEY_LAST_WATCH_DAY = "last_watch_day"
+        const val KEY_WATCH_DAYS = "watch_days"
     }
 }
