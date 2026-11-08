@@ -41,7 +41,7 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     }.getOrDefault(0)
     val currentVersionName: String = runCatching {
         getApplication<Application>().packageManager.getPackageInfo(getApplication<Application>().packageName, 0).versionName ?: "1.2.2"
-    }.getOrDefault("1.2.2")
+    }.getOrDefault("0.2.3")
 
     private fun commit(newItems: List<MediaItem>) {
         items = newItems
