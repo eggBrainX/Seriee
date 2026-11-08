@@ -178,3 +178,36 @@ jobs:
           name: Seriee ${{ github.ref_name }}
           files: Seriee-${{ github.ref_name }}.apk
           generate_release_notes: true
+
+      # Rolling "Stable" channel: always points at the newest signed tag.
+      # The tag is moved with PATCH (not deleted) so the release stays published.
+      - name: Publish stable channel
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK="Seriee-${GITHUB_REF_NAME}.apk"
+          NOTES="stable-notes-${GITHUB_REF_NAME}.md"
+          gh release view "$GITHUB_REF_NAME" --json body --jq '.body' > "$NOTES"
+
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/stable-latest" \
+            -f sha="$GITHUB_SHA" -F force=true \
+            || gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/stable-latest" -f sha="$GITHUB_SHA"
+
+          if gh release view stable-latest >/dev/null 2>&1; then
+            gh release edit stable-latest \
+              --title "Seriee Stable (latest)" \
+              --notes-file "$NOTES"
+            gh release upload stable-latest "$APK" --clobber
+            for asset in $(gh release view stable-latest --json assets --jq '.assets[].name'); do
+              if [ "$asset" != "$APK" ]; then
+                gh release delete-asset stable-latest "$asset" -y
+              fi
+            done
+          else
+            gh release create stable-latest "$APK" \
+              --title "Seriee Stable (latest)" \
+              --notes-file "$NOTES"
+          fi
+          echo "stable-latest now points at $GITHUB_REF_NAME."
