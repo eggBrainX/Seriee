@@ -34,14 +34,10 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     private val _showChangelog = mutableStateOf(false)
     val showChangelog: Boolean get() = _showChangelog.value
 
-    @Suppress("DEPRECATION")
-    val currentVersionCode: Int = runCatching {
-        val pinfo = getApplication<Application>().packageManager.getPackageInfo(getApplication<Application>().packageName, 0)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) pinfo.longVersionCode.toInt() else pinfo.versionCode
-    }.getOrDefault(0)
-    val currentVersionName: String = runCatching {
-        getApplication<Application>().packageManager.getPackageInfo(getApplication<Application>().packageName, 0).versionName ?: "1.2.2"
-    }.getOrDefault("0.2.3")
+    // Single source of truth: versionCode/versionName in app/build.gradle.kts,
+    // generated into BuildConfig. No hardcoded fallbacks here.
+    val currentVersionCode: Int = BuildConfig.VERSION_CODE
+    val currentVersionName: String = BuildConfig.VERSION_NAME
 
     private fun commit(newItems: List<MediaItem>) {
         items = newItems

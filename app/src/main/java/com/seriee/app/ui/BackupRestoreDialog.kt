@@ -443,7 +443,8 @@ fun BackupRestoreDialog(
                                     .clickable {
                                         vm.setTmdbKey("")
                                         keyInput = ""
-                                        showKey = false
+                                        // Empty input is shown in plain text (see showKey init)
+                                        showKey = true
                                         android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                     .padding(horizontal = 14.dp, vertical = 9.dp)

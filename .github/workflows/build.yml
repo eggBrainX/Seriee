@@ -1,26 +1,14 @@
 name: Build APK
 on:
   push:
-    branches: [main]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Extract source zip
-        run: |
-          if [ -f seriee-src.zip ]; then
-            unzip -oq seriee-src.zip
-            rm seriee-src.zip
-            git config user.name "github-actions"
-            git config user.email "actions@github.com"
-            git add -A
-            git commit -m "Extract project files"
-            git push
-          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

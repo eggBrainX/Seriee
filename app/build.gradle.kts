@@ -64,6 +64,10 @@ android {
     }
     buildFeatures {
         compose = true
+        // Expose versionCode/versionName to app code via BuildConfig.
+        // Single source of truth: defaultConfig below — never hardcode
+        // version fallbacks in Kotlin code.
+        buildConfig = true
     }
 }
 
