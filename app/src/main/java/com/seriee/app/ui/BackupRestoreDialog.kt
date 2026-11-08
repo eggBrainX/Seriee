@@ -474,6 +474,99 @@ fun BackupRestoreDialog(
                         }
                     }
                 }
+
+                // OMDb API key — hidden after save (same pattern as TMDB)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(p.card)
+                        .border(1.dp, p.border, RoundedCornerShape(16.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.omdb_api_key_title),
+                        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.text
+                    )
+                    Text(
+                        stringResource(R.string.omdb_api_key_hint),
+                        fontSize = 12.sp, color = p.muted
+                    )
+                    var omdbInput by remember { mutableStateOf(vm.omdbKey) }
+                    var omdbShow by remember { mutableStateOf(vm.omdbKey.isBlank()) }
+                    val omdbSaved = vm.omdbKey.isNotBlank()
+                    SField(
+                        value = omdbInput,
+                        onChange = {
+                            omdbInput = it
+                            if (!omdbShow && omdbSaved && it != vm.omdbKey) omdbShow = true
+                        },
+                        placeholder = if (omdbSaved && !omdbShow) "••••••••••••••••••••" else "API key",
+                        visualTransformation = if (omdbShow) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailing = {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { omdbShow = !omdbShow },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (omdbShow) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (omdbShow) "Hide key" else "Show key",
+                                    tint = p.muted,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    )
+                    if (omdbSaved) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Storage,
+                                contentDescription = null,
+                                tint = SerieColors.Emerald,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = if (omdbShow) "Visible" else "Key saved — tap eye to reveal",
+                                fontSize = 11.sp,
+                                color = p.muted
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SerieColors.Blue600)
+                                .clickable {
+                                    vm.setOmdbKey(omdbInput)
+                                    omdbShow = false
+                                    android.widget.Toast.makeText(context, context.getString(R.string.omdb_api_key_save), android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 9.dp)
+                        ) { Text(stringResource(R.string.omdb_api_key_save), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White) }
+                        if (vm.omdbKey.isNotBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(p.chip)
+                                    .clickable {
+                                        vm.setOmdbKey("")
+                                        omdbInput = ""
+                                        omdbShow = true
+                                        android.widget.Toast.makeText(context, context.getString(R.string.omdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 9.dp)
+                            ) { Text(stringResource(R.string.delete), fontSize = 12.sp, color = p.muted) }
+                        }
+                    }
+                }
             }
         }
     }

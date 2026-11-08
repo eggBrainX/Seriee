@@ -65,7 +65,7 @@ data class MetadataResult(
 
 class MetadataRepository {
 
-    suspend fun search(query: String, tmdbKey: String? = null, region: String = "ID"): Result<List<MetadataResult>> =
+    suspend fun search(query: String, tmdbKey: String? = null, omdbKey: String? = null, region: String = "ID"): Result<List<MetadataResult>> =
         withContext(Dispatchers.IO) {
             val trimmed = query.trim()
             if (trimmed.isBlank()) return@withContext Result.failure(IllegalArgumentException("blank query"))
@@ -79,6 +79,12 @@ class MetadataRepository {
             if (!tmdbKey.isNullOrBlank()) {
                 val tmdb = runCatching { searchTmdb(trimmed, tmdbKey.trim(), region) }
                 tmdb.getOrNull()?.let { results.addAll(it) }
+            }
+            // OMDb: optional key (free 1000/day at omdbapi.com). IMDb-backed
+            // movies & series; sits last so AniList/TVMaze/TMDB win ties.
+            if (!omdbKey.isNullOrBlank()) {
+                val omdb = runCatching { searchOmdb(trimmed, omdbKey.trim()) }
+                omdb.getOrNull()?.let { results.addAll(it) }
             }
             if (results.isEmpty()) {
                 Result.failure(IllegalStateException("No results"))
@@ -371,6 +377,97 @@ class MetadataRepository {
             }
         }
         return list
+    }
+
+    /**
+     * OMDb search (optional key, free 1000/day): GET ?s=query then a detail
+     * call (?i=imdbID&plot=short) per hit to fill plot/genres.
+     * Season counts are only prefilled for single-season series; multi-season
+     * counts are left empty so the user edits totals (OMDb has no season
+     * list endpoint — counting each season would need one call per season).
+     */
+    private fun searchOmdb(query: String, key: String): List<MetadataResult> {
+        val encoded = URLEncoder.encode(query, "UTF-8")
+        val encodedKey = URLEncoder.encode(key, "UTF-8")
+        val searchJson = getJson("https://www.omdbapi.com/?apikey=$encodedKey&s=$encoded")
+        if (!searchJson.optString("Response").equals("True", ignoreCase = true)) return emptyList()
+        val searchArr = searchJson.optJSONArray("Search") ?: return emptyList()
+        val list = mutableListOf<MetadataResult>()
+        for (i in 0 until minOf(5, searchArr.length())) {
+            val item = searchArr.optJSONObject(i) ?: continue
+            val imdbId = item.optString("imdbID").trim()
+            if (imdbId.isBlank()) continue
+            val detail = runCatching {
+                getJson("https://www.omdbapi.com/?apikey=$encodedKey&i=${URLEncoder.encode(imdbId, "UTF-8")}&plot=short")
+            }.getOrNull() ?: continue
+            if (!detail.optString("Response").equals("True", ignoreCase = true)) continue
+
+            val title = detail.optString("Title").ifBlank { item.optString("Title") }
+            if (title.isBlank()) continue
+            val typeStr = detail.optString("Type").ifBlank { item.optString("Type") }
+            val mediaType = if (typeStr.equals("movie", ignoreCase = true)) MediaType.Movie else MediaType.Series
+            val yearRaw = detail.optString("Year").ifBlank { item.optString("Year") }
+            val year = yearRaw.take(4).takeIf { it.all(Char::isDigit) } ?: ""
+            val posterRaw = detail.optString("Poster").ifBlank { item.optString("Poster") }
+            val poster = if (posterRaw.equals("N/A", ignoreCase = true)) "" else posterRaw
+            val description = detail.optString("Plot").takeUnless { it.equals("N/A", ignoreCase = true) } ?: ""
+            val genreRaw = detail.optString("Genre")
+            val tags = if (genreRaw.equals("N/A", ignoreCase = true)) emptyList()
+                else genreRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.equals("N/A", ignoreCase = true) }
+            val releaseAt = parseOmdbDateMillis(detail.optString("Released"))
+            val upcoming = releaseAt != null && releaseAt > System.currentTimeMillis()
+
+            val (counts, numbers) = when {
+                mediaType == MediaType.Movie -> Pair(listOf(1), listOf(1))
+                else -> {
+                    val totalSeasons = detail.optString("totalSeasons").toIntOrNull()
+                    if (totalSeasons == 1) {
+                        val count = fetchOmdbSeasonEpisodeCount(encodedKey, imdbId, 1)
+                        if (count != null) Pair(listOf(count), listOf(1)) else Pair(listOf(1), listOf(1))
+                    } else Pair(emptyList(), emptyList())
+                }
+            }
+
+            list.add(
+                MetadataResult(
+                    source = "OMDb",
+                    sourceId = imdbId,
+                    title = title,
+                    posterUrl = poster,
+                    description = description,
+                    tags = tags,
+                    seasonEpisodeCounts = counts,
+                    streamCandidates = emptyList(),
+                    year = year,
+                    type = mediaType,
+                    seasonNumbers = numbers,
+                    releaseAt = releaseAt,
+                    upcoming = upcoming
+                )
+            )
+        }
+        return list
+    }
+
+    /** Episode count of one season via ?i=&Season=n (Episodes array length), or null. */
+    private fun fetchOmdbSeasonEpisodeCount(encodedKey: String, imdbId: String, season: Int): Int? {
+        return runCatching {
+            val json = getJson("https://www.omdbapi.com/?apikey=$encodedKey&i=${URLEncoder.encode(imdbId, "UTF-8")}&Season=$season")
+            if (!json.optString("Response").equals("True", ignoreCase = true)) return@runCatching null
+            json.optJSONArray("Episodes")?.length()?.takeIf { it > 0 }
+        }.getOrNull()
+    }
+
+    /** OMDb Released looks like "24 Sep 2008" (English names, arbitrary day padding). */
+    private fun parseOmdbDateMillis(text: String?): Long? {
+        val raw = text?.trim().orEmpty()
+        if (raw.isBlank() || raw.equals("N/A", ignoreCase = true)) return null
+        return runCatching {
+            java.time.LocalDate.parse(
+                raw,
+                java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH)
+            ).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        }.getOrNull()
     }
 
     /** (season_number, episode_count) pairs, e.g. (4, 19) for Season 4. */

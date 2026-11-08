@@ -30,6 +30,8 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     val language: AppLanguage get() = _language.value
     private val _tmdbKey = mutableStateOf(repo.loadTmdbKey())
     val tmdbKey: String get() = _tmdbKey.value
+    private val _omdbKey = mutableStateOf(repo.loadOmdbKey())
+    val omdbKey: String get() = _omdbKey.value
 
     private val _streakDays = mutableStateOf(repo.loadStreakDays())
     val streakDays: Int get() = _streakDays.value
@@ -219,6 +221,11 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     fun setTmdbKey(value: String) {
         _tmdbKey.value = value.trim()
         repo.saveTmdbKey(value.trim())
+    }
+
+    fun setOmdbKey(value: String) {
+        _omdbKey.value = value.trim()
+        repo.saveOmdbKey(value.trim())
     }
 
     fun openChangelog() {

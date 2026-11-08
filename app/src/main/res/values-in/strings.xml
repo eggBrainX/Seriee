@@ -202,6 +202,10 @@
     <string name="tmdb_api_key_hint">Tempel kunci untuk link streaming resmi</string>
     <string name="tmdb_api_key_save">Simpan kunci</string>
     <string name="tmdb_api_key_cleared">Kunci dihapus</string>
+    <string name="omdb_api_key_title">Kunci API OMDb (opsional)</string>
+    <string name="omdb_api_key_hint">Kunci gratis di omdbapi.com — tambah film &amp; serial berbasis IMDb</string>
+    <string name="omdb_api_key_save">Simpan kunci OMDb</string>
+    <string name="omdb_api_key_cleared">Kunci OMDb dihapus</string>
     <string name="description_label">Deskripsi</string>
     <string name="add_season">Tambah Season</string>
     <string name="season_number_label">Season %1$d</string>
@@ -242,6 +246,7 @@
     <string name="changelog_6">Satu badge rating per item — badge bintang ganda di samping judul panjang dihapus, memberi ruang lebih untuk judul</string>
     <string name="changelog_7">Streak harian — tonton satu episode setiap hari untuk membangun streak, dengan badge api, strip minggu, dan streak terbaik di Progres</string>
     <string name="changelog_8">Pencarian TVMaze (gratis, tanpa kunci) — jadwal tayang episode berikutnya yang akurat untuk TV Barat, melengkapi hitung mundur Segera Tayang bersama AniList dan TMDB</string>
+    <string name="changelog_9">Pencarian OMDb (kunci opsional di Pengaturan Cadangan) — film dan serial berbasis IMDb sebagai sumber lain bersama AniList, TVMaze, dan TMDB</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Pengingat aktif untuk %1$s "%2$s"!</string>

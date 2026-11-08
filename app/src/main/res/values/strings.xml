@@ -202,6 +202,10 @@
     <string name="tmdb_api_key_hint">Paste key to enable official streaming links</string>
     <string name="tmdb_api_key_save">Save key</string>
     <string name="tmdb_api_key_cleared">Key cleared</string>
+    <string name="omdb_api_key_title">OMDb API key (optional)</string>
+    <string name="omdb_api_key_hint">Free key at omdbapi.com — adds IMDb-powered movies &amp; series</string>
+    <string name="omdb_api_key_save">Save OMDb key</string>
+    <string name="omdb_api_key_cleared">OMDb key cleared</string>
     <string name="description_label">Description</string>
     <string name="add_season">Add Season</string>
     <string name="season_number_label">Season %1$d</string>
@@ -242,6 +246,7 @@
     <string name="changelog_6">One rating badge per item — the duplicate star badge next to long titles is gone, giving titles more room</string>
     <string name="changelog_7">Daily streak — watch an episode every day to build your streak, with a flame badge, week strip, and best streak in Progress</string>
     <string name="changelog_8">TVMaze search (free, no key) — precise next-episode airtimes for Western TV, backing up the Coming Soon countdown alongside AniList and TMDB</string>
+    <string name="changelog_9">OMDb search (optional key in Backup settings) — IMDb-powered movies and series as another source alongside AniList, TVMaze, and TMDB</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Reminder active for %1$s "%2$s"!</string>

@@ -55,6 +55,11 @@ class SerieeRepository(context: Context) {
         prefs.edit().putString(KEY_TMDB, key.trim()).apply()
     }
 
+    fun loadOmdbKey(): String = prefs.getString(KEY_OMDB, "") ?: ""
+    fun saveOmdbKey(key: String) {
+        prefs.edit().putString(KEY_OMDB, key.trim()).apply()
+    }
+
     fun loadLastSeenVersionCode(): Int = prefs.getInt(KEY_LAST_SEEN_VERSION, 0)
     fun saveLastSeenVersionCode(code: Int) {
         prefs.edit().putInt(KEY_LAST_SEEN_VERSION, code).apply()
@@ -228,6 +233,7 @@ class SerieeRepository(context: Context) {
         const val KEY_GRID = "seriee_grid"
         const val KEY_LANG = "seriee_lang"
         const val KEY_TMDB = "tmdb_api_key"
+        const val KEY_OMDB = "omdb_api_key"
         const val KEY_LAST_SEEN_VERSION = "last_seen_version_code"
         const val KEY_STREAK_DAYS = "streak_days"
         const val KEY_BEST_STREAK = "best_streak"

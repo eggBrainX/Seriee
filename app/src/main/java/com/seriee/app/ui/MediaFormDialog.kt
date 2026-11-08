@@ -146,6 +146,10 @@ fun MediaFormDialog(
         context.getSharedPreferences("seriee", android.content.Context.MODE_PRIVATE)
             .getString("tmdb_api_key", "") ?: ""
     }
+    val omdbKey = remember {
+        context.getSharedPreferences("seriee", android.content.Context.MODE_PRIVATE)
+            .getString("omdb_api_key", "") ?: ""
+    }
 
     fun upsertDraft(idx: Int, updated: SeasonDraft) {
         if (idx in seasonsDraft.indices) {
@@ -292,7 +296,7 @@ fun MediaFormDialog(
         fetchError = null
         hasSearched = true
         scope.launch {
-            val res = metadataRepo.search(q, tmdbKey)
+            val res = metadataRepo.search(q, tmdbKey, omdbKey)
             withContext(Dispatchers.Main) {
                 fetchLoading = false
                 res.onSuccess { fetchResults = it }
