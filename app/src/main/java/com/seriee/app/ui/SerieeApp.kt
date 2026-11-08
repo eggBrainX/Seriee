@@ -19,14 +19,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -213,8 +213,7 @@ private fun SerieeTopBar(
     onOpenChangelog: () -> Unit
 ) {
     val p = LocalPalette.current
-    var themeMenu by remember { mutableStateOf(false) }
-    var languageMenu by remember { mutableStateOf(false) }
+    var optionsMenu by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -253,53 +252,41 @@ private fun SerieeTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Changelog button
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                    .clickable { onOpenChangelog() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Filled.Info,
-                    contentDescription = stringResource(R.string.changelog_title),
-                    tint = p.muted,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            // Backup & Restore button
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                    .clickable { onOpenBackupRestore() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Filled.Storage,
-                    contentDescription = stringResource(R.string.backup_restore),
-                    tint = p.muted,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            // Language switch button
+            // Single overflow: changelog, backup & restore (incl. API keys),
+            // language, and theme — one option (matches: overflow when >4).
             Box {
                 Box(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                        .clickable { languageMenu = true },
+                        .clickable { optionsMenu = true },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Language, contentDescription = stringResource(R.string.language), tint = p.muted, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.more_options), tint = p.muted, modifier = Modifier.size(18.dp))
                 }
-                DropdownMenu(expanded = languageMenu, onDismissRequest = { languageMenu = false }) {
+                DropdownMenu(expanded = optionsMenu, onDismissRequest = { optionsMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.changelog_title)) },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Info, contentDescription = null, tint = p.muted, modifier = Modifier.size(18.dp))
+                        },
+                        onClick = {
+                            optionsMenu = false
+                            onOpenChangelog()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.backup_restore)) },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Storage, contentDescription = null, tint = p.muted, modifier = Modifier.size(18.dp))
+                        },
+                        onClick = {
+                            optionsMenu = false
+                            onOpenBackupRestore()
+                        }
+                    )
+                    HorizontalDivider()
                     AppLanguage.entries.forEach { lang ->
                         DropdownMenuItem(
                             text = {
@@ -319,27 +306,12 @@ private fun SerieeTopBar(
                                 }
                             } else null,
                             onClick = {
+                                optionsMenu = false
                                 onLanguage(lang)
-                                languageMenu = false
                             }
                         )
                     }
-                }
-            }
-
-            // Theme switch button
-            Box {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                        .clickable { themeMenu = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Filled.Palette, contentDescription = stringResource(R.string.theme), tint = p.muted, modifier = Modifier.size(18.dp))
-                }
-                DropdownMenu(expanded = themeMenu, onDismissRequest = { themeMenu = false }) {
+                    HorizontalDivider()
                     AppTheme.entries.forEach { theme ->
                         val dot = paletteFor(theme)
                         DropdownMenuItem(
@@ -359,8 +331,8 @@ private fun SerieeTopBar(
                                 )
                             },
                             onClick = {
+                                optionsMenu = false
                                 onTheme(theme)
-                                themeMenu = false
                             }
                         )
                     }

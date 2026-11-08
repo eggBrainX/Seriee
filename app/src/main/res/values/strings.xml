@@ -10,6 +10,7 @@
     <string name="backup_restore">Backup &amp; Restore</string>
     <string name="theme">Theme</string>
     <string name="language">Language</string>
+    <string name="more_options">More options</string>
 
     <!-- Common -->
     <string name="close">Close</string>
