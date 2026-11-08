@@ -313,6 +313,14 @@ fun MediaFormDialog(
         source = r.source
         sourceId = r.sourceId
         if (r.tags.isNotEmpty()) tags = r.tags
+        // Use the source's real air time instead of a guessed date, so Coming Soon
+        // countdowns match AniList/TMDB. AniList's `airingAt` is exact (episode 1).
+        val upcomingAir = r.releaseAt?.takeIf { it > System.currentTimeMillis() }
+        if (r.upcoming) status = WatchStatus.ComingSoon
+        if (upcomingAir != null) {
+            releaseDate = upcomingAir
+            reminderEnabled = true
+        }
         // Season comes from the source result (AniList entry / TMDB season numbers),
         // falling back to parsing the fetched title. This keeps "…Season 4" from
         // saving as a Season 1 card — so Pick Folder targets Season 4.
@@ -451,7 +459,10 @@ fun MediaFormDialog(
                                 Text(r.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = p.text, maxLines = 1)
                                 val seasonLabel = if (r.type == MediaType.Series && resultSeason != null && resultSeason > 1)
                                     " · " + stringResource(R.string.season_format, resultSeason) else ""
-                                Text(("${r.source} ${r.year}".trim() + seasonLabel), fontSize = 11.sp, color = p.muted)
+                                // Show the source's real air date so it can be verified before applying.
+                                val airLabel = r.releaseAt?.takeIf { it > System.currentTimeMillis() }
+                                    ?.let { " · " + ReminderScheduler.formatShortDate(context, it) } ?: ""
+                                Text(("${r.source} ${r.year}".trim() + seasonLabel + airLabel), fontSize = 11.sp, color = p.muted)
                             }
                             Box(
                                 modifier = Modifier
@@ -544,8 +555,14 @@ fun MediaFormDialog(
                             status = it
                             if (it == WatchStatus.ComingSoon) {
                                 reminderEnabled = true
+                                // Never invent a release date: if the metadata had no
+                                // air time, ask the user instead of showing a fake
+                                // "+3 days" date that disagrees with the source.
                                 if (releaseDate == null || releaseDate!! <= System.currentTimeMillis()) {
-                                    releaseDate = System.currentTimeMillis() + 3 * 86400000L
+                                    ReminderScheduler.showDateTimePicker(context, releaseDate) { selected ->
+                                        releaseDate = selected
+                                        reminderEnabled = true
+                                    }
                                 }
                             }
                         },
@@ -612,7 +629,12 @@ fun MediaFormDialog(
                                 checked = reminderEnabled,
                                 onCheckedChange = {
                                     reminderEnabled = it
-                                    if (it && releaseDate == null) releaseDate = System.currentTimeMillis() + 3 * 86400000L
+                                    if (it && (releaseDate == null || releaseDate!! <= System.currentTimeMillis())) {
+                                        ReminderScheduler.showDateTimePicker(context, releaseDate) { selected ->
+                                            releaseDate = selected
+                                            reminderEnabled = true
+                                        }
+                                    }
                                 },
                                 colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = SerieColors.Orange)
                             )

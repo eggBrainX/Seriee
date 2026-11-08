@@ -56,7 +56,11 @@ data class MetadataResult(
     val year: String = "",
     val type: MediaType = MediaType.Series,
     /** Season number per entry in [seasonEpisodeCounts] (parallel list). Empty = [1]. */
-    val seasonNumbers: List<Int> = emptyList()
+    val seasonNumbers: List<Int> = emptyList(),
+    /** Epoch millis of the first air time when the source exposes it (e.g. AniList `airingAt`). */
+    val releaseAt: Long? = null,
+    /** Source says the title has not aired yet (e.g. AniList status NOT_YET_RELEASED). */
+    val upcoming: Boolean = false
 )
 
 class MetadataRepository {
@@ -84,7 +88,9 @@ class MetadataRepository {
                   Media(search: ${'$'}search, type: ANIME) {
                     id title { english romaji }
                     coverImage { large } description genres episodes format
-                    startDate { year }
+                    status
+                    startDate { year month day }
+                    nextAiringEpisode { airingAt episode }
                     externalLinks { url site type }
                   }
                 }
@@ -134,6 +140,18 @@ class MetadataRepository {
             if (url.isNotBlank()) streams.add(StreamCandidate(site.ifBlank { "Official" }, url))
         }
         val year = media.optJSONObject("startDate")?.optInt("year", 0)?.takeIf { it > 0 }?.toString() ?: ""
+        // AniList knows the real schedule: `nextAiringEpisode.airingAt` is the exact
+        // epoch timestamp of the upcoming episode (episode 1 for a not-yet-released
+        // title). Only use it for unreleased entries — once a show is airing it points
+        // at a later episode, not at its release date.
+        val sourceStatus = media.optString("status")
+        val upcoming = sourceStatus.equals("NOT_YET_RELEASED", ignoreCase = true)
+        val nextAirAt = media.optJSONObject("nextAiringEpisode")
+            ?.optLong("airingAt", 0L)
+            ?.takeIf { it > 0L }
+            ?.times(1000L)
+        val startAt = startDateMillis(media.optJSONObject("startDate"))
+        val releaseAt = if (upcoming) nextAirAt ?: startAt else null
         return listOf(
             MetadataResult(
                 source = "AniList",
@@ -146,9 +164,36 @@ class MetadataRepository {
                 streamCandidates = streams,
                 year = year,
                 type = mediaType,
-                seasonNumbers = seasonNumbers
+                seasonNumbers = seasonNumbers,
+                releaseAt = releaseAt,
+                upcoming = upcoming
             )
         )
+    }
+
+    private fun startDateMillis(date: JSONObject?): Long? {
+        if (date == null) return null
+        val year = date.optInt("year", 0)
+        val month = date.optInt("month", 0)
+        val day = date.optInt("day", 0)
+        if (year <= 0 || month !in 1..12 || day !in 1..31) return null
+        return runCatching {
+            java.time.LocalDate.of(year, month, day)
+                .atStartOfDay(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        }.getOrNull()
+    }
+
+    private fun parseIsoDateMillis(text: String?): Long? {
+        val raw = text?.trim().orEmpty()
+        if (raw.length < 10) return null
+        return runCatching {
+            java.time.LocalDate.parse(raw.substring(0, 10))
+                .atStartOfDay(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        }.getOrNull()
     }
 
     private fun searchTmdb(query: String, key: String, region: String): List<MetadataResult> {
@@ -166,6 +211,7 @@ class MetadataRepository {
                 val desc = item.optString("overview")
                 val tags = mutableListOf<String>()
                 // TMDB search does not include genre names, only ids — skip.
+                val releaseAt = parseIsoDateMillis(item.optString("release_date"))
                 val year = (item.optString("release_date").take(4))
                 val providers = fetchTmdbProviders(key, "movie", id, region)
                 list.add(
@@ -180,7 +226,9 @@ class MetadataRepository {
                         streamCandidates = providers,
                         year = year,
                         type = MediaType.Movie,
-                        seasonNumbers = listOf(1)
+                        seasonNumbers = listOf(1),
+                        releaseAt = releaseAt,
+                        upcoming = releaseAt != null && releaseAt > System.currentTimeMillis()
                     )
                 )
             }
@@ -195,7 +243,9 @@ class MetadataRepository {
                 val posterPath = item.optString("poster_path")
                 val poster = if (posterPath.isNotBlank()) "https://image.tmdb.org/t/p/w500$posterPath" else ""
                 val desc = item.optString("overview")
-                val year = (item.optString("first_air_date").take(4))
+                val firstAir = item.optString("first_air_date")
+                val releaseAt = parseIsoDateMillis(firstAir)
+                val year = (firstAir.take(4))
                 // episode count requires detail call — keep (season_number, episode_count)
                 val allSeasons = fetchTmdbSeasons(key, id)
                 // TMDB returns the whole show; if the query/title names one season
@@ -218,7 +268,9 @@ class MetadataRepository {
                         streamCandidates = providers,
                         year = year,
                         type = MediaType.Series,
-                        seasonNumbers = pickedSeasons.map { it.first }
+                        seasonNumbers = pickedSeasons.map { it.first },
+                        releaseAt = releaseAt,
+                        upcoming = releaseAt != null && releaseAt > System.currentTimeMillis()
                     )
                 )
             }
