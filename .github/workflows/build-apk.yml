@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+# Only one run may publish the rolling `debug-latest` release at a time.
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -91,6 +96,31 @@ jobs:
         with:
           name: seriee-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Name debug APK by version
+        if: github.ref_type != 'tag'
+        run: |
+          VERSION=$(jq -r '.elements[0].versionName' app/build/outputs/apk/debug/output-metadata.json)
+          APK="Seriee-${VERSION}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$APK"
+          echo "APK_NAME=$APK" >> "$GITHUB_ENV"
+          echo "Publishing $APK"
+
+      # Release assets are served as real files (not zipped), so this link
+      # installs directly:
+      - name: Publish debug APK to Releases
+        if: github.ref_type != 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-latest
+          name: Seriee debug (latest)
+          prerelease: true
+          files: ${{ env.APK_NAME }}
+          body: |
+            Debug build from commit ${{ github.sha }}.
+
+            Download the `.apk` asset below and install it directly.
+            (The *Actions → Artifacts* download is a `.zip`, by GitHub design.)
 
       - name: Upload release APK artifact
         if: github.ref_type == 'tag'
