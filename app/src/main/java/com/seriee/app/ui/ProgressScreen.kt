@@ -15,9 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -36,6 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,23 +66,35 @@ fun ProgressScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableIntStateOf(0) }
 
-    val filterOptions = listOf(
-        stringResource(R.string.filter_all) to list.size,
-        stringResource(R.string.filter_watching) to list.count { it.status == WatchStatus.Watching },
-        stringResource(R.string.filter_completed) to list.count { it.status == WatchStatus.Completed },
-        stringResource(R.string.filter_coming_soon) to list.count { it.status == WatchStatus.ComingSoon }
+    // Filter labels need localized strings, so they stay in composition (cheap, 4 items).
+    val filterLabels = listOf(
+        stringResource(R.string.filter_all),
+        stringResource(R.string.filter_watching),
+        stringResource(R.string.filter_completed),
+        stringResource(R.string.filter_coming_soon)
     )
+    val filterCounts = remember(list) {
+        listOf(
+            list.size,
+            list.count { it.status == WatchStatus.Watching },
+            list.count { it.status == WatchStatus.Completed },
+            list.count { it.status == WatchStatus.ComingSoon }
+        )
+    }
 
-    val filtered = list
-        .filter { it.title.contains(query.trim(), ignoreCase = true) }
-        .filter {
-            when (filter) {
-                1 -> it.status == WatchStatus.Watching
-                2 -> it.status == WatchStatus.Completed
-                3 -> it.status == WatchStatus.ComingSoon
-                else -> true
-            }
+    val filtered by remember(list, query, filter) {
+        derivedStateOf {
+            list.filter { it.title.contains(query.trim(), ignoreCase = true) }
+                .filter {
+                    when (filter) {
+                        1 -> it.status == WatchStatus.Watching
+                        2 -> it.status == WatchStatus.Completed
+                        3 -> it.status == WatchStatus.ComingSoon
+                        else -> true
+                    }
+                }
         }
+    }
 
     Column(
         Modifier
@@ -130,9 +143,9 @@ fun ProgressScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                filterOptions.forEachIndexed { index, (label, count) ->
+                filterLabels.forEachIndexed { index, label ->
                     FilterChip(
-                        label = "$label ($count)",
+                        label = "$label (${filterCounts[index]})",
                         selected = filter == index,
                         onClick = { filter = index }
                     )
@@ -150,13 +163,11 @@ fun ProgressScreen(
                 )
             }
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(320.dp),
+            LazyColumn(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(filtered, key = { it.id }) { item ->
+                items(filtered, key = { it.id }, contentType = { it.type }) { item ->
                     ProgressCard(item, onClick = { onOpen(item) }, onIncrement = { onIncrement(item.id) })
                 }
             }
@@ -168,7 +179,22 @@ fun ProgressScreen(
 private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -> Unit) {
     val p = LocalPalette.current
     val context = LocalContext.current
-    val shape = RoundedCornerShape(16.dp)
+    val shape = remember { RoundedCornerShape(16.dp) }
+    // Memoize date-derived strings (they call SimpleDateFormat etc.)
+    val badgeText = remember(item.releaseDate, item.status) {
+        if (item.status == WatchStatus.ComingSoon) ReminderScheduler.countdownShortBadge(context, item.releaseDate) else ""
+    }
+    val badgeLong = remember(item.releaseDate, item.status) {
+        if (item.status == WatchStatus.ComingSoon) ReminderScheduler.countdownBadgeText(context, item.releaseDate) else ""
+    }
+    val detailedText = remember(item.releaseDate, item.status) {
+        if (item.status == WatchStatus.ComingSoon) ReminderScheduler.countdownDetailedText(context, item.releaseDate) else ""
+    }
+    val relTime = remember(item.updatedAt) { relativeTime(context, item.updatedAt) }
+    val visualProgress = remember(item.releaseDate) {
+        val daysLeft = ReminderScheduler.daysUntilRelease(item.releaseDate)
+        ((30 - daysLeft).coerceIn(1, 30) / 30f)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,7 +217,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                         .padding(horizontal = 4.dp, vertical = 1.dp)
                 ) {
                     Text(
-                        ReminderScheduler.countdownShortBadge(context, item.releaseDate),
+                        badgeText,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White
@@ -222,7 +248,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     fontWeight = FontWeight.SemiBold,
                     color = if (item.status == WatchStatus.ComingSoon) SerieColors.Orange else SerieColors.Blue400
                 )
-                Text(relativeTime(context, item.updatedAt), fontSize = 10.sp, color = p.muted)
+                Text(relTime, fontSize = 10.sp, color = p.muted)
             }
 
             Row(
@@ -273,7 +299,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            ReminderScheduler.countdownBadgeText(context, item.releaseDate),
+                            badgeLong,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = SerieColors.Orange
@@ -286,7 +312,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                             .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            ReminderScheduler.countdownShortBadge(context, item.releaseDate),
+                            badgeText,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = SerieColors.Orange
@@ -294,8 +320,6 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                val daysLeft = ReminderScheduler.daysUntilRelease(item.releaseDate)
-                val visualProgress = ((30 - daysLeft).coerceIn(1, 30) / 30f)
                 LinearProgressIndicator(
                     progress = { visualProgress },
                     modifier = Modifier
@@ -307,7 +331,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    ReminderScheduler.countdownDetailedText(context, item.releaseDate),
+                    detailedText,
                     fontSize = 11.sp,
                     color = p.muted
                 )
@@ -317,7 +341,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(stringResource(R.string.episode_progress, item.currentEp, item.totalEp), fontSize = 12.sp, color = p.muted)
+                    Text(stringResource(R.string.episode_progress, item.watchedEpisodes, item.totalEpisodes), fontSize = 12.sp, color = p.muted)
                     Text("${item.percent}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = p.text)
                 }
                 Spacer(Modifier.height(6.dp))
@@ -350,7 +374,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     modifier = Modifier.size(18.dp)
                 )
             }
-        } else if (item.currentEp < item.totalEp) {
+        } else if (item.watchedEpisodes < item.totalEpisodes) {
             Box(
                 modifier = Modifier
                     .size(36.dp)

@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
@@ -72,7 +73,8 @@ fun SerieeApp(vm: SerieeViewModel) {
                 onTheme = vm::setTheme,
                 currentLanguage = vm.language,
                 onLanguage = vm::setLanguage,
-                onOpenBackupRestore = { showBackupRestore = true }
+                onOpenBackupRestore = { showBackupRestore = true },
+                onOpenChangelog = { vm.openChangelog() }
             )
         },
         bottomBar = {
@@ -104,7 +106,7 @@ fun SerieeApp(vm: SerieeViewModel) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .shadow(8.dp, CircleShape)
+                    .shadow(4.dp, CircleShape)
                     .clip(CircleShape)
                     .background(Brush.linearGradient(listOf(SerieColors.Blue600, SerieColors.Indigo500)))
                     .clickable {
@@ -169,6 +171,9 @@ fun SerieeApp(vm: SerieeViewModel) {
                 },
                 onUpdateRating = { newRating ->
                     vm.upsert(item.copy(rating = newRating))
+                },
+                onSelectEpisode = { seasonNo, epNo ->
+                    vm.setCurrentEpisode(item.id, seasonNo, epNo)
                 }
             )
         }
@@ -180,6 +185,13 @@ fun SerieeApp(vm: SerieeViewModel) {
             onDismiss = { showBackupRestore = false }
         )
     }
+
+    if (vm.showChangelog) {
+        ChangelogDialog(
+            versionName = vm.currentVersionName,
+            onDismiss = { vm.dismissChangelog() }
+        )
+    }
 }
 
 @Composable
@@ -188,7 +200,8 @@ private fun SerieeTopBar(
     onTheme: (AppTheme) -> Unit,
     currentLanguage: AppLanguage,
     onLanguage: (AppLanguage) -> Unit,
-    onOpenBackupRestore: () -> Unit
+    onOpenBackupRestore: () -> Unit,
+    onOpenChangelog: () -> Unit
 ) {
     val p = LocalPalette.current
     var themeMenu by remember { mutableStateOf(false) }
@@ -231,6 +244,23 @@ private fun SerieeTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Changelog button
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, p.border, RoundedCornerShape(12.dp))
+                    .clickable { onOpenChangelog() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = stringResource(R.string.changelog_title),
+                    tint = p.muted,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
             // Backup & Restore button
             Box(
                 modifier = Modifier

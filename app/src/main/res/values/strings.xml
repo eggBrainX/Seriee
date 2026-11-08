@@ -180,6 +180,62 @@
     <string name="backup_failed">Backup failed: %1$s</string>
     <string name="restore_success">✅ Successfully restored %1$d items from backup!</string>
     <string name="restore_failed">Restore failed: %1$s</string>
+    <string name="backup_to_json_title">Back up to JSON file</string>
+    <string name="backup_to_json_desc">Save your full list of series, episodes, poster covers, and release schedules to a JSON file on your device storage.</string>
+
+    <!-- New features: poster, fetch, seasons -->
+    <string name="poster_source_storage">Upload from device</string>
+    <string name="poster_source_url">Image URL</string>
+    <string name="fetch_metadata_title">Fetch cover &amp; info</string>
+    <string name="fetch_search_hint">Search title first...</string>
+    <string name="fetch_search_button">Search</string>
+    <string name="fetch_no_results">No results found</string>
+    <string name="fetch_failed">Fetch failed — fill manually</string>
+    <string name="fetch_applied">Metadata applied, you can edit it</string>
+    <string name="fetch_loading">Searching...</string>
+    <string name="tmdb_api_key_title">TMDB API key (optional)</string>
+    <string name="tmdb_api_key_hint">Paste key to enable official streaming links</string>
+    <string name="tmdb_api_key_save">Save key</string>
+    <string name="tmdb_api_key_cleared">Key cleared</string>
+    <string name="description_label">Description</string>
+    <string name="add_season">Add Season</string>
+    <string name="season_number_label">Season %1$d</string>
+    <string name="pick_folder">Pick Folder</string>
+    <string name="pick_files">Pick Files</string>
+    <string name="episode_missing">Not set</string>
+    <string name="episode_not_matched">Not matched — assign manually</string>
+    <string name="select_episode_title">Select Episode</string>
+    <string name="file_not_picked">File not picked for this episode</string>
+    <string name="remove_season">Remove Season %1$d</string>
+    <string name="episode_picked_ok">Picked</string>
+    <string name="episode_picked_summary">Picked %1$d / %2$d</string>
+    <string name="episode_missing_only">Missing only</string>
+    <string name="episode_page_range">%1$d–%2$d of %3$d</string>
+    <string name="episode_go_to_hint">Go to E...</string>
+    <string name="episode_prev">Prev</string>
+    <string name="episode_next">Next</string>
+    <string name="episode_all_picked">All episodes picked</string>
+    <string name="episode_page_label">Page %1$d / %2$d</string>
+    <string name="episode_go">Go</string>
+
+    <!-- Changelog -->
+    <string name="changelog_title">What\'s New</string>
+    <string name="changelog_version">Version %1$s</string>
+    <string name="changelog_got_it">Got it</string>
+    <string name="changelog_close">Close changelog</string>
+    <string name="changelog_1">Multi-season support — one title can now hold Season 1, 2, and more, with separate episode counts and progress</string>
+    <string name="changelog_2">Episode picker — tap a season and an episode number (E1, E2…) to play it instantly in VLC / MX Player, just like their in-app pickers</string>
+    <string name="changelog_3">Offline files per episode — pick a whole folder or multiple files; filenames like S02E05 are matched automatically, and you can still fix each episode manually</string>
+    <string name="changelog_4">Poster upload — choose a cover from your device storage (saved inside the app) or keep using a URL</string>
+    <string name="changelog_5">Auto-fetch info — search AniList (anime, no key needed) and TMDB (optional key in Backup settings) to fill title, poster, description, genres, and streaming links — all still editable</string>
+    <string name="changelog_6">Descriptions — fetched and manual descriptions now show on the details screen</string>
+    <string name="changelog_7">Indonesian + English labels for all the new features</string>
+    <string name="changelog_8">Smoother scrolling — posters and lists now load and scroll without jank on the Progress and Library screens</string>
+    <string name="changelog_9">Faster list filtering — search and filters update instantly while you type</string>
+    <string name="changelog_10">Bug fix — fixed list recomposition jank and countdown badge rendering on scrolling lists</string>
+    <string name="changelog_11">Long series (100–1000+ episodes) — file picker is now paged (50 per page) with Prev/Next and Go-to, so One Piece–scale lists load and scroll instantly</string>
+    <string name="changelog_12">Missing-only filter + picked counter to spot gaps without scrolling, and the detail screen now opens at the current episode</string>
+    <string name="changelog_13">Faster bulk picking — folder / multiple-file imports now run in the background, no more freezing on large libraries</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Reminder active for %1$s "%2$s"!</string>

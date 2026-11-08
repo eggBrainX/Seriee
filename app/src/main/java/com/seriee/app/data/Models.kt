@@ -32,6 +32,19 @@ enum class AppLanguage(val tag: String, val label: String) {
     }
 }
 
+data class EpisodeFile(
+    val number: Int,
+    val uri: String,
+    val displayName: String
+)
+
+data class Season(
+    val number: Int,
+    val currentEp: Int = 0,
+    val totalEp: Int = 1,
+    val episodes: List<EpisodeFile> = emptyList()
+)
+
 data class MediaItem(
     val id: String,
     val title: String,
@@ -49,11 +62,36 @@ data class MediaItem(
     val reminderEnabled: Boolean = false,
     val tags: List<String> = emptyList(),
     val rating: Int = 0,
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val seasons: List<Season> = emptyList(),
+    val description: String = "",
+    val source: String = "",
+    val sourceId: String = ""
 ) {
+    val effectiveSeasons: List<Season>
+        get() = if (seasons.isNotEmpty()) seasons else {
+            val legacyEpisodes = if (videoUri.isNotBlank()) {
+                listOf(EpisodeFile(number = currentEp.coerceAtLeast(1), uri = videoUri, displayName = videoPath.ifBlank { "video" }))
+            } else emptyList()
+            listOf(
+                Season(
+                    number = season.coerceAtLeast(1),
+                    currentEp = currentEp,
+                    totalEp = totalEp.coerceAtLeast(1),
+                    episodes = legacyEpisodes
+                )
+            )
+        }
+
+    val totalEpisodes: Int
+        get() = if (type == MediaType.Movie) 1 else effectiveSeasons.sumOf { it.totalEp.coerceAtLeast(1) }
+
+    val watchedEpisodes: Int
+        get() = if (type == MediaType.Movie) (if (currentEp > 0) 1 else 0) else effectiveSeasons.sumOf { it.currentEp.coerceIn(0, it.totalEp) }
+
     val percent: Int
-        get() = if (totalEp <= 0) 0 else Math.round(currentEp * 100f / totalEp)
+        get() = if (totalEpisodes <= 0) 0 else Math.round(watchedEpisodes * 100f / totalEpisodes)
 
     val fraction: Float
-        get() = if (totalEp <= 0) 0f else (currentEp.toFloat() / totalEp).coerceIn(0f, 1f)
+        get() = if (totalEpisodes <= 0) 0f else (watchedEpisodes.toFloat() / totalEpisodes).coerceIn(0f, 1f)
 }
