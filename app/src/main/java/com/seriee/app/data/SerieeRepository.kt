@@ -12,9 +12,7 @@ class SerieeRepository(context: Context) {
     fun loadItems(): List<MediaItem> {
         val raw = prefs.getString(KEY_DATA, null)
         if (raw == null) {
-            val seeded = seed()
-            saveItems(seeded)
-            return seeded
+            return emptyList()
         }
         return try {
             val arr = JSONArray(raw)

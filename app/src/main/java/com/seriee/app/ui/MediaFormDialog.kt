@@ -63,10 +63,10 @@ import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
 import com.seriee.app.data.MetadataRepository
 import com.seriee.app.data.MetadataResult
-import com.seriee.app.data.parseSeasonNumberFromText
 import com.seriee.app.data.PosterStore
 import com.seriee.app.data.Season
 import com.seriee.app.data.WatchStatus
+import com.seriee.app.data.parseSeasonNumberFromText
 import com.seriee.app.reminder.ReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -318,24 +318,42 @@ fun MediaFormDialog(
         // saving as a Season 1 card — so Pick Folder targets Season 4.
         val detectedSeason = r.seasonNumbers.firstOrNull()?.takeIf { it > 0 }
             ?: parseSeasonNumberFromText(r.title)
+        // Season-scoped result: the source named one explicit season (TMDB
+        // filter / single AniList entry), so counts hold just that season.
+        val isSeasonScoped = r.seasonEpisodeCounts.size == 1 && detectedSeason != null
         if (r.seasonEpisodeCounts.isNotEmpty()) {
-            val drafts = r.seasonEpisodeCounts.mapIndexed { idx, total ->
+            val scopedDrafts = r.seasonEpisodeCounts.mapIndexed { idx, total ->
                 val num = r.seasonNumbers.getOrNull(idx)?.takeIf { it > 0 }
                     ?: detectedSeason
                     ?: seasonsDraft.getOrNull(idx)?.number
                     ?: (idx + 1)
+                // Match by season number only — never borrow progress/episode
+                // files from another season via index fallback.
                 val existing = seasonsDraft.firstOrNull { it.number == num }
-                    ?: seasonsDraft.getOrNull(idx)
                 SeasonDraft(num, total.toString(), existing?.currentEpStr ?: "0", existing?.episodes ?: emptyMap())
-            }.toMutableList()
-            seasonsDraft = drafts
+            }
+            seasonsDraft = if (isSeasonScoped && seasonsDraft.size > 1) {
+                // Editing a multi-season series with a single-season result:
+                // update only that season and preserve the other drafts
+                // (progress + episode files) instead of replacing the list.
+                val byNumber = seasonsDraft.associateBy { it.number }.toMutableMap()
+                scopedDrafts.forEach { byNumber[it.number] = it }
+                byNumber.values.sortedBy { it.number }.toMutableList()
+            } else {
+                scopedDrafts.sortedBy { it.number }.toMutableList()
+            }
         } else if (detectedSeason != null) {
             val existing = seasonsDraft.firstOrNull { it.number == detectedSeason }
                 ?: if (seasonsDraft.size == 1) seasonsDraft.firstOrNull { it.episodes.isEmpty() } else null
-            seasonsDraft = mutableListOf(
-                existing?.copy(number = detectedSeason)
-                    ?: SeasonDraft(detectedSeason, "12", "0", emptyMap())
-            )
+            val single = existing?.copy(number = detectedSeason)
+                ?: SeasonDraft(detectedSeason, "12", "0", emptyMap())
+            seasonsDraft = if (seasonsDraft.size > 1) {
+                // Same preservation for the no-counts path on multi-season drafts.
+                (seasonsDraft.filter { it.number != detectedSeason } + single)
+                    .sortedBy { it.number }.toMutableList()
+            } else {
+                mutableListOf(single)
+            }
         }
         if (r.streamCandidates.isNotEmpty()) {
             if (streamUrl.isBlank()) streamUrl = r.streamCandidates.first().url
@@ -533,8 +551,16 @@ fun MediaFormDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (status == WatchStatus.ComingSoon) SerieColors.Orange.copy(alpha = 0.08f) else p.card)
-                            .border(1.dp, if (status == WatchStatus.ComingSoon) SerieColors.Orange.copy(alpha = 0.35f) else p.border, RoundedCornerShape(16.dp))
+                            .background(
+                                if (status == WatchStatus.ComingSoon) SerieColors.Orange.copy(
+                                    alpha = 0.08f
+                                ) else p.card
+                            )
+                            .border(
+                                1.dp,
+                                if (status == WatchStatus.ComingSoon) SerieColors.Orange.copy(alpha = 0.35f) else p.border,
+                                RoundedCornerShape(16.dp)
+                            )
                             .padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -576,9 +602,16 @@ fun MediaFormDialog(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(SerieColors.Orange.copy(alpha = 0.15f))
-                                        .border(1.dp, SerieColors.Orange.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                        .border(
+                                            1.dp,
+                                            SerieColors.Orange.copy(alpha = 0.4f),
+                                            RoundedCornerShape(12.dp)
+                                        )
                                         .clickable {
-                                            ReminderScheduler.showDateTimePicker(context, releaseDate) { selected ->
+                                            ReminderScheduler.showDateTimePicker(
+                                                context,
+                                                releaseDate
+                                            ) { selected ->
                                                 releaseDate = selected
                                                 reminderEnabled = true
                                             }
@@ -607,7 +640,10 @@ fun MediaFormDialog(
                                             .background(p.chip)
                                             .border(1.dp, p.border, RoundedCornerShape(10.dp))
                                             .clickable {
-                                                ReminderScheduler.showDateTimePicker(context, releaseDate) { selected -> releaseDate = selected }
+                                                ReminderScheduler.showDateTimePicker(
+                                                    context,
+                                                    releaseDate
+                                                ) { selected -> releaseDate = selected }
                                             }
                                             .padding(horizontal = 12.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically
@@ -677,8 +713,13 @@ fun MediaFormDialog(
                                     .background(p.chip)
                                     .border(1.dp, p.border, RoundedCornerShape(8.dp))
                                     .clickable {
-                                        val nextNum = (seasonsDraft.maxOfOrNull { it.number } ?: 0) + 1
-                                        seasonsDraft = (seasonsDraft + SeasonDraft(nextNum, "12", "0")).sortedBy { it.number }.toMutableList()
+                                        val nextNum =
+                                            (seasonsDraft.maxOfOrNull { it.number } ?: 0) + 1
+                                        seasonsDraft = (seasonsDraft + SeasonDraft(
+                                            nextNum,
+                                            "12",
+                                            "0"
+                                        )).sortedBy { it.number }.toMutableList()
                                     }
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) { Text(stringResource(R.string.add_season), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.text) }
@@ -706,7 +747,9 @@ fun MediaFormDialog(
                                                 .clip(RoundedCornerShape(6.dp))
                                                 .background(SerieColors.Red.copy(alpha = 0.15f))
                                                 .clickable {
-                                                    seasonsDraft = seasonsDraft.filter { it.number != draft.number }.toMutableList()
+                                                    seasonsDraft =
+                                                        seasonsDraft.filter { it.number != draft.number }
+                                                            .toMutableList()
                                                 }
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) { Text(stringResource(R.string.remove_season, draft.number), fontSize = 10.sp, color = SerieColors.Red) }
@@ -780,9 +823,14 @@ fun MediaFormDialog(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(100.dp))
                                                 .background(if (chipSelected) SerieColors.Blue600 else p.chip)
-                                                .border(1.dp, if (chipSelected) SerieColors.Blue600 else p.border, RoundedCornerShape(100.dp))
+                                                .border(
+                                                    1.dp,
+                                                    if (chipSelected) SerieColors.Blue600 else p.border,
+                                                    RoundedCornerShape(100.dp)
+                                                )
                                                 .clickable {
-                                                    showMissingOnlyBySeason[draft.number] = !chipSelected
+                                                    showMissingOnlyBySeason[draft.number] =
+                                                        !chipSelected
                                                     episodePageBySeason[draft.number] = 0
                                                 }
                                                 .padding(horizontal = 10.dp, vertical = 4.dp)
@@ -886,7 +934,10 @@ fun MediaFormDialog(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(10.dp))
                                                 .background(SerieColors.Blue600)
-                                                .clickable(enabled = gotoText.isNotBlank(), onClick = goToPage)
+                                                .clickable(
+                                                    enabled = gotoText.isNotBlank(),
+                                                    onClick = goToPage
+                                                )
                                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -938,7 +989,9 @@ fun MediaFormDialog(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(p.chip)
                                     .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                                    .clickable { manualTarget = null; picker.launch(arrayOf("video/*")) }
+                                    .clickable {
+                                        manualTarget = null; picker.launch(arrayOf("video/*"))
+                                    }
                                     .padding(horizontal = 12.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -969,18 +1022,38 @@ fun MediaFormDialog(
                                 if (title.isBlank()) {
                                     error = context.getString(R.string.title_required)
                                 } else {
-                                    val base = initial ?: MediaItem(id = System.currentTimeMillis().toString(), title = "", type = type, status = status, poster = "")
+                                    val base = initial ?: MediaItem(
+                                        id = System.currentTimeMillis().toString(),
+                                        title = "",
+                                        type = type,
+                                        status = status,
+                                        poster = ""
+                                    )
                                     val builtSeasons: List<Season> = if (type == MediaType.Series) {
                                         seasonsDraft.sortedBy { it.number }.map { d ->
-                                            val tot = (d.totalEpStr.toIntOrNull() ?: 1).coerceAtLeast(1)
-                                            val cur = (d.currentEpStr.toIntOrNull() ?: 0).coerceIn(0, tot)
-                                            Season(number = d.number, currentEp = cur, totalEp = tot, episodes = d.episodes.values.sortedBy { it.number })
+                                            val tot =
+                                                (d.totalEpStr.toIntOrNull() ?: 1).coerceAtLeast(1)
+                                            val cur =
+                                                (d.currentEpStr.toIntOrNull() ?: 0).coerceIn(0, tot)
+                                            Season(
+                                                number = d.number,
+                                                currentEp = cur,
+                                                totalEp = tot,
+                                                episodes = d.episodes.values.sortedBy { it.number })
                                         }
                                     } else emptyList()
-                                    val legacyTotal = if (type == MediaType.Movie) 1 else builtSeasons.sumOf { it.totalEp }.coerceAtLeast(1)
-                                    val legacyCurrent = if (type == MediaType.Movie) (initial?.currentEp ?: 1) else builtSeasons.sumOf { it.currentEp }.coerceAtLeast(0)
-                                    val firstFileUri = builtSeasons.flatMap { it.episodes }.firstOrNull()?.uri ?: videoUri
-                                    val firstFilePath = builtSeasons.flatMap { it.episodes }.firstOrNull()?.displayName ?: videoPath
+                                    val legacyTotal =
+                                        if (type == MediaType.Movie) 1 else builtSeasons.sumOf { it.totalEp }
+                                            .coerceAtLeast(1)
+                                    val legacyCurrent =
+                                        if (type == MediaType.Movie) (initial?.currentEp
+                                            ?: 1) else builtSeasons.sumOf { it.currentEp }
+                                            .coerceAtLeast(0)
+                                    val firstFileUri =
+                                        builtSeasons.flatMap { it.episodes }.firstOrNull()?.uri
+                                            ?: videoUri
+                                    val firstFilePath = builtSeasons.flatMap { it.episodes }
+                                        .firstOrNull()?.displayName ?: videoPath
                                     onSave(
                                         base.copy(
                                             title = title.trim(),
@@ -990,7 +1063,8 @@ fun MediaFormDialog(
                                             description = description.trim(),
                                             source = source,
                                             sourceId = sourceId,
-                                            season = builtSeasons.firstOrNull()?.number ?: base.season,
+                                            season = builtSeasons.firstOrNull()?.number
+                                                ?: base.season,
                                             currentEp = legacyCurrent,
                                             totalEp = legacyTotal,
                                             seasons = builtSeasons,
@@ -1074,7 +1148,11 @@ private fun EpisodeAssignRow(ep: Int, file: EpisodeFile?, onPick: () -> Unit) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(if (file != null) SerieColors.Emerald.copy(alpha = 0.15f) else SerieColors.Blue600.copy(alpha = 0.15f))
+                .background(
+                    if (file != null) SerieColors.Emerald.copy(alpha = 0.15f) else SerieColors.Blue600.copy(
+                        alpha = 0.15f
+                    )
+                )
                 .clickable(onClick = onPick)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) { Text(if (file != null) "✓" else "+", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (file != null) SerieColors.Emerald else SerieColors.Blue400) }
@@ -1088,7 +1166,11 @@ private fun PosterSourceChip(label: String, selected: Boolean, onClick: () -> Un
         modifier = Modifier
             .clip(RoundedCornerShape(100.dp))
             .background(if (selected) SerieColors.Blue600 else p.chip)
-            .border(1.dp, if (selected) SerieColors.Blue600 else p.border, RoundedCornerShape(100.dp))
+            .border(
+                1.dp,
+                if (selected) SerieColors.Blue600 else p.border,
+                RoundedCornerShape(100.dp)
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) { Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (selected) Color.White else p.muted) }
