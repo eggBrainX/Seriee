@@ -1,23 +1,52 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Release signing credentials live in <root>/keystore.properties (git-ignored).
+// See keystore.properties.example. Debug builds work without it; release builds
+// stay unsigned until the file exists — create it once and back up both files.
+val releasePropsFile = rootProject.file("keystore.properties")
+val releaseProps = Properties().apply {
+    if (releasePropsFile.exists()) {
+        FileInputStream(releasePropsFile).use { load(it) }
+    }
+}
+val hasReleaseSigning = releasePropsFile.exists() &&
+    !releaseProps.getProperty("storeFile").isNullOrBlank()
+
 android {
     namespace = "com.seriee.app"
     compileSdk = 34
+
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                keyAlias = releaseProps.getProperty("keyAlias")
+                keyPassword = releaseProps.getProperty("keyPassword")
+                storeFile = rootProject.file(releaseProps.getProperty("storeFile"))
+                storePassword = releaseProps.getProperty("storePassword")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.aistudio.seriee.twvpmz"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.2.2"
+        versionCode = 7
+        versionName = "0.2.4"
     }
 
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -35,6 +64,10 @@ android {
     }
     buildFeatures {
         compose = true
+        // Expose versionCode/versionName to app code via BuildConfig.
+        // Single source of truth: defaultConfig below — never hardcode
+        // version fallbacks in Kotlin code.
+        buildConfig = true
     }
 }
 

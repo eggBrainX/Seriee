@@ -10,6 +10,40 @@ import java.net.URL
 
 data class StreamCandidate(val name: String, val url: String)
 
+private val ROMAN_SEASONS = mapOf(
+    "i" to 1, "ii" to 2, "iii" to 3, "iv" to 4, "v" to 5,
+    "vi" to 6, "vii" to 7, "viii" to 8, "ix" to 9, "x" to 10
+)
+
+/**
+ * Extracts the season number a source entry *is* from its title / query text.
+ * AniList splits later seasons into separate entries ("… - Season 4"); TMDB
+ * titles usually don't, so the search query is checked too.
+ * Matches: "Season 4", "Season IV", "S4", "Part 2", "4th Season", "Season-4".
+ * Returns null when no explicit season is present (caller defaults to 1 / all seasons).
+ */
+fun parseSeasonNumberFromText(text: String?): Int? {
+    if (text.isNullOrBlank()) return null
+    fun num(s: String?): Int? = s?.toIntOrNull()?.takeIf { it in 1..50 }
+    fun roman(s: String?): Int? = s?.lowercase()?.let { ROMAN_SEASONS[it] }
+    // "4th Season" / "2nd Season"
+    Regex("""\b0*(\d{1,2})(?:st|nd|rd|th)\s*season\b""", RegexOption.IGNORE_CASE)
+        .find(text)?.let { if (num(it.groupValues[1]) != null) return num(it.groupValues[1]) }
+    // "Season 4", "Season-4", "Season: 4"
+    Regex("""\bseason\s*[-:=]?\s*0*(\d{1,2})\b""", RegexOption.IGNORE_CASE)
+        .find(text)?.let { if (num(it.groupValues[1]) != null) return num(it.groupValues[1]) }
+    // "Season IV"
+    Regex("""\bseason\s*[-:=]?\s*(viii|vii|vi|iv|ix|iii|ii|x|v|i)\b""", RegexOption.IGNORE_CASE)
+        .find(text)?.let { if (roman(it.groupValues[1]) != null) return roman(it.groupValues[1]) }
+    // "Part 2" (split-cour continuation treated as next season)
+    Regex("""\bpart\s*[-:=]?\s*0*(\d{1,2})\b""", RegexOption.IGNORE_CASE)
+        .find(text)?.let { if (num(it.groupValues[1]) != null) return num(it.groupValues[1]) }
+    // "S4" / " S04 " (standalone code, not inside a word)
+    Regex("""(?:^|[\s\-:])S0*(\d{1,2})(?=$|[\s\-:.])""", RegexOption.IGNORE_CASE)
+        .find(text)?.let { if (num(it.groupValues[1]) != null) return num(it.groupValues[1]) }
+    return null
+}
+
 data class MetadataResult(
     val source: String,
     val sourceId: String,
@@ -20,7 +54,9 @@ data class MetadataResult(
     val seasonEpisodeCounts: List<Int>,
     val streamCandidates: List<StreamCandidate>,
     val year: String = "",
-    val type: MediaType = MediaType.Series
+    val type: MediaType = MediaType.Series,
+    /** Season number per entry in [seasonEpisodeCounts] (parallel list). Empty = [1]. */
+    val seasonNumbers: List<Int> = emptyList()
 )
 
 class MetadataRepository {
@@ -69,16 +105,32 @@ class MetadataRepository {
         val total = media.optInt("episodes", 0)
         val isMovie = media.optString("format").equals("MOVIE", ignoreCase = true)
         val mediaType = if (isMovie) MediaType.Movie else MediaType.Series
+        // AniList models each season as its own entry ("…Season 4"). Its `season`
+        // field is the release season (WINTER/SPRING…), not the sequel number,
+        // so the number comes from the entry's title (then the search query).
+        val detectedSeason = if (isMovie) null
+            else parseSeasonNumberFromText(title) ?: parseSeasonNumberFromText(query)
         val seasons = when {
             isMovie -> listOf(1)
             total > 0 -> listOf(total)
             else -> emptyList()
         }
+        val seasonNumbers = when {
+            isMovie -> listOf(1)
+            seasons.isNotEmpty() -> listOf(detectedSeason ?: 1)
+            else -> emptyList()
+        }
         val streams = mutableListOf<StreamCandidate>()
         val links = media.optJSONArray("externalLinks")
         if (links != null) for (i in 0 until links.length()) {
-            val site = links.optJSONObject(i)?.optString("site") ?: ""
-            val url = links.optJSONObject(i)?.optString("url") ?: ""
+            val link = links.optJSONObject(i) ?: continue
+            val site = link.optString("site")
+            val url = link.optString("url")
+            // AniList ExternalLinkType: INFO | STREAMING | SOCIAL.
+            // Only STREAMING links are playback candidates — INFO (wiki/official sites)
+            // or SOCIAL links must not become the item's streamUrl via applyFetch.
+            val linkType = link.optString("type")
+            if (!linkType.equals("STREAMING", ignoreCase = true)) continue
             if (url.isNotBlank()) streams.add(StreamCandidate(site.ifBlank { "Official" }, url))
         }
         val year = media.optJSONObject("startDate")?.optInt("year", 0)?.takeIf { it > 0 }?.toString() ?: ""
@@ -93,7 +145,8 @@ class MetadataRepository {
                 seasonEpisodeCounts = seasons,
                 streamCandidates = streams,
                 year = year,
-                type = mediaType
+                type = mediaType,
+                seasonNumbers = seasonNumbers
             )
         )
     }
@@ -126,7 +179,8 @@ class MetadataRepository {
                         seasonEpisodeCounts = listOf(1),
                         streamCandidates = providers,
                         year = year,
-                        type = MediaType.Movie
+                        type = MediaType.Movie,
+                        seasonNumbers = listOf(1)
                     )
                 )
             }
@@ -142,8 +196,15 @@ class MetadataRepository {
                 val poster = if (posterPath.isNotBlank()) "https://image.tmdb.org/t/p/w500$posterPath" else ""
                 val desc = item.optString("overview")
                 val year = (item.optString("first_air_date").take(4))
-                // episode count requires detail call
-                val seasons = fetchTmdbSeasonCounts(key, id)
+                // episode count requires detail call — keep (season_number, episode_count)
+                val allSeasons = fetchTmdbSeasons(key, id)
+                // TMDB returns the whole show; if the query/title names one season
+                // ("re:zero season 4") expose only that season so Pick Folder lands on it.
+                val wantedSeason = parseSeasonNumberFromText(title)
+                    ?: parseSeasonNumberFromText(query)
+                val pickedSeasons = if (wantedSeason != null && allSeasons.any { it.first == wantedSeason }) {
+                    allSeasons.filter { it.first == wantedSeason }
+                } else allSeasons
                 val providers = fetchTmdbProviders(key, "tv", id, region)
                 list.add(
                     MetadataResult(
@@ -153,10 +214,11 @@ class MetadataRepository {
                         posterUrl = poster,
                         description = desc,
                         tags = emptyList(),
-                        seasonEpisodeCounts = seasons,
+                        seasonEpisodeCounts = pickedSeasons.map { it.second },
                         streamCandidates = providers,
                         year = year,
-                        type = MediaType.Series
+                        type = MediaType.Series,
+                        seasonNumbers = pickedSeasons.map { it.first }
                     )
                 )
             }
@@ -164,19 +226,20 @@ class MetadataRepository {
         return list
     }
 
-    private fun fetchTmdbSeasonCounts(key: String, tvId: String): List<Int> {
+    /** (season_number, episode_count) pairs, e.g. (4, 19) for Season 4. */
+    private fun fetchTmdbSeasons(key: String, tvId: String): List<Pair<Int, Int>> {
         return try {
             val detail = getJson("https://api.themoviedb.org/3/tv/${URLEncoder.encode(tvId, "UTF-8")}?api_key=${URLEncoder.encode(key, "UTF-8")}")
             val seasonsArr = detail.optJSONArray("seasons") ?: return emptyList()
-            val counts = mutableListOf<Int>()
+            val out = mutableListOf<Pair<Int, Int>>()
             for (i in 0 until seasonsArr.length()) {
                 val s = seasonsArr.optJSONObject(i) ?: continue
                 val seasonNumber = s.optInt("season_number", 0)
                 if (seasonNumber <= 0) continue
                 val epCount = s.optInt("episode_count", 0)
-                if (epCount > 0) counts.add(epCount)
+                if (epCount > 0) out.add(seasonNumber to epCount)
             }
-            counts
+            out.sortedBy { it.first }
         } catch (_: Exception) {
             emptyList()
         }

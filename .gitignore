@@ -8,3 +8,8 @@ captures/
 .cxx/
 *.apk
 *.aab
+# Release signing secrets — never commit (back these up off-machine!)
+*.keystore
+*.jks
+keystore.properties
+!keystore.properties.example
