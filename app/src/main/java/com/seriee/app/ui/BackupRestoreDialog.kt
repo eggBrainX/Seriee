@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,6 +44,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -350,7 +354,7 @@ fun BackupRestoreDialog(
                     }
                 }
 
-                // TMDB API key
+                // TMDB API key — hidden after save
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -369,7 +373,56 @@ fun BackupRestoreDialog(
                         fontSize = 12.sp, color = p.muted
                     )
                     var keyInput by remember { mutableStateOf(vm.tmdbKey) }
-                    SField(keyInput, { keyInput = it }, placeholder = "API key")
+                    // Hidden by default once a key is saved — eye icon toggles reveal
+                    var showKey by remember { mutableStateOf(false) }
+                    val isSaved = vm.tmdbKey.isNotBlank()
+                    SField(
+                        value = keyInput,
+                        onChange = {
+                            keyInput = it
+                            // Reveal while typing so user can verify, hide again on Save
+                            if (!showKey && isSaved && it != vm.tmdbKey) {
+                                showKey = true
+                            }
+                        },
+                        placeholder = if (isSaved && !showKey) "••••••••••••••••••••" else "API key",
+                        visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailing = {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showKey = !showKey },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (showKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (showKey) "Hide key" else "Show key",
+                                    tint = p.muted,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    )
+                    // Saved indicator
+                    if (isSaved) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Storage,
+                                contentDescription = null,
+                                tint = SerieColors.Emerald,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = if (showKey) "Visible" else "Key saved — tap eye to reveal",
+                                fontSize = 11.sp,
+                                color = p.muted
+                            )
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(
                             modifier = Modifier
@@ -377,6 +430,7 @@ fun BackupRestoreDialog(
                                 .background(SerieColors.Blue600)
                                 .clickable {
                                     vm.setTmdbKey(keyInput)
+                                    showKey = false
                                     android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_save), android.widget.Toast.LENGTH_SHORT).show()
                                 }
                                 .padding(horizontal = 14.dp, vertical = 9.dp)
@@ -389,6 +443,7 @@ fun BackupRestoreDialog(
                                     .clickable {
                                         vm.setTmdbKey("")
                                         keyInput = ""
+                                        showKey = false
                                         android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                     .padding(horizontal = 14.dp, vertical = 9.dp)
