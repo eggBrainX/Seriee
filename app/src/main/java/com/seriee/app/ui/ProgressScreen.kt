@@ -265,10 +265,6 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                if (item.rating > 0) {
-                    Spacer(Modifier.width(6.dp))
-                    StarRatingBadge(rating = item.rating)
-                }
             }
 
             if (item.tags.isNotEmpty()) {
@@ -341,7 +337,14 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(stringResource(R.string.episode_progress, item.watchedEpisodes, item.totalEpisodes), fontSize = 12.sp, color = p.muted)
+                    Text(
+                        if (item.type == MediaType.Movie) {
+                            stringResource(if (item.watchedEpisodes > 0) R.string.movie_watched else R.string.movie_not_watched)
+                        } else {
+                            stringResource(R.string.episode_progress, item.watchedEpisodes, item.totalEpisodes)
+                        },
+                        fontSize = 12.sp, color = p.muted
+                    )
                     Text("${item.percent}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = p.text)
                 }
                 Spacer(Modifier.height(6.dp))

@@ -131,7 +131,11 @@ fun DetailDialog(
                         }
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            stringResource(R.string.episode_colon, item.watchedEpisodes, item.totalEpisodes),
+                            if (item.type == MediaType.Movie) {
+                                stringResource(if (item.watchedEpisodes > 0) R.string.movie_watched else R.string.movie_not_watched)
+                            } else {
+                                stringResource(R.string.episode_colon, item.watchedEpisodes, item.totalEpisodes)
+                            },
                             fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text
                         )
                         if (item.type == MediaType.Series) {

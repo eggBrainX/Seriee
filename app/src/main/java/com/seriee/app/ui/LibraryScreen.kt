@@ -194,7 +194,7 @@ fun LibraryScreen(
             }
         } else if (gridView) {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Adaptive(minSize = 120.dp),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -241,7 +241,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
     val badgeShort = remember(item.releaseDate) { ReminderScheduler.countdownShortBadge(context, item.releaseDate) }
     val badgeText = remember(item.releaseDate) { ReminderScheduler.countdownBadgeText(context, item.releaseDate) }
     Column(Modifier.clickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
             Poster(item.poster, Modifier.fillMaxSize(), RoundedCornerShape(16.dp))
             if (item.status == WatchStatus.ComingSoon) {
                 // Top-Start Days Until Release Badge (e.g. D-5)
@@ -320,7 +320,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                 Icon(
                     Icons.Filled.PushPin,
                     contentDescription = stringResource(R.string.pin),
-                    tint = if (item.pinned) SerieColors.Amber else Color.White.copy(alpha = 0.6f),
+                    tint = if (item.pinned) SerieColors.Amber else Color.White.copy(alpha = 0.4f),
                     modifier = Modifier.size(14.dp)
                 )
             }
@@ -331,7 +331,7 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = p.text,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
@@ -340,9 +340,14 @@ private fun GridItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
             Spacer(Modifier.height(2.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)
             ) {
-                GenreTagBadge(item.tags.first())
+                item.tags.take(2).forEach { tag ->
+                    GenreTagBadge(tag)
+                }
+                if (item.tags.size > 2) {
+                    GenreTagBadge("+${item.tags.size - 2}")
+                }
             }
         }
     }
@@ -369,7 +374,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Poster(item.poster, Modifier.size(48.dp))
+        Poster(item.poster, Modifier.size(width = 48.dp, height = 72.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(
@@ -393,7 +398,7 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = p.text,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -418,14 +423,23 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
                         "${stringResource(item.type.labelRes)} • $detailedCountdown",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = SerieColors.Orange
+                        color = SerieColors.Orange,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             } else {
+                val progressLabel = if (item.type == MediaType.Movie) {
+                    stringResource(if (item.watchedEpisodes > 0) R.string.movie_watched else R.string.movie_not_watched)
+                } else {
+                    stringResource(R.string.episode_progress, item.watchedEpisodes, item.totalEpisodes)
+                }
                 Text(
-                    "${stringResource(item.type.labelRes)} • ${stringResource(R.string.episode_progress, item.watchedEpisodes, item.totalEpisodes)}",
+                    "${stringResource(item.type.labelRes)} • $progressLabel",
                     fontSize = 12.sp,
-                    color = p.muted
+                    color = p.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             if (item.tags.isNotEmpty()) {

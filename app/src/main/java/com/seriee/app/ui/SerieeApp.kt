@@ -141,6 +141,7 @@ fun SerieeApp(vm: SerieeViewModel) {
     if (showForm) {
         MediaFormDialog(
             initial = editingId?.let { id -> vm.items.find { it.id == id } },
+            existing = vm.items,
             onDismiss = { showForm = false },
             onSave = {
                 vm.upsert(it)

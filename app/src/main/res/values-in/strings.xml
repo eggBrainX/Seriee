@@ -41,6 +41,8 @@
     <string name="season_format">Musim %1$d</string>
     <string name="movie">Film</string>
     <string name="episode_progress">Episode %1$d / %2$d</string>
+    <string name="movie_watched">Sudah ditonton</string>
+    <string name="movie_not_watched">Belum ditonton</string>
     <string name="add_one_episode">Tambah 1 episode</string>
     <string name="completed">Selesai</string>
     <string name="reminder">Pengingat</string>
@@ -84,6 +86,7 @@
     <string name="video_name_placeholder">Nama video...</string>
     <string name="pick_file">Pilih File</string>
     <string name="title_required">Judul wajib diisi</string>
+    <string name="duplicate_media">Judul ini sudah ada di pustaka kamu.</string>
 
     <!-- Detail dialog -->
     <string name="status_colon">Status: %1$s</string>
@@ -223,19 +226,12 @@
     <string name="changelog_version">Versi %1$s</string>
     <string name="changelog_got_it">Mengerti</string>
     <string name="changelog_close">Tutup changelog</string>
-    <string name="changelog_1">Dukungan multi-season — satu judul kini bisa menampung Season 1, 2, dan seterusnya, dengan jumlah episode &amp; progres terpisah</string>
-    <string name="changelog_2">Pemilih episode — ketuk season dan nomor episode (E1, E2…) untuk langsung memutarnya di VLC / MX Player, seperti pemilih di aplikasi mereka</string>
-    <string name="changelog_3">File offline per episode — pilih satu folder penuh atau banyak file; nama seperti S02E05 dicocokkan otomatis, dan tiap episode tetap bisa diperbaiki manual</string>
-    <string name="changelog_4">Upload poster — pilih cover dari penyimpanan perangkat (disimpan di dalam aplikasi) atau tetap pakai URL</string>
-    <string name="changelog_5">Ambil info otomatis — cari di AniList (anime, tanpa kunci) dan TMDB (kunci opsional di Pengaturan Cadangan) untuk mengisi judul, poster, deskripsi, genre, dan link streaming — semuanya tetap bisa diedit</string>
-    <string name="changelog_6">Deskripsi — deskripsi hasil fetch maupun manual kini tampil di layar detail</string>
-    <string name="changelog_7">Label Bahasa Indonesia &amp; Inggris untuk semua fitur baru</string>
-    <string name="changelog_8">Scroll lebih mulus — poster dan daftar kini dimuat dan di-scroll tanpa patah-patah di layar Progres &amp; Pustaka</string>
-    <string name="changelog_9">Filter daftar lebih cepat — pencarian dan filter diperbarui langsung saat kamu mengetik</string>
-    <string name="changelog_10">Perbaikan bug — memperlancar recomposition daftar dan rendering badge hitung mundur saat scrolling</string>
-    <string name="changelog_11">Serial panjang (100–1000+ episode) — pemilih file kini berhalaman (50 per halaman) dengan Sebelumnya/Berikutnya dan Lompat ke, sehingga daftar skala One Piece dimuat dan di-scroll seketika</string>
-    <string name="changelog_12">Filter hanya-yang-kosong + penghitung terisi untuk menemukan celah tanpa scroll, dan layar detail kini membuka di episode saat ini</string>
-    <string name="changelog_13">Pilih massal lebih cepat — impor folder / banyak file kini berjalan di background, tidak lagi macet di perpustakaan besar</string>
+    <string name="changelog_1">Segera Tayang kini memakai tanggal rilis asli dari AniList dan TMDB, jadi hitung mundurnya sesuai sumber, bukan tanggal perkiraan</string>
+    <string name="changelog_2">Film kini menampilkan Sudah ditonton / Belum ditonton, bukan label "Episode 1 / 1" yang membingungkan</string>
+    <string name="changelog_3">Pencegahan duplikat — menyimpan judul yang sudah ada di pustaka (judul, tipe, dan musim sama) kini diblokir dengan pesan yang jelas</string>
+    <string name="changelog_4">Grid Pustaka — kolom adaptif, poster 2:3 yang proporsional, judul dua baris, dan maksimal dua tag plus penghitung +N</string>
+    <string name="changelog_5">Daftar Pustaka — thumbnail 2:3, judul dua baris, dan baris info satu baris yang tidak lagi terpotong</string>
+    <string name="changelog_6">Satu badge rating per item — badge bintang ganda di samping judul panjang dihapus, memberi ruang lebih untuk judul</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Pengingat aktif untuk %1$s "%2$s"!</string>

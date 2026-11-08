@@ -85,6 +85,7 @@ private data class SeasonDraft(
 @Composable
 fun MediaFormDialog(
     initial: MediaItem?,
+    existing: List<MediaItem> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (MediaItem) -> Unit
 ) {
@@ -369,6 +370,22 @@ fun MediaFormDialog(
         fetchResults = emptyList()
         fetchError = null
         Toast.makeText(context, context.getString(R.string.fetch_applied), Toast.LENGTH_SHORT).show()
+    }
+
+    fun normalizedTitle(value: String) = value.trim().replace(Regex("\\s+"), " ").lowercase()
+
+    fun targetSeason(): Int =
+        if (type == MediaType.Series) (seasonsDraft.minOfOrNull { it.number } ?: 1) else 1
+
+    // Same title + type + season is one library entry. When both entries carry a
+    // metadata source id, different ids mean different titles (remakes, etc.).
+    fun isDuplicateOf(other: MediaItem): Boolean {
+        if (other.type != type) return false
+        if (normalizedTitle(other.title) != normalizedTitle(title)) return false
+        if (other.season != targetSeason()) return false
+        return if (sourceId.isNotBlank() && other.sourceId.isNotBlank()) {
+            other.sourceId == sourceId && other.source.equals(source, ignoreCase = true)
+        } else true
     }
 
     Dialog(
@@ -1064,8 +1081,13 @@ fun MediaFormDialog(
                             .clip(RoundedCornerShape(12.dp))
                             .background(SerieColors.Blue600)
                             .clickable {
+                                error = null
                                 if (title.isBlank()) {
                                     error = context.getString(R.string.title_required)
+                                } else if (existing.any { other ->
+                                        other.id != initial?.id && isDuplicateOf(other)
+                                    }) {
+                                    error = context.getString(R.string.duplicate_media)
                                 } else {
                                     val base = initial ?: MediaItem(
                                         id = System.currentTimeMillis().toString(),
