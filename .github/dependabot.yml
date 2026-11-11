@@ -12,6 +12,14 @@ updates:
     ignore:
       - dependency-name: "androidx.core:core"
       - dependency-name: "androidx.core:core-ktx"
+      # Compose 1.10+ (BOM 2025.xx+) requires AGP 9.1 and compileSdk 37.
+      - dependency-name: "androidx.compose:compose-bom"
+      # AGP 9 is a breaking migration (built-in Kotlin, new DSL).
+      - dependency-name: "com.android.application"
+        versions: [">= 9.0.0"]
+      # Gradle 9.6 removed a Gradle internal API that AGP 8.13 still uses.
+      - dependency-name: "gradle-wrapper"
+        versions: [">= 9.6.0"]
     groups:
       androidx:
         patterns:

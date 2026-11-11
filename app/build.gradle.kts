@@ -82,7 +82,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
 
-    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    // Pinned to the last BOM whose Compose runtime works on AGP 8.x.
+    // Compose 1.10+ (BOM 2025.xx and later) requires AGP 9.1 and compileSdk 37.
+    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
