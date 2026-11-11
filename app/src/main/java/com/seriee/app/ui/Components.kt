@@ -33,6 +33,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -141,9 +143,43 @@ fun SField(
     keyboardType: KeyboardType = KeyboardType.Text,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
-    visualTransformation: VisualTransformation = VisualTransformation.None
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    filled: Boolean = false
 ) {
     val p = LocalPalette.current
+    if (filled) {
+        TextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text(placeholder, fontSize = 14.sp) },
+            leadingIcon = leading,
+            trailingIcon = trailing,
+            visualTransformation = visualTransformation,
+            textStyle = TextStyle(fontSize = 14.sp),
+            shape = RoundedCornerShape(50),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            colors = TextFieldDefaults.colors(
+                focusedTextColor = p.text,
+                unfocusedTextColor = p.text,
+                focusedContainerColor = p.chip,
+                unfocusedContainerColor = p.chip,
+                disabledContainerColor = p.chip,
+                cursorColor = p.primary,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent,
+                focusedPlaceholderColor = p.muted,
+                unfocusedPlaceholderColor = p.muted,
+                focusedLeadingIconColor = p.muted,
+                unfocusedLeadingIconColor = p.muted,
+                focusedTrailingIconColor = p.muted,
+                unfocusedTrailingIconColor = p.muted
+            )
+        )
+        return
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -161,8 +197,8 @@ fun SField(
             unfocusedTextColor = p.text,
             focusedContainerColor = p.bg,
             unfocusedContainerColor = p.bg,
-            cursorColor = SerieColors.Blue500,
-            focusedBorderColor = SerieColors.Blue500,
+            cursorColor = p.primary,
+            focusedBorderColor = p.primary,
             unfocusedBorderColor = p.border,
             focusedPlaceholderColor = p.muted,
             unfocusedPlaceholderColor = p.muted,

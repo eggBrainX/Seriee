@@ -14,8 +14,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,13 +32,15 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,8 +59,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.seriee.app.R
 import com.seriee.app.data.EpisodeFile
 import com.seriee.app.data.MediaItem
@@ -84,6 +85,7 @@ private data class SeasonDraft(
     val episodes: Map<Int, EpisodeFile> = emptyMap()
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MediaFormDialog(
     initial: MediaItem?,
@@ -390,25 +392,23 @@ fun MediaFormDialog(
         } else true
     }
 
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = p.surface,
+        scrimColor = Color.Black.copy(alpha = 0.55f),
+        dragHandle = { SheetDragHandle() }
     ) {
-        Surface(
-            modifier = Modifier
+        Column(
+            Modifier
                 .fillMaxWidth()
-                .heightIn(max = 640.dp)
-                .padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = p.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, p.border)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(
-                Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         if (initial == null) stringResource(R.string.add_to_seriee) else stringResource(R.string.edit_media),
@@ -1130,7 +1130,6 @@ fun MediaFormDialog(
                             .padding(horizontal = 22.dp, vertical = 11.dp)
                     ) { Text(stringResource(R.string.save), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 }
-            }
         }
     }
 }

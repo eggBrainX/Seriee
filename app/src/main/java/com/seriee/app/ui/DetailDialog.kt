@@ -1,6 +1,5 @@
 package com.seriee.app.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,10 +31,12 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,14 +55,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.seriee.app.R
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
 import com.seriee.app.data.WatchStatus
 import com.seriee.app.reminder.ReminderScheduler
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailDialog(
     item: MediaItem,
@@ -83,23 +84,21 @@ fun DetailDialog(
     }
     val safeSeasonIdx = selectedSeasonIdx.coerceIn(0, (seasons.size - 1).coerceAtLeast(0))
 
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = p.surface,
+        scrimColor = Color.Black.copy(alpha = 0.55f),
+        dragHandle = { SheetDragHandle() }
     ) {
-        Surface(
-            modifier = Modifier
+        Column(
+            Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = p.surface,
-            border = BorderStroke(1.dp, p.border)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 20.dp)
         ) {
-            Column(
-                Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp)
-            ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Box(
                         Modifier
@@ -127,7 +126,7 @@ fun DetailDialog(
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) { Text(stringResource(item.type.labelRes), fontSize = 11.sp, color = SerieColors.Blue400) }
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.status_colon, stringResource(item.status.labelRes)), fontSize = 12.sp, color = p.muted)
+                            StatusBadge(item.status)
                         }
                         Spacer(Modifier.height(10.dp))
                         Text(
@@ -496,7 +495,6 @@ fun DetailDialog(
                         Text(stringResource(R.string.edit_details), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                     }
                 }
-            }
         }
     }
 

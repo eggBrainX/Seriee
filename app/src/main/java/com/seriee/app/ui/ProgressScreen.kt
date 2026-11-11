@@ -18,21 +18,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +45,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -56,6 +60,7 @@ import com.seriee.app.data.MediaType
 import com.seriee.app.data.WatchStatus
 import com.seriee.app.reminder.ReminderScheduler
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProgressScreen(
     list: List<MediaItem>,
@@ -64,39 +69,49 @@ fun ProgressScreen(
     onIncrement: (String) -> Unit,
     streakDays: Int = 0,
     bestStreak: Int = 0,
-    watchDays: Set<String> = emptySet()
+    watchDays: Set<String> = emptySet(),
+    onAdd: () -> Unit = {},
+    searchFocusTick: Int = 0,
+    comingSoonTick: Int = 0
 ) {
     val p = LocalPalette.current
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableIntStateOf(0) }
+    val focusRequester = remember { FocusRequester() }
 
-    // Filter labels need localized strings, so they stay in composition (cheap, 4 items).
-    val filterLabels = listOf(
-        stringResource(R.string.filter_all),
-        stringResource(R.string.filter_watching),
-        stringResource(R.string.filter_completed),
-        stringResource(R.string.filter_coming_soon)
+    LaunchedEffect(searchFocusTick) {
+        if (searchFocusTick > 0) runCatching { focusRequester.requestFocus() }
+    }
+    LaunchedEffect(comingSoonTick) {
+        if (comingSoonTick > 0) filter = 4
+    }
+
+    val filters = listOf(
+        stringResource(R.string.filter_all) to null,
+        stringResource(R.string.filter_watching) to WatchStatus.Watching,
+        stringResource(R.string.filter_completed) to WatchStatus.Completed,
+        stringResource(R.string.filter_plan_to_watch) to WatchStatus.PlanToWatch,
+        stringResource(R.string.filter_coming_soon) to WatchStatus.ComingSoon,
+        stringResource(R.string.filter_on_hold) to WatchStatus.OnHold,
+        stringResource(R.string.filter_dropped) to WatchStatus.Dropped
     )
     val filterCounts = remember(list) {
         listOf(
             list.size,
             list.count { it.status == WatchStatus.Watching },
             list.count { it.status == WatchStatus.Completed },
-            list.count { it.status == WatchStatus.ComingSoon }
+            list.count { it.status == WatchStatus.PlanToWatch },
+            list.count { it.status == WatchStatus.ComingSoon },
+            list.count { it.status == WatchStatus.OnHold },
+            list.count { it.status == WatchStatus.Dropped }
         )
     }
 
     val filtered by remember(list, query, filter) {
         derivedStateOf {
+            val status = filters.getOrNull(filter)?.second
             list.filter { it.title.contains(query.trim(), ignoreCase = true) }
-                .filter {
-                    when (filter) {
-                        1 -> it.status == WatchStatus.Watching
-                        2 -> it.status == WatchStatus.Completed
-                        3 -> it.status == WatchStatus.ComingSoon
-                        else -> true
-                    }
-                }
+                .filter { status == null || it.status == status }
         }
     }
 
@@ -126,7 +141,9 @@ fun ProgressScreen(
             SField(
                 value = query,
                 onChange = { query = it },
+                modifier = Modifier.focusRequester(focusRequester),
                 placeholder = stringResource(R.string.search_progress_placeholder),
+                filled = true,
                 leading = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 trailing = if (query.isNotBlank()) {
                     {
@@ -142,14 +159,12 @@ fun ProgressScreen(
                 } else null
             )
 
-            // Top Status Filter Bar for All, Watching, Completed, Coming Soon
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                filterLabels.forEachIndexed { index, label ->
+                filters.forEachIndexed { index, (label, _) ->
                     FilterChip(
                         label = "$label (${filterCounts[index]})",
                         selected = filter == index,
@@ -160,13 +175,31 @@ fun ProgressScreen(
         }
 
         if (filtered.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
-                Text(
-                    if (query.isNotBlank()) stringResource(R.string.no_search_results, query)
-                    else stringResource(R.string.no_shows),
-                    color = p.muted,
-                    fontSize = 14.sp
-                )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(top = 40.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                if (query.isBlank() && list.isEmpty()) {
+                    EmptyState(
+                        icon = Icons.Filled.LiveTv,
+                        title = stringResource(R.string.empty_progress_title),
+                        hint = stringResource(R.string.empty_progress_hint),
+                        ctaLabel = stringResource(R.string.add_first_title),
+                        onCta = onAdd
+                    )
+                } else {
+                    EmptyState(
+                        icon = Icons.Filled.SearchOff,
+                        title = if (query.isNotBlank()) {
+                            stringResource(R.string.no_search_results, query)
+                        } else {
+                            stringResource(R.string.no_shows)
+                        },
+                        hint = stringResource(R.string.empty_progress_hint)
+                    )
+                }
             }
         } else {
             LazyColumn(
@@ -174,7 +207,12 @@ fun ProgressScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(filtered, key = { it.id }, contentType = { it.type }) { item ->
-                    ProgressCard(item, onClick = { onOpen(item) }, onIncrement = { onIncrement(item.id) })
+                    ProgressCard(
+                        item = item,
+                        onClick = { onOpen(item) },
+                        onIncrement = { onIncrement(item.id) },
+                        modifier = Modifier.animateItem()
+                    )
                 }
             }
         }
@@ -182,7 +220,12 @@ fun ProgressScreen(
 }
 
 @Composable
-private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -> Unit) {
+private fun ProgressCard(
+    item: MediaItem,
+    onClick: () -> Unit,
+    onIncrement: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val p = LocalPalette.current
     val context = LocalContext.current
     val shape = remember { RoundedCornerShape(16.dp) }
@@ -202,7 +245,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
         ((30 - daysLeft).coerceIn(1, 30) / 30f)
     }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(shape)
             .background(p.card)
@@ -252,7 +295,7 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     else stringResource(R.string.movie),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (item.status == WatchStatus.ComingSoon) SerieColors.Orange else SerieColors.Blue400
+                    color = statusColor(item.status)
                 )
                 Text(relTime, fontSize = 10.sp, color = p.muted)
             }
@@ -322,15 +365,13 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { visualProgress },
-                    drawStopIndicator = {},
+                GradientProgressBar(
+                    fraction = visualProgress,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(50)),
-                    color = SerieColors.Orange,
-                    trackColor = SerieColors.Orange.copy(alpha = 0.15f)
+                        .height(6.dp),
+                    colors = listOf(SerieColors.Orange, SerieColors.Amber),
+                    track = SerieColors.Orange.copy(alpha = 0.15f)
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -355,15 +396,11 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                     Text("${item.percent}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = p.text)
                 }
                 Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { item.fraction },
-                    drawStopIndicator = {},
+                GradientProgressBar(
+                    fraction = item.fraction,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)
-                        .clip(RoundedCornerShape(50)),
-                    color = SerieColors.Blue500,
-                    trackColor = p.chip
                 )
             }
         }
@@ -375,13 +412,13 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (item.reminderEnabled) SerieColors.Orange.copy(alpha = 0.2f) else p.chip),
+                    .background(p.chip),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (item.reminderEnabled) Icons.Filled.NotificationsActive else Icons.Filled.Alarm,
                     contentDescription = stringResource(R.string.reminder),
-                    tint = if (item.reminderEnabled) SerieColors.Orange else p.muted,
+                    tint = if (item.reminderEnabled) p.warning else p.muted,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -390,21 +427,21 @@ private fun ProgressCard(item: MediaItem, onClick: () -> Unit, onIncrement: () -
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SerieColors.Blue600.copy(alpha = 0.2f))
+                    .background(p.primary.copy(alpha = 0.2f))
                     .clickable(onClick = onIncrement),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_one_episode), tint = SerieColors.Blue400, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_one_episode), tint = p.primary, modifier = Modifier.size(18.dp))
             }
         } else {
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SerieColors.Emerald.copy(alpha = 0.12f)),
+                    .background(p.success.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.completed), tint = SerieColors.Emerald, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.completed), tint = p.success, modifier = Modifier.size(18.dp))
             }
         }
     }

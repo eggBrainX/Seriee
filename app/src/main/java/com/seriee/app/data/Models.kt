@@ -12,23 +12,32 @@ enum class WatchStatus(@StringRes val labelRes: Int) {
     Watching(R.string.status_watching),
     Completed(R.string.status_completed),
     PlanToWatch(R.string.status_plan_to_watch),
-    ComingSoon(R.string.status_coming_soon)
+    ComingSoon(R.string.status_coming_soon),
+    OnHold(R.string.status_on_hold),
+    Dropped(R.string.status_dropped)
 }
 
-enum class AppTheme(val label: String) {
-    Dark("Dark"),
-    Amoled("AMOLED"),
-    Glass("Frost Glass"),
-    Light("Light")
+enum class AppTheme(
+    @StringRes val labelRes: Int,
+    @StringRes val descriptionRes: Int
+) {
+    FollowSystem(R.string.theme_follow_system, R.string.theme_follow_system_desc),
+    Dark(R.string.theme_dark, R.string.theme_dark_desc),
+    Amoled(R.string.theme_amoled, R.string.theme_amoled_desc),
+    Glass(R.string.theme_glass, R.string.theme_glass_desc),
+    LiquidGlass(R.string.theme_liquid_glass, R.string.theme_liquid_glass_desc),
+    Light(R.string.theme_light, R.string.theme_light_desc),
+    Custom(R.string.theme_custom, R.string.theme_custom_desc)
 }
 
-enum class AppLanguage(val tag: String, val label: String) {
-    English("en", "English"),
-    Indonesian("in", "Bahasa Indonesia");
+enum class AppLanguage(@StringRes val labelRes: Int, val tag: String) {
+    System(R.string.language_system, ""),
+    English(R.string.language_english, "en"),
+    Indonesian(R.string.language_indonesian, "in");
 
     companion object {
         fun fromTag(tag: String?): AppLanguage =
-            entries.firstOrNull { it.tag == tag } ?: English
+            entries.firstOrNull { it.tag == (tag ?: "") } ?: System
     }
 }
 

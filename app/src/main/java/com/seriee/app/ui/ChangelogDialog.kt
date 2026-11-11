@@ -45,6 +45,13 @@ fun ChangelogDialog(
     val p = LocalPalette.current
 
     val items = listOf(
+        stringResource(R.string.changelog_15),
+        stringResource(R.string.changelog_16),
+        stringResource(R.string.changelog_17),
+        stringResource(R.string.changelog_18),
+        stringResource(R.string.changelog_19),
+        stringResource(R.string.changelog_20),
+        stringResource(R.string.changelog_21),
         stringResource(R.string.changelog_1),
         stringResource(R.string.changelog_2),
         stringResource(R.string.changelog_3),

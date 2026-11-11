@@ -47,8 +47,15 @@ the About screen.
 
 ### AniList
 
-Anime metadata and cover images are provided by the AniList GraphQL API.
-<https://anilist.co>
+Anime metadata, cover images, and public collection import are provided by the
+AniList GraphQL API. <https://anilist.co>
+
+### MyAnimeList
+
+Collection import reads an XML export that you download from MyAnimeList. The
+file is parsed entirely on-device and is never uploaded. MyAnimeList is a
+trademark of MyAnimeList Co., Ltd.; Seriee is not affiliated with or endorsed by
+MyAnimeList. <https://myanimelist.net>
 
 ### TVmaze
 

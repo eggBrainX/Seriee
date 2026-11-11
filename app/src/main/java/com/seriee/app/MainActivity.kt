@@ -17,7 +17,7 @@ import com.seriee.app.ui.SerieeTheme
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        val savedTag = getSharedPreferences("seriee", MODE_PRIVATE).getString("seriee_lang", "en") ?: "en"
+        val savedTag = getSharedPreferences("seriee", MODE_PRIVATE).getString("seriee_lang", "") ?: ""
         val currentTags = AppCompatDelegate.getApplicationLocales().toLanguageTags()
         if (savedTag.isNotBlank() && currentTags != savedTag) {
             AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(savedTag))
@@ -37,7 +37,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            SerieeTheme(vm.theme) {
+            SerieeTheme(
+                theme = vm.theme,
+                customAccent = vm.customAccent,
+                customGradient = vm.customGradient
+            ) {
                 SerieeApp(vm)
             }
         }

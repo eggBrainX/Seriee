@@ -7,14 +7,31 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.seriee.app.R
+import com.seriee.app.data.AniListListClient
 import com.seriee.app.data.AppLanguage
 import com.seriee.app.data.AppTheme
+import com.seriee.app.data.ImportError
+import com.seriee.app.data.ImportException
+import com.seriee.app.data.ImportMapper
+import com.seriee.app.data.ImportMode
+import com.seriee.app.data.ImportPhase
+import com.seriee.app.data.ImportSource
+import com.seriee.app.data.ImportUiState
+import com.seriee.app.data.MalXmlParser
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.SerieeRepository
 import com.seriee.app.data.WatchStatus
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SerieeViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -24,6 +41,10 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         private set
     private val _theme = mutableStateOf(repo.loadTheme())
     val theme: AppTheme get() = _theme.value
+    private val _customAccent = mutableStateOf(Color(repo.loadCustomAccent()))
+    val customAccent: Color get() = _customAccent.value
+    private val _customGradient = mutableStateOf(repo.loadCustomGradient())
+    val customGradient: Boolean get() = _customGradient.value
     private val _gridView = mutableStateOf(repo.loadGridView())
     val gridView: Boolean get() = _gridView.value
     private val _language = mutableStateOf(repo.loadLanguage())
@@ -42,6 +63,11 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _showChangelog = mutableStateOf(false)
     val showChangelog: Boolean get() = _showChangelog.value
+
+    private val aniListClient = AniListListClient()
+    private var importJob: Job? = null
+    private val _importState = mutableStateOf(ImportUiState())
+    val importState: ImportUiState get() = _importState.value
 
     // Single source of truth: versionCode/versionName in app/build.gradle.kts,
     // generated into BuildConfig. No hardcoded fallbacks here.
@@ -242,6 +268,18 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveTheme(value)
     }
 
+    fun setCustomAccent(value: Color) {
+        _customAccent.value = value
+        repo.saveCustomAccent(value.toArgb())
+        if (_theme.value != AppTheme.Custom) setTheme(AppTheme.Custom)
+    }
+
+    fun setCustomGradient(value: Boolean) {
+        _customGradient.value = value
+        repo.saveCustomGradient(value)
+        if (_theme.value != AppTheme.Custom) setTheme(AppTheme.Custom)
+    }
+
     fun setGridView(value: Boolean) {
         _gridView.value = value
         repo.saveGridView(value)
@@ -251,7 +289,123 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         if (_language.value == value) return
         _language.value = value
         repo.saveLanguage(value)
-        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(value.tag))
+        val locales = if (value.tag.isBlank()) {
+            LocaleListCompat.getEmptyLocaleList()
+        } else {
+            LocaleListCompat.forLanguageTags(value.tag)
+        }
+        AppCompatDelegate.setApplicationLocales(locales)
+    }
+
+    // ------------------------------------------------------------- import UX
+
+    fun beginImport() {
+        importJob?.cancel()
+        val current = _importState.value
+        _importState.value = ImportUiState(source = current.source, mode = current.mode)
+    }
+
+    fun setImportSource(source: ImportSource) {
+        importJob?.cancel()
+        _importState.value = _importState.value.copy(
+            source = source,
+            phase = ImportPhase.Idle,
+            fileName = "",
+            preview = null,
+            result = null,
+            error = null
+        )
+    }
+
+    fun setImportMode(mode: ImportMode) {
+        _importState.value = _importState.value.copy(mode = mode)
+    }
+
+    fun fetchAniList(username: String) {
+        importJob?.cancel()
+        _importState.value = _importState.value.copy(
+            phase = ImportPhase.Loading,
+            preview = null,
+            result = null,
+            error = null
+        )
+        importJob = viewModelScope.launch {
+            try {
+                val rows = aniListClient.fetch(username)
+                val mapped = ImportMapper.fromAniList(rows)
+                if (mapped.isEmpty()) throw ImportException(ImportError.ListPrivateOrEmpty)
+                _importState.value = _importState.value.copy(
+                    phase = ImportPhase.Preview,
+                    preview = ImportMapper.preview(mapped, items)
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ImportException) {
+                _importState.value = _importState.value.copy(phase = ImportPhase.Error, error = e.error)
+            } catch (e: Exception) {
+                _importState.value = _importState.value.copy(phase = ImportPhase.Error, error = ImportError.Unknown)
+            }
+        }
+    }
+
+    fun loadMalFile(context: Context, uri: Uri, displayName: String) {
+        importJob?.cancel()
+        _importState.value = _importState.value.copy(
+            phase = ImportPhase.Loading,
+            fileName = displayName,
+            preview = null,
+            result = null,
+            error = null
+        )
+        importJob = viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: throw ImportException(ImportError.FileInvalid)
+                    ImportMapper.fromMal(MalXmlParser.parseBytes(bytes))
+                }
+                if (result.isEmpty()) throw ImportException(ImportError.NoEntries)
+                _importState.value = _importState.value.copy(
+                    phase = ImportPhase.Preview,
+                    preview = ImportMapper.preview(result, items)
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ImportException) {
+                _importState.value = _importState.value.copy(phase = ImportPhase.Error, error = e.error)
+            } catch (e: Exception) {
+                _importState.value = _importState.value.copy(phase = ImportPhase.Error, error = ImportError.FileInvalid)
+            }
+        }
+    }
+
+    fun applyImport() {
+        val preview = _importState.value.preview ?: return
+        val result = if (_importState.value.mode == ImportMode.Replace) {
+            // Replace drops the old library, so clear its pending alarms first.
+            items.forEach { old ->
+                if (old.reminderEnabled) {
+                    com.seriee.app.reminder.ReminderScheduler.cancelReminder(getApplication(), old.id)
+                }
+            }
+            val (finalItems, result) = ImportMapper.replace(preview.entries)
+            commit(finalItems)
+            result
+        } else {
+            val (finalItems, result) = ImportMapper.merge(preview.entries, items)
+            commit(finalItems)
+            result
+        }
+        _importState.value = _importState.value.copy(
+            phase = ImportPhase.Done,
+            preview = null,
+            result = result
+        )
+    }
+
+    fun dismissImport() {
+        importJob?.cancel()
+        _importState.value = ImportUiState(source = _importState.value.source, mode = _importState.value.mode)
     }
 
     fun exportBackup(context: Context, uri: Uri): Result<Int> {

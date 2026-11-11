@@ -92,7 +92,6 @@
     <string name="duplicate_media">This title is already in your library.</string>
 
     <!-- Detail dialog -->
-    <string name="status_colon">Status: %1$s</string>
     <string name="episode_colon">Episode: %1$d / %2$d</string>
     <string name="schedule_and_reminder">Release Schedule &amp; Reminder</string>
     <string name="reminder_alarm_on">Reminder Alarm On</string>
@@ -241,9 +240,9 @@
     <string name="about_data_sources">Data sources &amp; credits</string>
     <string name="about_tmdb_notice">This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
     <string name="about_justwatch_notice">Watch-provider data is provided by JustWatch.</string>
-    <string name="about_other_sources">Anime metadata from AniList, TV schedules from TVmaze, and additional movie/TV details from OMDb (IMDb data). Posters and metadata remain the property of their respective rights holders.</string>
+    <string name="about_other_sources">Anime metadata from AniList, TV schedules from TVmaze, and additional movie/TV details from OMDb (IMDb data). Collection import supports public AniList lists and MyAnimeList XML exports. Posters and metadata remain the property of their respective rights holders.</string>
     <string name="about_privacy">Privacy</string>
-    <string name="about_privacy_body">Seriee stores your library only on this device. A metadata search sends the title you type to the selected providers (AniList, TVmaze, TMDB, OMDb). No analytics, ads, or accounts. API keys stay on-device and are excluded from system backups.</string>
+    <string name="about_privacy_body">Seriee stores your library only on this device. A metadata search sends the title you type to the selected providers (AniList, TVmaze, TMDB, OMDb); an AniList import sends only the username you type. MyAnimeList exports are parsed on-device. No analytics, ads, or accounts. API keys stay on-device and are excluded from system backups.</string>
     <string name="about_privacy_link">Read the privacy policy</string>
     <string name="about_license">License</string>
     <string name="about_license_value">Apache License 2.0</string>
@@ -273,10 +272,107 @@
     <string name="changelog_12">Release builds are minified with R8 and published with a SHA-256 checksum; unsigned debug APKs are no longer distributed to users</string>
     <string name="changelog_13">Targets Android 16 (API 36) with modern backup and network-security rules</string>
     <string name="changelog_14">Application ID changed to com.seriee.app — export a backup before installing this build, because Android treats it as a new app</string>
+    <string name="changelog_15">Seven themes in a new two-level menu — Follow system, Dark, AMOLED, Frost Glass, Liquid Glass, Light, and a Custom theme with your own accent and solid or gradient background</string>
+    <string name="changelog_16">On Hold and Dropped are now real statuses, so you can filter and colour-code paused and abandoned titles everywhere</string>
+    <string name="changelog_17">Swipe left or right to move between Progress and Library, with a floating navigation pill that follows your drag</string>
+    <string name="changelog_18">Import your collection from AniList or a MyAnimeList export, preview the result, and choose merge (never lowers progress) or replace</string>
+    <string name="changelog_19">Redesigned header, filled search pill, gradient progress bars, and detail, edit, and backup screens that open as bottom sheets</string>
+    <string name="changelog_20">System default language option, plus localised import errors and empty states</string>
+    <string name="changelog_21">Fixed: the FAB hides while scrolling, and Progress and Library swipes no longer fight the filter chips</string>
 
     <!-- ViewModel messages -->
-    <string name="reminder_test_message">Reminder active for %1$s "%2$s"!</string>
+    <string name="reminder_test_message">Reminder active for %1$s \"%2$s\"!</string>
     <string name="error_open_output">Could not open output stream</string>
     <string name="error_read_backup">Could not read backup file</string>
     <string name="error_empty_backup">Backup file is empty or format is not supported</string>
+
+    <!-- Statuses: On Hold / Dropped -->
+    <string name="status_on_hold">On Hold</string>
+    <string name="status_dropped">Dropped</string>
+    <string name="filter_on_hold">On Hold</string>
+    <string name="filter_dropped">Dropped</string>
+
+    <!-- Theme -->
+    <string name="theme_follow_system">Follow system</string>
+    <string name="theme_follow_system_desc">Match your device light or dark mode</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_dark_desc">Balanced dark blue palette</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Pure black, saves battery</string>
+    <string name="theme_glass">Frost Glass</string>
+    <string name="theme_glass_desc">Translucent frosted surfaces</string>
+    <string name="theme_liquid_glass">Liquid Glass</string>
+    <string name="theme_liquid_glass_desc">Flowing gradients and glass cards</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_light_desc">Bright and clean</string>
+    <string name="theme_custom">Custom</string>
+    <string name="theme_custom_desc">Your own accent and background</string>
+    <string name="theme_customize">Customize Theme…</string>
+    <string name="customize_theme_title">Customize</string>
+    <string name="accent">Accent</string>
+    <string name="background">Background</string>
+    <string name="background_solid">Solid</string>
+    <string name="background_gradient">Gradient</string>
+    <string name="theme_preview">Preview</string>
+    <string name="theme_preview_card_title">Continue watching</string>
+    <string name="theme_preview_chip">Watching</string>
+    <string name="language_system">System default</string>
+    <string name="language_english">English</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="new_badge">New</string>
+    <string name="back">Back</string>
+
+    <!-- Header quick actions -->
+    <string name="search">Search</string>
+    <string name="schedule">Schedule</string>
+    <string name="nav_next_tab">Next tab</string>
+    <string name="nav_previous_tab">Previous tab</string>
+
+    <!-- Empty states -->
+    <string name="empty_progress_title">No series yet</string>
+    <string name="empty_progress_hint">Add a title to start tracking episodes and release dates.</string>
+    <string name="empty_library_title">Your library is empty</string>
+    <string name="empty_library_hint">Add a series or movie to get started.</string>
+    <string name="clear_filters">Clear filters</string>
+
+    <!-- Collection import -->
+    <string name="import_collection">Import collection</string>
+    <string name="import_title">Import collection</string>
+    <string name="import_subtitle">Bring your anime list into Seriee</string>
+    <string name="import_source_anilist">AniList</string>
+    <string name="import_source_mal">MyAnimeList</string>
+    <string name="import_mode_merge">Merge with current library</string>
+    <string name="import_mode_merge_desc">Adds new titles and never lowers progress</string>
+    <string name="import_mode_replace">Replace entire library</string>
+    <string name="import_mode_replace_desc">Deletes the current library first</string>
+    <string name="import_anilist_username">AniList username</string>
+    <string name="import_anilist_hint">your public username…</string>
+    <string name="import_anilist_privacy">Public lists only. The username is sent to graphql.anilist.co and is not stored.</string>
+    <string name="import_mal_pick">Choose .xml or .xml.gz export</string>
+    <string name="import_mal_help">Export it from MyAnimeList → Profile → Export. The file stays on your device.</string>
+    <string name="import_mal_selected">Selected: %1$s</string>
+    <string name="import_fetch">Fetch list</string>
+    <string name="import_loading">Fetching your list…</string>
+    <string name="import_import_button">Import %1$d entries</string>
+    <string name="import_preview_title">Ready to import</string>
+    <string name="import_preview_counts">%1$d entries · %2$d series · %3$d movies</string>
+    <string name="import_preview_breakdown">%1$d new · %2$d updated · %3$d unchanged</string>
+    <string name="import_result_title">Import complete</string>
+    <string name="import_result_added">%1$d added</string>
+    <string name="import_result_updated">%1$d updated</string>
+    <string name="import_result_skipped">%1$d skipped</string>
+    <string name="import_view_library">View library</string>
+    <string name="import_replace_confirm_title">Replace library?</string>
+    <string name="import_replace_confirm_message">Replace your current %1$d-item library with the imported list? This cannot be undone.</string>
+    <string name="import_replace_confirm">Replace</string>
+    <string name="import_username_required">Enter your AniList username</string>
+    <string name="import_error_user_not_found">AniList user not found</string>
+    <string name="import_error_private_or_empty">That list is private or empty</string>
+    <string name="import_error_rate_limited">AniList is rate limiting requests. Try again in a minute.</string>
+    <string name="import_error_network">Network error. Check your connection.</string>
+    <string name="import_error_parse">Could not read that list</string>
+    <string name="import_error_file_invalid">That file is not a valid MyAnimeList export</string>
+    <string name="import_error_cancelled">Import cancelled</string>
+    <string name="import_error_unknown">Import failed. Try again.</string>
+    <string name="import_no_entries">No entries found in that list</string>
 </resources>

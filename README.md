@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 ![Material 3](https://img.shields.io/badge/UI-Material%203-6750A4)
-![Version](https://img.shields.io/badge/version-0.3.0-blue)
+![Version](https://img.shields.io/badge/version-0.4.0-blue)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/eggBrainX/Seriee/actions/workflows/ci.yml/badge.svg)](https://github.com/eggBrainX/Seriee/actions/workflows/ci.yml)
 
@@ -40,19 +40,20 @@ local-first: there is no account, no server, no ads, and no analytics.
 
 ### 📈 Progress Tab
 - Episode progress cards with completion percentage (computed across all seasons).
-- Search plus filters: **All / Watching / Completed / Coming Soon**.
+- Search plus filters: **All / Watching / Completed / Plan to Watch / Coming Soon / On Hold / Dropped**, with live counts.
+- Swipe left or right to switch between **Progress** and **Library**; the floating navigation pill follows the drag.
 - The **`+`** button advances one episode and automatically sets the status to *Completed* on the last one.
 - **Daily streak**: watch something every day to build a streak, with a flame badge, a 7-day activity strip, and a best-streak record. The streak can be reset from the same card.
 
 ### 📚 Library Tab
-- Title search and type filter (**Series / Movie**).
+- Title search and type filter (**Series / Movie**), plus the same seven status filters.
 - **Adaptive grid** or **list** view, with real 2:3 poster proportions.
 - **Pin** your favorites; pinned items are shown first.
 - **Star rating** (0–5) and **tag/genre** badges on cards.
 
 ### 📝 Manage Media
 - Add, edit, and delete media: title, type, status, poster, season, current episode, total episodes, description, and release date.
-- Available statuses: `Watching`, `Completed`, `Plan to Watch`, `Coming Soon`.
+- Available statuses: `Watching`, `Completed`, `Plan to Watch`, `Coming Soon`, `On Hold`, `Dropped`.
 - Duplicate guard: saving the same title, type, and season twice is blocked.
 - **Multi-season tracking**: add/remove seasons, track progress per season, and attach local video files per episode.
 - **Poster sources**: remote image URL or upload from device storage (copied into the app's private files).
@@ -84,12 +85,21 @@ local-first: there is no account, no server, no ads, and no analytics.
   - **Merge**: adds items from the file without removing existing ones (recommended).
   - **Replace**: overwrites all data with the contents of the file.
 - Item data and streak history are restored; active reminders are rescheduled automatically after a restore.
-- The same dialog is where optional **TMDB** and **OMDb** API keys are configured.
+- The same sheet is where optional **TMDB** and **OMDb** API keys are configured.
+
+### 📥 Collection Import
+- Import an existing anime list so you do not have to retype your library.
+- **AniList**: enter a public username (no token or OAuth needed).
+- **MyAnimeList**: choose an `.xml` or `.xml.gz` export from *Profile → Export*.
+- Preview new, updated, and unchanged counts before writing anything.
+- **Merge** adds new titles, only raises progress and totals, and only upgrades statuses, so local edits survive. **Replace** asks for confirmation first.
+- Entries are matched by source ID, then by normalized title and type. Imported IDs use the `anilist-…` / `mal-…` prefixes.
 
 ### 🎨 Themes & Language
-- Four themes: **Dark**, **AMOLED**, **Frost Glass**, and **Light**.
-- Two UI languages: **English** and **Bahasa Indonesia** (in-app switcher, applied immediately).
-- Theme, view mode, language, and API keys are saved on the device.
+- Seven themes: **Follow system**, **Dark**, **AMOLED**, **Frost Glass**, **Liquid Glass**, **Light**, and **Custom**.
+- The theme menu is two levels deep: pick a theme, or open **Customize Theme…** for eight accent presets and a solid/gradient background with a live preview.
+- Three language options: **System default**, **English**, and **Bahasa Indonesia** (applied immediately).
+- Theme, custom accent/background, view mode, language, and API keys are saved on the device.
 
 ### 🆕 Changelog & About
 - A **What's New** dialog appears once per version upgrade and can be reopened from the overflow menu.
@@ -196,8 +206,8 @@ Release signing, publishing and repository settings are maintainer tasks; see
 App version is a single source of truth in [`app/build.gradle.kts`](app/build.gradle.kts):
 
 ```kotlin
-versionCode = 11
-versionName = "0.3.0"
+versionCode = 12
+versionName = "0.4.0"
 ```
 
 Both values are exposed to Kotlin through `BuildConfig` (for the changelog and About UI). Never hardcode version numbers elsewhere.
@@ -230,7 +240,7 @@ Search tolerates partial failures: if one source fails or has no result, the rem
 ### On-device storage
 | Data | Location |
 |---|---|
-| Library, theme, view mode, language, streak | `SharedPreferences` file `seriee` (JSON values) |
+| Library, theme, custom accent/background, view mode, language, streak | `SharedPreferences` file `seriee` (JSON values) |
 | TMDB / OMDb API keys | `SharedPreferences` file `seriee_secrets` (excluded from system backup) |
 | Locally uploaded posters | `filesDir/posters/` (stored as `posters/<id>_<timestamp>.<ext>`) |
 | Remote posters | Plain URLs, loaded by Coil and cached by the image library |
@@ -278,23 +288,28 @@ MainActivity
   └── SerieeTheme / SerieeApp (Compose UI)
         ├── ProgressScreen
         ├── LibraryScreen
-        ├── MediaFormDialog / DetailDialog
-        ├── BackupRestoreDialog
+        ├── MediaFormDialog / DetailDialog      (bottom sheets)
+        ├── BackupRestoreDialog / ImportSheet   (bottom sheets)
+        ├── ThemeMenu (themes, customize, language)
         ├── ChangelogDialog / AboutDialog
               │  state + actions
               ▼
         SerieeViewModel (AndroidViewModel)
               ├── SerieeRepository      → SharedPreferences + JSON
               ├── MetadataRepository    → AniList / TVmaze / TMDB / OMDb
+              ├── AniListListClient     → public collection import
+              ├── MalXmlParser          → on-device MAL export import
               ├── PosterStore           → local poster files
               └── ReminderScheduler     → AlarmManager + notifications
 ```
 
 - **Single source of truth:** `SerieeViewModel.items` is a Compose `mutableStateOf` list. Every mutation commits to memory *and* persists immediately through `SerieeRepository`, so the UI recomposes from one place.
-- **No coroutines in the UI layer:** metadata search is the only suspending work and runs on `Dispatchers.IO`.
+- **Swipe tabs:** `SerieeApp` hosts a `HorizontalPager`; the custom navigation pill interpolates `currentPage + currentPageOffsetFraction`, and filter chips use `FlowRow` so drags reach the pager.
+- **No coroutines in the UI layer:** metadata search and collection import are the only suspending work and run on `Dispatchers.IO`.
 - **Reminders are stateless broadcasts:** `ReminderScheduler` schedules an `AlarmManager` alarm with a `PendingIntent` keyed by `item.id.hashCode()`; `ReminderReceiver` builds the notification. Alarms are re-scheduled on app start and after import.
 - **Movies vs series:** series count progress over `Seasons`; a movie is treated as a single unit and displays *Watched / Not watched*.
-- **Localization:** user-visible strings live in `res/values/strings.xml` and `res/values-in/strings.xml`; language switching uses `AppCompatDelegate.setApplicationLocales`.
+- **Import mapping is pure Kotlin:** `ImportMapper` handles mapping, previews, merge, and replace without Android APIs, so the full matrix is covered by JVM tests.
+- **Localization:** user-visible strings live in `res/values/strings.xml` and `res/values-in/strings.xml`; language switching uses `AppCompatDelegate.setApplicationLocales`, with an empty locale list for *System default*.
 
 ---
 
@@ -327,17 +342,24 @@ Seriee/
 │       │       │   ├── Models.kt              # MediaItem, Season, EpisodeFile, enums
 │       │       │   ├── SerieeRepository.kt    # SharedPreferences + JSON backup/restore
 │       │       │   ├── MetadataRepository.kt  # AniList, TVmaze, TMDB, OMDb clients
+│       │       │   ├── ImportModels.kt        # import state, DTOs, errors
+│       │       │   ├── ImportMapper.kt        # mapping, preview, merge, replace
+│       │       │   ├── AniListListClient.kt   # paginated public AniList list
+│       │       │   ├── MalXmlParser.kt        # gzip sniff + MAL XML scanner
 │       │       │   └── PosterStore.kt         # local poster copy/delete helpers
 │       │       ├── reminder/
 │       │       │   ├── ReminderScheduler.kt   # alarms, notifications, countdown text
 │       │       │   └── ReminderReceiver.kt
 │       │       └── ui/
-│       │           ├── SerieeApp.kt           # scaffold, tabs, top bar, overflow menu
+│       │           ├── SerieeApp.kt           # scaffold, pager, top bar, overflow menu
 │       │           ├── ProgressScreen.kt
 │       │           ├── LibraryScreen.kt
 │       │           ├── MediaFormDialog.kt
 │       │           ├── DetailDialog.kt
 │       │           ├── BackupRestoreDialog.kt
+│       │           ├── ImportSheet.kt         # AniList / MAL import UX
+│       │           ├── ThemeMenu.kt           # themes, customize, language pages
+│       │           ├── DesignSystem.kt        # tokens and shared components
 │       │           ├── ChangelogDialog.kt
 │       │           ├── AboutDialog.kt         # version, credits, license links
 │       │           ├── Components.kt
@@ -363,7 +385,7 @@ Seriee/
 
 | Permission | Purpose |
 |---|---|
-| `INTERNET` | Load posters and open streaming links |
+| `INTERNET` | Load posters, fetch metadata, import an AniList collection, and open streaming links |
 | `POST_NOTIFICATIONS` | Show release reminder notifications (Android 13+) |
 | `SCHEDULE_EXACT_ALARM` | Schedule reminders at the exact time |
 | `VIBRATE`, `WAKE_LOCK` | Vibrate and wake the device for reminders |
@@ -442,6 +464,7 @@ repository protection settings — are documented in
 - Posters are loaded from URLs via Coil, so they need an internet connection.
 - All data is stored **locally on your device**. Use **Backup & Restore** before switching phones or uninstalling the app.
 - API keys are stored on-device and are not exported or auto-backed up.
+- Collection import is explicit: AniList sends only the username you type to `graphql.anilist.co`, and a MyAnimeList export is parsed entirely on-device.
 - The application ID is `com.seriee.app`; the Kotlin namespace is also `com.seriee.app`.
 - Version 0.3.0 changed the application ID from `com.aistudio.seriee.twvpmz`. The old and new versions can coexist; export/import a backup to move your library.
 
@@ -466,7 +489,8 @@ Seriee relies on community data and open-source software:
 
 - **TMDB** — this product uses the TMDB API but is not endorsed or certified by TMDB.
 - **JustWatch** — watch-provider data is provided by JustWatch.
-- **AniList** — anime metadata and cover images.
+- **AniList** — anime metadata, cover images, and public collection import.
+- **MyAnimeList** — the user-initiated XML export format used for collection import.
 - **TVmaze** — TV metadata and episode schedules.
 - **OMDb / IMDb** — additional movie and TV metadata.
 - **Kotlin, AndroidX, Jetpack Compose, Coil** — Apache-2.0.

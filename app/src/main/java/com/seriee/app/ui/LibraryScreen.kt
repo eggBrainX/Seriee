@@ -18,11 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,9 +34,12 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,6 +50,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +67,7 @@ import com.seriee.app.data.MediaType
 import com.seriee.app.data.WatchStatus
 import com.seriee.app.reminder.ReminderScheduler
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LibraryScreen(
     list: List<MediaItem>,
@@ -70,12 +76,18 @@ fun LibraryScreen(
     onSetGrid: (Boolean) -> Unit,
     onOpen: (MediaItem) -> Unit,
     onPin: (String) -> Unit,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    searchFocusTick: Int = 0
 ) {
     val p = LocalPalette.current
     var query by rememberSaveable { mutableStateOf("") }
     var typeFilter by rememberSaveable { mutableIntStateOf(0) }
     var statusFilter by rememberSaveable { mutableIntStateOf(0) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(searchFocusTick) {
+        if (searchFocusTick > 0) runCatching { focusRequester.requestFocus() }
+    }
 
     val typeLabels = listOf(
         stringResource(R.string.all_types),
@@ -83,8 +95,19 @@ fun LibraryScreen(
         stringResource(R.string.type_movie)
     )
 
+    val statusChips = listOf(
+        Triple(stringResource(R.string.filter_all), null, list.size),
+        Triple(stringResource(R.string.filter_watching), WatchStatus.Watching, list.count { it.status == WatchStatus.Watching }),
+        Triple(stringResource(R.string.filter_completed), WatchStatus.Completed, list.count { it.status == WatchStatus.Completed }),
+        Triple(stringResource(R.string.filter_plan_to_watch), WatchStatus.PlanToWatch, list.count { it.status == WatchStatus.PlanToWatch }),
+        Triple(stringResource(R.string.filter_coming_soon), WatchStatus.ComingSoon, list.count { it.status == WatchStatus.ComingSoon }),
+        Triple(stringResource(R.string.filter_on_hold), WatchStatus.OnHold, list.count { it.status == WatchStatus.OnHold }),
+        Triple(stringResource(R.string.filter_dropped), WatchStatus.Dropped, list.count { it.status == WatchStatus.Dropped })
+    )
+
     val filtered by remember(list, query, typeFilter, statusFilter) {
         derivedStateOf {
+            val status = statusChips.getOrNull(statusFilter)?.second
             list.filter { it.title.contains(query.trim(), ignoreCase = true) }
                 .filter {
                     when (typeFilter) {
@@ -93,15 +116,7 @@ fun LibraryScreen(
                         else -> true
                     }
                 }
-                .filter {
-                    when (statusFilter) {
-                        1 -> it.status == WatchStatus.Watching
-                        2 -> it.status == WatchStatus.Completed
-                        3 -> it.status == WatchStatus.ComingSoon
-                        4 -> it.status == WatchStatus.PlanToWatch
-                        else -> true
-                    }
-                }
+                .filter { status == null || it.status == status }
                 .sortedByDescending { it.pinned }
         }
     }
@@ -118,7 +133,9 @@ fun LibraryScreen(
             SField(
                 value = query,
                 onChange = { query = it },
+                modifier = Modifier.focusRequester(focusRequester),
                 placeholder = stringResource(R.string.search_library_placeholder),
+                filled = true,
                 leading = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 trailing = if (query.isNotBlank()) {
                     {
@@ -159,22 +176,13 @@ fun LibraryScreen(
                 }
             }
 
-            // Status filter chips: All, Watching, Completed, Coming Soon, Plan to Watch
-            val statusChips = listOf(
-                stringResource(R.string.filter_all) to list.size,
-                stringResource(R.string.filter_watching) to list.count { it.status == WatchStatus.Watching },
-                stringResource(R.string.filter_completed) to list.count { it.status == WatchStatus.Completed },
-                stringResource(R.string.filter_coming_soon) to list.count { it.status == WatchStatus.ComingSoon },
-                stringResource(R.string.filter_plan_to_watch) to list.count { it.status == WatchStatus.PlanToWatch }
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Status filter chips, wrapping so the pager still receives swipes
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                statusChips.forEachIndexed { index, (label, count) ->
+                statusChips.forEachIndexed { index, (label, _, count) ->
                     FilterChip(
                         label = "$label ($count)",
                         selected = statusFilter == index,
@@ -186,33 +194,30 @@ fun LibraryScreen(
 
         if (filtered.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        if (query.isNotBlank()) stringResource(R.string.no_library_results, query)
-                        else stringResource(R.string.no_library_items),
-                        color = p.muted,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center
+                if (list.isEmpty()) {
+                    EmptyState(
+                        icon = Icons.Filled.VideoLibrary,
+                        title = stringResource(R.string.empty_library_title),
+                        hint = stringResource(R.string.empty_library_hint),
+                        ctaLabel = stringResource(R.string.add_first_title),
+                        onCta = onAdd
                     )
-                    if (query.isBlank() && list.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(SerieColors.Blue600)
-                                .clickable(onClick = onAdd)
-                                .padding(horizontal = 18.dp, vertical = 12.dp)
-                        ) {
-                            Text(
-                                stringResource(R.string.add_first_title),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
+                } else {
+                    EmptyState(
+                        icon = Icons.Filled.SearchOff,
+                        title = if (query.isNotBlank()) {
+                            stringResource(R.string.no_library_results, query)
+                        } else {
+                            stringResource(R.string.no_library_items)
+                        },
+                        hint = stringResource(R.string.empty_library_hint),
+                        ctaLabel = stringResource(R.string.clear_filters),
+                        onCta = {
+                            query = ""
+                            typeFilter = 0
+                            statusFilter = 0
                         }
-                    }
+                    )
                 }
             }
         } else if (gridView) {
@@ -478,23 +483,24 @@ private fun ListItem(item: MediaItem, onClick: () -> Unit, onPin: () -> Unit) {
             }
         }
         Spacer(Modifier.width(8.dp))
+        val badgeColor = statusColor(item.status)
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .background(if (item.status == WatchStatus.ComingSoon) SerieColors.Orange.copy(alpha = 0.18f) else p.chip)
+                .background(badgeColor.copy(alpha = 0.14f))
                 .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (item.status == WatchStatus.ComingSoon && item.reminderEnabled) {
-                    Icon(Icons.Filled.NotificationsActive, null, tint = SerieColors.Orange, modifier = Modifier.size(12.dp))
+                    Icon(Icons.Filled.NotificationsActive, null, tint = badgeColor, modifier = Modifier.size(12.dp))
                     Spacer(Modifier.width(4.dp))
                 }
                 Text(
                     if (item.status == WatchStatus.ComingSoon) shortBadge
                     else stringResource(item.status.labelRes),
                     fontSize = 11.sp,
-                    fontWeight = if (item.status == WatchStatus.ComingSoon) FontWeight.Bold else FontWeight.Normal,
-                    color = if (item.status == WatchStatus.ComingSoon) SerieColors.Orange else p.text
+                    fontWeight = if (item.status == WatchStatus.ComingSoon) FontWeight.Bold else FontWeight.Medium,
+                    color = badgeColor
                 )
             }
         }

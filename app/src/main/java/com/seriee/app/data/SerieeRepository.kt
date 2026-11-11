@@ -59,6 +59,20 @@ class SerieeRepository(context: Context) {
         prefs.edit().putString(KEY_THEME, theme.name).apply()
     }
 
+    /** Custom theme accent, stored as ARGB. Defaults to the blue primary. */
+    fun loadCustomAccent(): Int = prefs.getInt(KEY_CUSTOM_ACCENT, 0xFF3B82F6.toInt())
+
+    fun saveCustomAccent(argb: Int) {
+        prefs.edit().putInt(KEY_CUSTOM_ACCENT, argb).apply()
+    }
+
+    /** Custom theme background: true = gradient, false = solid. */
+    fun loadCustomGradient(): Boolean = prefs.getBoolean(KEY_CUSTOM_GRADIENT, false)
+
+    fun saveCustomGradient(gradient: Boolean) {
+        prefs.edit().putBoolean(KEY_CUSTOM_GRADIENT, gradient).apply()
+    }
+
     fun loadGridView(): Boolean = prefs.getBoolean(KEY_GRID, true)
 
     fun saveGridView(grid: Boolean) {
@@ -66,7 +80,7 @@ class SerieeRepository(context: Context) {
     }
 
     fun loadLanguage(): AppLanguage =
-        AppLanguage.fromTag(prefs.getString(KEY_LANG, AppLanguage.English.tag))
+        AppLanguage.fromTag(prefs.getString(KEY_LANG, ""))
 
     fun saveLanguage(language: AppLanguage) {
         prefs.edit().putString(KEY_LANG, language.tag).apply()
@@ -252,6 +266,8 @@ class SerieeRepository(context: Context) {
     private companion object {
         const val KEY_DATA = "seriee_data_v2"
         const val KEY_THEME = "seriee_theme"
+        const val KEY_CUSTOM_ACCENT = "custom_accent"
+        const val KEY_CUSTOM_GRADIENT = "custom_background_gradient"
         const val KEY_GRID = "seriee_grid"
         const val KEY_LANG = "seriee_lang"
         const val KEY_TMDB = "tmdb_api_key"

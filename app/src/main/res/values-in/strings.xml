@@ -92,7 +92,6 @@
     <string name="duplicate_media">Judul ini sudah ada di pustaka kamu.</string>
 
     <!-- Detail dialog -->
-    <string name="status_colon">Status: %1$s</string>
     <string name="episode_colon">Episode: %1$d / %2$d</string>
     <string name="schedule_and_reminder">Jadwal Tayang &amp; Pengingat</string>
     <string name="reminder_alarm_on">Alarm Pengingat Aktif</string>
@@ -241,9 +240,9 @@
     <string name="about_data_sources">Sumber data &amp; kredit</string>
     <string name="about_tmdb_notice">Produk ini menggunakan API TMDB tetapi tidak didukung atau disertifikasi oleh TMDB.</string>
     <string name="about_justwatch_notice">Data penyedia streaming disediakan oleh JustWatch.</string>
-    <string name="about_other_sources">Metadata anime dari AniList, jadwal TV dari TVmaze, dan detail film/serial tambahan dari OMDb (data IMDb). Poster dan metadata tetap milik pemegang hak masing-masing.</string>
+    <string name="about_other_sources">Metadata anime dari AniList, jadwal TV dari TVmaze, dan detail film/serial tambahan dari OMDb (data IMDb). Impor koleksi mendukung daftar AniList publik dan ekspor XML MyAnimeList. Poster dan metadata tetap milik pemegang hak masing-masing.</string>
     <string name="about_privacy">Privasi</string>
-    <string name="about_privacy_body">Seriee hanya menyimpan pustaka Anda di perangkat ini. Pencarian metadata mengirim judul yang Anda ketik ke penyedia yang dipilih (AniList, TVmaze, TMDB, OMDb). Tanpa analitik, iklan, atau akun. Kunci API tetap di perangkat dan tidak disertakan dalam cadangan sistem.</string>
+    <string name="about_privacy_body">Seriee hanya menyimpan pustaka Anda di perangkat ini. Pencarian metadata mengirim judul yang Anda ketik ke penyedia yang dipilih (AniList, TVmaze, TMDB, OMDb); impor AniList hanya mengirim nama pengguna yang Anda ketik. Ekspor MyAnimeList diurai di perangkat. Tanpa analitik, iklan, atau akun. Kunci API tetap di perangkat dan tidak disertakan dalam cadangan sistem.</string>
     <string name="about_privacy_link">Baca kebijakan privasi</string>
     <string name="about_license">Lisensi</string>
     <string name="about_license_value">Apache License 2.0</string>
@@ -273,10 +272,107 @@
     <string name="changelog_12">Build rilis kini diperkecil dengan R8 dan diterbitkan dengan checksum SHA-256; APK debug tanpa tanda tangan tidak lagi dibagikan ke pengguna</string>
     <string name="changelog_13">Menargetkan Android 16 (API 36) dengan aturan pencadangan dan keamanan jaringan modern</string>
     <string name="changelog_14">Application ID berubah menjadi com.seriee.app — ekspor cadangan sebelum memasang build ini, karena Android menganggapnya sebagai aplikasi baru</string>
+    <string name="changelog_15">Tujuh tema di menu dua tingkat baru — Ikuti sistem, Gelap, AMOLED, Kaca Buram, Kaca Cair, Terang, dan tema Kustom dengan aksen serta latar solid atau gradien pilihanmu</string>
+    <string name="changelog_16">Ditunda dan Dihentikan kini menjadi status sungguhan, jadi judul yang dijeda atau ditinggalkan bisa difilter dan diberi warna di mana saja</string>
+    <string name="changelog_17">Geser ke kiri atau kanan untuk berpindah antara Progres dan Pustaka, dengan pil navigasi mengambang yang mengikuti geseranmu</string>
+    <string name="changelog_18">Impor koleksimu dari AniList atau ekspor MyAnimeList, lihat pratinjaunya, lalu pilih gabungkan (tidak menurunkan progres) atau ganti</string>
+    <string name="changelog_19">Header baru, kolom pencarian terisi, bilah progres gradien, serta layar detail, edit, dan cadangan yang terbuka sebagai bottom sheet</string>
+    <string name="changelog_20">Opsi bahasa ikuti sistem, plus pesan kesalahan impor dan empty state yang dilokalkan</string>
+    <string name="changelog_21">Perbaikan: tombol tambah sembunyi saat menggulir, dan geseran Progres–Pustaka tidak lagi bentrok dengan chip filter</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Pengingat aktif untuk %1$s "%2$s"!</string>
     <string name="error_open_output">Tidak bisa membuka output stream</string>
     <string name="error_read_backup">Tidak bisa membaca file backup</string>
     <string name="error_empty_backup">File cadangan kosong atau format tidak sesuai</string>
+
+    <!-- Statuses: On Hold / Dropped -->
+    <string name="status_on_hold">Ditunda</string>
+    <string name="status_dropped">Dihentikan</string>
+    <string name="filter_on_hold">Ditunda</string>
+    <string name="filter_dropped">Dihentikan</string>
+
+    <!-- Theme -->
+    <string name="theme_follow_system">Ikuti sistem</string>
+    <string name="theme_follow_system_desc">Sesuaikan mode terang atau gelap perangkat</string>
+    <string name="theme_dark">Gelap</string>
+    <string name="theme_dark_desc">Palet biru gelap yang seimbang</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Hitam pekat, hemat baterai</string>
+    <string name="theme_glass">Kaca Buram</string>
+    <string name="theme_glass_desc">Permukaan kaca transparan</string>
+    <string name="theme_liquid_glass">Kaca Cair</string>
+    <string name="theme_liquid_glass_desc">Gradien mengalir dan kartu kaca</string>
+    <string name="theme_light">Terang</string>
+    <string name="theme_light_desc">Cerah dan bersih</string>
+    <string name="theme_custom">Kustom</string>
+    <string name="theme_custom_desc">Aksen dan latar pilihanmu</string>
+    <string name="theme_customize">Sesuaikan Tema…</string>
+    <string name="customize_theme_title">Sesuaikan</string>
+    <string name="accent">Aksen</string>
+    <string name="background">Latar</string>
+    <string name="background_solid">Solid</string>
+    <string name="background_gradient">Gradien</string>
+    <string name="theme_preview">Pratinjau</string>
+    <string name="theme_preview_card_title">Lanjutkan menonton</string>
+    <string name="theme_preview_chip">Sedang Ditonton</string>
+    <string name="language_system">Ikuti sistem</string>
+    <string name="language_english">English</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="new_badge">Baru</string>
+    <string name="back">Kembali</string>
+
+    <!-- Header quick actions -->
+    <string name="search">Cari</string>
+    <string name="schedule">Jadwal</string>
+    <string name="nav_next_tab">Tab berikutnya</string>
+    <string name="nav_previous_tab">Tab sebelumnya</string>
+
+    <!-- Empty states -->
+    <string name="empty_progress_title">Belum ada serial</string>
+    <string name="empty_progress_hint">Tambah judul untuk mulai melacak episode dan tanggal tayang.</string>
+    <string name="empty_library_title">Pustakamu kosong</string>
+    <string name="empty_library_hint">Tambah serial atau film untuk memulai.</string>
+    <string name="clear_filters">Hapus filter</string>
+
+    <!-- Collection import -->
+    <string name="import_collection">Impor koleksi</string>
+    <string name="import_title">Impor koleksi</string>
+    <string name="import_subtitle">Bawa daftar animemu ke Seriee</string>
+    <string name="import_source_anilist">AniList</string>
+    <string name="import_source_mal">MyAnimeList</string>
+    <string name="import_mode_merge">Gabungkan dengan pustaka saat ini</string>
+    <string name="import_mode_merge_desc">Menambah judul baru dan tidak menurunkan progres</string>
+    <string name="import_mode_replace">Ganti seluruh pustaka</string>
+    <string name="import_mode_replace_desc">Hapus pustaka saat ini lebih dulu</string>
+    <string name="import_anilist_username">Nama pengguna AniList</string>
+    <string name="import_anilist_hint">nama pengguna publikmu…</string>
+    <string name="import_anilist_privacy">Hanya daftar publik. Nama pengguna dikirim ke graphql.anilist.co dan tidak disimpan.</string>
+    <string name="import_mal_pick">Pilih ekspor .xml atau .xml.gz</string>
+    <string name="import_mal_help">Ekspor dari MyAnimeList → Profil → Ekspor. File tetap di perangkatmu.</string>
+    <string name="import_mal_selected">Dipilih: %1$s</string>
+    <string name="import_fetch">Ambil daftar</string>
+    <string name="import_loading">Mengambil daftarmu…</string>
+    <string name="import_import_button">Impor %1$d entri</string>
+    <string name="import_preview_title">Siap diimpor</string>
+    <string name="import_preview_counts">%1$d entri · %2$d serial · %3$d film</string>
+    <string name="import_preview_breakdown">%1$d baru · %2$d diperbarui · %3$d tetap</string>
+    <string name="import_result_title">Impor selesai</string>
+    <string name="import_result_added">%1$d ditambahkan</string>
+    <string name="import_result_updated">%1$d diperbarui</string>
+    <string name="import_result_skipped">%1$d dilewati</string>
+    <string name="import_view_library">Lihat pustaka</string>
+    <string name="import_replace_confirm_title">Ganti pustaka?</string>
+    <string name="import_replace_confirm_message">Ganti pustaka %1$d item saat ini dengan daftar hasil impor? Tindakan ini tidak bisa dibatalkan.</string>
+    <string name="import_replace_confirm">Ganti</string>
+    <string name="import_username_required">Masukkan nama pengguna AniList</string>
+    <string name="import_error_user_not_found">Pengguna AniList tidak ditemukan</string>
+    <string name="import_error_private_or_empty">Daftar itu privat atau kosong</string>
+    <string name="import_error_rate_limited">AniList membatasi permintaan. Coba lagi sebentar.</string>
+    <string name="import_error_network">Kesalahan jaringan. Periksa koneksimu.</string>
+    <string name="import_error_parse">Tidak bisa membaca daftar itu</string>
+    <string name="import_error_file_invalid">File itu bukan ekspor MyAnimeList yang valid</string>
+    <string name="import_error_cancelled">Impor dibatalkan</string>
+    <string name="import_error_unknown">Impor gagal. Coba lagi.</string>
+    <string name="import_no_entries">Tidak ada entri di daftar itu</string>
 </resources>
