@@ -5,7 +5,12 @@
 ![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 ![Material 3](https://img.shields.io/badge/UI-Material%203-6750A4)
-![Version](https://img.shields.io/badge/version-0.2.7-blue)
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/eggBrainX/Seriee/actions/workflows/ci.yml/badge.svg)](https://github.com/eggBrainX/Seriee/actions/workflows/ci.yml)
+
+Seriee is free software, licensed under the [Apache License 2.0](LICENSE). It is
+local-first: there is no account, no server, no ads, and no analytics.
 
 ---
 
@@ -22,10 +27,14 @@
 - [Architecture](#-architecture)
 - [Project Structure](#-project-structure)
 - [Permissions](#-permissions)
+- [Security & Privacy](#-security--privacy)
 - [CI / CD](#-ci--cd)
+- [Repository hardening](#-repository-hardening)
 - [Troubleshooting](#-troubleshooting)
 - [Notes](#-notes)
 - [Contributing](#-contributing)
+- [Credits](#-credits)
+- [License](#-license)
 
 ---
 
@@ -54,7 +63,7 @@
 - Search once to auto-fill title, poster, description, genres, year, season counts, and release/air dates.
 - Aggregates several sources in one query:
   - **AniList** — anime, no key required.
-  - **TVMaze** — Western TV, no key required; provides precise next-episode airtimes.
+  - **TVmaze** — Western TV, no key required; provides precise next-episode airtimes.
   - **TMDB** — optional API key; adds official streaming-provider links.
   - **OMDb** — optional API key; IMDb-backed movies and series.
 - Season numbers are detected from titles/queries (e.g. *Season 4*, *S4*, *Part 2*).
@@ -69,6 +78,7 @@
 ### ▶️ Watch
 - **Streaming link** with presets for Netflix, Bilibili, and YouTube, opened in the app or browser.
 - **Offline video**: pick a file from storage, assign it to a specific episode, then open it in **VLC**, **MX Player**, or any other installed player.
+- Seriee does not host, scrape, or provide copyrighted video. Links point to services you already use; local files are played by a third-party player you choose.
 
 ### 💾 Backup & Restore
 - Export all your data to a **JSON** file (format version 3).
@@ -83,8 +93,9 @@
 - Two UI languages: **English** and **Bahasa Indonesia** (in-app switcher, applied immediately).
 - Theme, view mode, language, and API keys are saved on the device.
 
-### 🆕 Changelog
-- A **What's New** dialog appears once per version upgrade, and can be reopened from the overflow menu.
+### 🆕 Changelog & About
+- A **What's New** dialog appears once per version upgrade and can be reopened from the overflow menu.
+- An **About** screen lists the version, data-source credits (TMDB, JustWatch, AniList, TVmaze, OMDb), the privacy policy, the license, and the source repository.
 
 ---
 
@@ -98,10 +109,11 @@
 | Images | [Coil](https://coil-kt.github.io/coil/) `2.7.0` |
 | Storage | `SharedPreferences` (data serialized to JSON, stored locally) |
 | Networking | `HttpURLConnection` + `org.json` (no Retrofit/OkHttp) |
-| Android Gradle Plugin | `8.5.2` |
-| Gradle | Wrapper `9.8.2` (CI pins `8.9`) |
+| Android Gradle Plugin | `8.13.2` |
+| Gradle | Wrapper `9.5.1` (used locally and in CI) |
 | Java | `17` |
-| Min SDK / Target & Compile SDK | `26` (Android 8.0) / `34` |
+| Min SDK / Target & Compile SDK | `26` (Android 8.0) / `36` (Android 16) |
+| Minification | R8 + resource shrinking in release builds |
 
 There is no DI framework, database, or navigation library — state lives in one `SerieeViewModel` and screens are plain Composables.
 
@@ -109,44 +121,61 @@ There is no DI framework, database, or navigation library — state lives in one
 
 ## ✅ Requirements
 
-- **Android Studio Koala or newer** (or a command-line Android SDK setup).
+- **Android Studio** (current stable) or a command-line Android SDK setup.
 - **JDK 17**.
-- Android SDK Platform **34** (API 34) and Build Tools.
+- Android SDK Platform **36** (API 36) and Build Tools.
 - A device or emulator running **Android 8.0 (API 26)** or newer.
 
 ---
 
 ## 📲 Install
 
-The project publishes two rolling channels on GitHub Releases:
+Signed releases are published on [GitHub Releases](https://github.com/eggBrainX/Seriee/releases/tag/stable-latest).
 
 | Channel | Source | Notes |
 |---|---|---|
 | **Stable** | Signed release builds from `v*` tags | [Latest stable release](https://github.com/eggBrainX/Seriee/releases/tag/stable-latest) |
-| **Debug** | Every push to `main` | [Latest debug build](https://github.com/eggBrainX/Seriee/releases/tag/debug-latest) |
 
-Download the `.apk` asset and open it on the device.
+Each release includes:
 
-> Enable *Install from unknown sources* if Android asks for it.
+| Asset | Purpose |
+|---|---|
+| `Seriee-v<version>.apk` | The installable app |
+| `SHA256SUMS.txt` | Checksum to verify the download |
+| `signing-certificate.txt` | Certificate fingerprint used to sign the APK |
+
+Verify the APK before installing:
+
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+Debug APKs are **not** distributed to users. They are build artifacts for
+contributors only (debug builds are debuggable and use the public AOSP debug
+key, so they are not safe to recommend as an install channel).
+
+> **Upgrading from 0.2.x:** version 0.3.0 changes the application ID from
+> `com.aistudio.seriee.twvpmz` to `com.seriee.app`. Android will treat it as a
+> new app. Export a backup from the old version first, install 0.3.0, then use
+> **Backup & Restore → Merge** to import it.
 
 ---
 
 ## 🔨 Build
 
 ### Android Studio
-1. Open the project folder in **Android Studio (Koala or newer)**.
+1. Open the project folder in **Android Studio**.
 2. Wait for the Gradle sync to finish.
 3. Select the `app` run configuration and press **Run**.
 
-The Gradle wrapper is checked in, so no extra setup is needed. To regenerate it:
-```bash
-gradle wrapper --gradle-version 8.9
-```
+The Gradle wrapper is checked in, so no extra setup is needed.
 
 ### Terminal
 ```bash
 ./gradlew assembleDebug        # debug APK
-./gradlew assembleRelease      # release APK (requires signing config)
+./gradlew assembleRelease      # minified release APK (requires signing config)
+./gradlew lintDebug            # Android lint
+./gradlew testDebugUnitTest    # unit tests
 ```
 
 Outputs:
@@ -166,8 +195,8 @@ Useful variants:
 App version is a single source of truth in [`app/build.gradle.kts`](app/build.gradle.kts):
 
 ```kotlin
-versionCode = 10
-versionName = "0.2.7"
+versionCode = 11
+versionName = "0.3.0"
 ```
 
 Both values are exposed to Kotlin through `BuildConfig` (for the changelog and About UI). Never hardcode version numbers elsewhere.
@@ -180,52 +209,55 @@ Debug builds work without any setup. Release builds are **unsigned** until a sig
 
 1. Generate a keystore (keep it and its passwords safe — losing it means you cannot update the app on Play Store):
 
-   ```bash
-   keytool -genkeypair -v \
-     -keystore seriee-release.keystore \
-     -alias seriee \
-     -keyalg RSA -keysize 2048 -validity 10000
-   ```
+```bash
+keytool -genkeypair -v \
+  -keystore seriee-release.keystore \
+  -alias seriee \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
 
 2. Copy the template and fill in your values:
 
-   ```bash
-   cp keystore.properties.example keystore.properties
-   ```
+```bash
+cp keystore.properties.example keystore.properties
+```
 
-   ```properties
-   storePassword=CHANGE_ME
-   keyPassword=CHANGE_ME
-   keyAlias=seriee
-   storeFile=app/seriee-release.keystore
-   ```
+```properties
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=seriee
+storeFile=seriee-release.keystore
+```
 
-   `storeFile` is resolved relative to the **repository root**, so place the keystore at `app/seriee-release.keystore` (or adjust the path).
+`storeFile` is resolved relative to the **repository root**. Both
+`keystore.properties` and `*.keystore` are git-ignored. For CI, see [CI / CD](#-ci--cd).
 
 3. Build:
 
-   ```bash
-   ./gradlew assembleRelease
-   ```
-
-Both `keystore.properties` and `*.keystore` are git-ignored. For CI, see [CI / CD](#-ci--cd).
+```bash
+./gradlew assembleRelease
+```
 
 ---
 
 ## 🔎 Metadata Sources & API Keys
 
-Open the overflow menu → **Backup & Restore** to configure keys. Keys are stored locally on the device and are **not** included in backup exports.
+Open the overflow menu → **Backup & Restore** to configure keys. Keys are stored locally on the device and are **not** included in backup exports or Android system backups.
 
 | Source | Key required | What it adds |
 |---|---|---|
 | **AniList** (GraphQL) | No | Anime titles, covers, genres, episode counts, air schedule |
-| **TVMaze** | No | Western TV details and exact next-episode airtimes |
+| **TVmaze** | No | Western TV details and exact next-episode airtimes |
 | **TMDB** | Yes — [themoviedb.org](https://www.themoviedb.org/settings/api) | Movie/TV metadata and streaming-provider links (region `ID` by default) |
 | **OMDb** | Yes — free at [omdbapi.com](https://www.omdbapi.com/apikey.aspx) | IMDb-backed movies/series (1,000 requests/day on the free tier) |
 
 Search tolerates partial failures: if one source fails or has no result, the remaining sources still return data. If every source fails, the app falls back to manual entry.
 
-> **Privacy:** metadata queries send the typed title to the selected providers. Nothing else is uploaded; all library data stays on-device.
+> **Privacy:** metadata queries send the typed title to the selected providers. Nothing else is uploaded; all library data stays on-device. See [PRIVACY.md](PRIVACY.md) for details.
+
+> **Attribution:** TMDB requires the notice shown in the in-app About screen, and
+> watch-provider data must credit JustWatch. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+> before publishing a fork.
 
 ---
 
@@ -234,7 +266,8 @@ Search tolerates partial failures: if one source fails or has no result, the rem
 ### On-device storage
 | Data | Location |
 |---|---|
-| Library, theme, view mode, language, API keys, streak | `SharedPreferences` file `seriee` (JSON values) |
+| Library, theme, view mode, language, streak | `SharedPreferences` file `seriee` (JSON values) |
+| TMDB / OMDb API keys | `SharedPreferences` file `seriee_secrets` (excluded from system backup) |
 | Locally uploaded posters | `filesDir/posters/` (stored as `posters/<id>_<timestamp>.<ext>`) |
 | Remote posters | Plain URLs, loaded by Coil and cached by the image library |
 
@@ -267,9 +300,10 @@ Notes:
 - Older backups (a bare JSON array, or objects without streak fields) are still accepted.
 - Imports are validated defensively; unknown/missing fields fall back to defaults.
 - Local poster files are **not embedded** in the backup. A backup from one device keeps the `posters/…` paths, which will not resolve after moving to a new phone — re-upload those covers or switch to image URLs before switching devices.
+- API keys are deliberately excluded from exports and from Android Auto Backup / device transfer.
 
 ### Reinstalling
-Uninstalling the app removes its private storage. Export a backup first; if you rely on Android Auto Backup, it is enabled via `android:allowBackup="true"` but should not replace an explicit export.
+Uninstalling the app removes its private storage. Export a backup first; Android Auto Backup is enabled (`android:allowBackup="true"`) but should not replace an explicit export.
 
 ---
 
@@ -282,12 +316,12 @@ MainActivity
         ├── LibraryScreen
         ├── MediaFormDialog / DetailDialog
         ├── BackupRestoreDialog
-        └── ChangelogDialog
+        ├── ChangelogDialog / AboutDialog
               │  state + actions
               ▼
         SerieeViewModel (AndroidViewModel)
               ├── SerieeRepository      → SharedPreferences + JSON
-              ├── MetadataRepository    → AniList / TVMaze / TMDB / OMDb
+              ├── MetadataRepository    → AniList / TVmaze / TMDB / OMDb
               ├── PosterStore           → local poster files
               └── ReminderScheduler     → AlarmManager + notifications
 ```
@@ -304,43 +338,57 @@ MainActivity
 
 ```
 Seriee/
-├── .github/workflows/build-apk.yml   # CI: debug on main, signed release on tags
+├── .github/
+│   ├── workflows/ci.yml              # lint + tests + debug build, dependency review
+│   ├── workflows/codeql.yml           # CodeQL analysis
+│   ├── workflows/build-apk.yml        # signed releases from tags
+│   ├── ISSUE_TEMPLATE/                # bug/feature forms
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── dependabot.yml
 ├── app/
-│   ├── build.gradle.kts              # app config, dependencies, signing
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── res/
-│       │   ├── values/strings.xml        # English strings + changelog entries
-│       │   ├── values-in/strings.xml     # Indonesian strings
-│       │   ├── values/themes.xml, colors.xml
-│       │   └── xml/locales_config.xml
-│       └── java/com/seriee/app/
-│           ├── MainActivity.kt            # entry point, permission + locale setup
-│           ├── SerieeViewModel.kt         # UI state and all library actions
-│           ├── data/
-│           │   ├── Models.kt              # MediaItem, Season, EpisodeFile, enums
-│           │   ├── SerieeRepository.kt    # SharedPreferences + JSON backup/restore
-│           │   ├── MetadataRepository.kt  # AniList, TVMaze, TMDB, OMDb clients
-│           │   └── PosterStore.kt         # local poster copy/delete helpers
-│           ├── reminder/
-│           │   ├── ReminderScheduler.kt   # alarms, notifications, countdown text
-│           │   └── ReminderReceiver.kt
-│           └── ui/
-│               ├── SerieeApp.kt           # scaffold, tabs, top bar, overflow menu
-│               ├── ProgressScreen.kt
-│               ├── LibraryScreen.kt
-│               ├── MediaFormDialog.kt
-│               ├── DetailDialog.kt
-│               ├── BackupRestoreDialog.kt
-│               ├── ChangelogDialog.kt
-│               ├── Components.kt
-│               ├── Theme.kt
-│               └── Actions.kt
+│   ├── build.gradle.kts               # app config, dependencies, signing, R8
+│   ├── proguard-rules.pro
+│   └── src/
+│       ├── main/
+│       │   ├── AndroidManifest.xml
+│       │   ├── res/
+│       │   │   ├── values/strings.xml        # English strings + changelog entries
+│       │   │   ├── values-in/strings.xml     # Indonesian strings
+│       │   │   ├── values/themes.xml, colors.xml
+│       │   │   └── xml/                      # locales, backup, network security
+│       │   └── java/com/seriee/app/
+│       │       ├── MainActivity.kt            # entry point, permission + locale setup
+│       │       ├── SerieeViewModel.kt         # UI state and all library actions
+│       │       ├── data/
+│       │       │   ├── Models.kt              # MediaItem, Season, EpisodeFile, enums
+│       │       │   ├── SerieeRepository.kt    # SharedPreferences + JSON backup/restore
+│       │       │   ├── MetadataRepository.kt  # AniList, TVmaze, TMDB, OMDb clients
+│       │       │   └── PosterStore.kt         # local poster copy/delete helpers
+│       │       ├── reminder/
+│       │       │   ├── ReminderScheduler.kt   # alarms, notifications, countdown text
+│       │       │   └── ReminderReceiver.kt
+│       │       └── ui/
+│       │           ├── SerieeApp.kt           # scaffold, tabs, top bar, overflow menu
+│       │           ├── ProgressScreen.kt
+│       │           ├── LibraryScreen.kt
+│       │           ├── MediaFormDialog.kt
+│       │           ├── DetailDialog.kt
+│       │           ├── BackupRestoreDialog.kt
+│       │           ├── ChangelogDialog.kt
+│       │           ├── AboutDialog.kt         # version, credits, license links
+│       │           ├── Components.kt
+│       │           ├── Theme.kt
+│       │           └── Actions.kt
+│       └── test/java/com/seriee/app/          # JVM unit tests
 ├── build.gradle.kts
 ├── settings.gradle.kts
 ├── gradle.properties
 ├── gradle/wrapper/                   # checked-in Gradle wrapper
 ├── keystore.properties.example       # release signing template
+├── LICENSE, NOTICE
+├── CHANGELOG.md
+├── CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, PRIVACY.md
+├── THIRD_PARTY_NOTICES.md
 └── metadata.json
 ```
 
@@ -357,19 +405,57 @@ Seriee/
 
 `POST_NOTIFICATIONS` is requested on first launch on Android 13+. Exact alarms cannot be forced: when the system denies them, `ReminderScheduler` degrades to `setAndAllowWhileIdle`, which may deliver the reminder slightly late.
 
+Seriee does not request location, contacts, camera, microphone, or broad storage access. Files are selected through Android's system picker.
+
+---
+
+## 🔒 Security & Privacy
+
+- [PRIVACY.md](PRIVACY.md) — what stays on the device, what a metadata query sends, and how to remove your data.
+- [SECURITY.md](SECURITY.md) — how to report a vulnerability privately and what is in scope.
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — libraries, data sources, and attribution.
+
+Technical safeguards:
+
+- Cleartext HTTP is disabled app-wide (`res/xml/network_security_config.xml`).
+- API keys live in a separate preferences file excluded from cloud backup and device transfer.
+- The only exported component under app control is the launcher activity. The reminder receiver is not exported and uses immutable `PendingIntent`s; the extra exported receiver (`androidx.profileinstaller.ProfileInstallReceiver`) ships with AndroidX and is protected by the system-only `DUMP` permission.
+- Release keystores are git-ignored and supplied to CI through encrypted secrets.
+- Release builds are minified with R8 and published with SHA-256 checksums and the signing certificate.
+
 ---
 
 ## ⚙️ CI / CD
 
-[`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) runs on:
+| Workflow | Trigger | Result |
+|---|---|---|
+| [`ci.yml`](.github/workflows/ci.yml) | Push/PR to `main` | Lint, unit tests, debug build, dependency review on PRs |
+| [`codeql.yml`](.github/workflows/codeql.yml) | Push/PR to `main`, weekly | CodeQL analysis for Kotlin |
+| [`build-apk.yml`](.github/workflows/build-apk.yml) | Push tag `v*`, manual | Signed release, checksums, certificate, GitHub Release, `stable-latest` |
+| [`dependabot.yml`](.github/dependabot.yml) | Weekly | Grouped dependency and Actions update PRs |
 
-| Trigger | Result |
+`build-apk.yml` is split into two jobs so that the keystore never touches a job
+that compiles repository code:
+
+| Job | Secrets | What it does |
+|---|---|---|
+| `build` | none | Lint, unit tests, unsigned release build, changelog-derived release notes |
+| `publish` | signing keys | Signs with `apksigner`, verifies, computes checksums, publishes the release |
+
+`publish` runs in the **`release` environment**, which requires your approval
+and only accepts deployments from `v*` tags. Signing secrets therefore cannot
+be reached from a branch push, even by a collaborator with write access.
+
+`build-apk.yml` publishes:
+
+| Artifact | Published |
 |---|---|
-| Push to `main` | Builds the debug APK, uploads an artifact, and updates the rolling `debug-latest` prerelease |
-| Push tag `v*` | Builds a signed release APK, creates a GitHub Release, and moves `stable-latest` to it |
-| Manual (`workflow_dispatch`) | Runs the debug pipeline |
+| `Seriee-v<version>.apk` | Yes |
+| `SHA256SUMS.txt` | Yes |
+| `signing-certificate.txt` | Yes |
+| Debug APK | No — workflow artifact only |
 
-Release builds require these repository secrets:
+Signing keys are **environment** secrets, not repository secrets:
 
 | Secret | Value |
 |---|---|
@@ -378,7 +464,46 @@ Release builds require these repository secrets:
 | `ANDROID_KEY_ALIAS` | Key alias (e.g. `seriee`) |
 | `ANDROID_KEY_PASSWORD` | Key password |
 
-The workflow restores the keystore, writes `keystore.properties`, and fails fast on tag builds if a secret is missing. Debug release notes are generated from the `changelog_*` strings in `values/strings.xml`, so update those strings when you bump the version.
+```bash
+base64 -w0 seriee-release.keystore > seriee-release.keystore.b64
+gh secret set ANDROID_KEYSTORE_BASE64 --env release < seriee-release.keystore.b64
+gh secret set ANDROID_KEYSTORE_PASSWORD --env release
+gh secret set ANDROID_KEY_ALIAS --env release
+gh secret set ANDROID_KEY_PASSWORD --env release
+```
+
+The signing job restores the keystore, signs and verifies the APK, and fails if
+a secret is missing. Passwords reach `apksigner` through the environment, never
+the command line. Release notes are generated from the `changelog_*` strings in
+`values/strings.xml`, so update those strings when you bump the version.
+
+GitHub Actions are pinned to commit SHAs and run with least privilege
+(`contents: read` by default; `contents: write` only in the signing job).
+
+### 🔒 Repository hardening
+
+Run once, as an admin, after creating the repository:
+
+```bash
+./scripts/harden-repo.sh          # DRY_RUN=1 to preview
+```
+
+It applies:
+
+- Actions limited to GitHub-owned and verified Marketplace actions.
+- A read-only default `GITHUB_TOKEN` (workflows opt in to more).
+- `main` protection: pull request + CI check required, no force-push or deletion.
+- `v*` tags protected from update and deletion.
+- The `release` environment with you as required reviewer and only `v*` tags
+  allowed to deploy.
+
+One setting is UI-only: **Settings → Actions → General → Fork pull request
+workflows → "Require approval for all outside collaborators"**.
+
+> Collaborators with **Write** can edit workflow files. They cannot open
+> Settings or read secrets, but they *can* run a modified workflow on a branch —
+> which is exactly why signing keys live in the tag-restricted environment
+> instead of repository secrets.
 
 ---
 
@@ -391,21 +516,26 @@ The workflow restores the keystore, writes `keystore.properties`, and fails fast
 - The release date must be in the future and **Reminder Alarm** must be on. Use **Test Alarm Now** to verify the channel works.
 
 **Posters don't load**
-- Remote posters need an internet connection and a valid `http(s)` URL.
+- Remote posters need an internet connection and an `https://` URL. Cleartext `http://` URLs are blocked.
 - If the poster was uploaded locally, the file may have been cleared by uninstalling/clearing app data.
 
 **A restore didn't bring back local posters**
 - The JSON backup stores `posters/…` paths, not image bytes. Re-upload covers on the new device or use URLs.
 
 **Metadata search finds nothing**
-- Verify the title spelling. TMDB/OMDb need keys; AniList and TVMaze work without one.
+- Verify the title spelling. TMDB/OMDb need keys; AniList and TVmaze work without one.
 - A failed source is skipped, so partial results are normal.
 
 **Build fails with "SDK location not found"**
 - Set `sdk.dir` in `local.properties` or open the project in Android Studio once so it generates the file.
+- Install Android SDK Platform 36.
 
-**Release APK is unsigned**
+**`./gradlew` is not executable**
+- Run `chmod +x gradlew` (the file is executable in git; some archives drop the bit).
+
+**Release APK is unsigned or R8 fails**
 - Create `keystore.properties` as described in [Release Signing](#-release-signing).
+- Do not disable minification; add a targeted rule to `app/proguard-rules.pro` instead.
 
 ---
 
@@ -413,17 +543,51 @@ The workflow restores the keystore, writes `keystore.properties`, and fails fast
 
 - Posters are loaded from URLs via Coil, so they need an internet connection.
 - All data is stored **locally on your device**. Use **Backup & Restore** before switching phones or uninstalling the app.
-- API keys are stored in plain `SharedPreferences` and are not exported in backups.
-- The **debug** channel is unsigned-for-release but installable; the **stable** channel contains signed release builds.
-- The application ID is `com.aistudio.seriee.twvpmz`; the Kotlin namespace is `com.seriee.app`.
+- API keys are stored on-device and are not exported or auto-backed up.
+- The application ID is `com.seriee.app`; the Kotlin namespace is also `com.seriee.app`.
+- Version 0.3.0 changed the application ID from `com.aistudio.seriee.twvpmz`. The old and new versions can coexist; export/import a backup to move your library.
 
 ---
 
 ## 🤝 Contributing
 
-Pull requests and suggestions are welcome. Feel free to open an issue to report a bug or propose a feature.
+Pull requests and suggestions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately via [SECURITY.md](SECURITY.md).
 
 When contributing:
 - Keep strings localized in both `values/strings.xml` and `values-in/strings.xml`.
-- Update the `changelog_*` entries when adding user-visible changes.
-- Run `./gradlew assembleDebug` before opening a PR.
+- Update the `changelog_*` entries and `CHANGELOG.md` when adding user-visible changes.
+- Run `./gradlew lintDebug testDebugUnitTest assembleDebug` before opening a PR.
+- Update `THIRD_PARTY_NOTICES.md` and the About screen when adding a data source or library.
+- Sign off commits with `git commit -s` (DCO).
+
+---
+
+## 🙏 Credits
+
+Seriee relies on community data and open-source software:
+
+- **TMDB** — this product uses the TMDB API but is not endorsed or certified by TMDB.
+- **JustWatch** — watch-provider data is provided by JustWatch.
+- **AniList** — anime metadata and cover images.
+- **TVmaze** — TV metadata and episode schedules.
+- **OMDb / IMDb** — additional movie and TV metadata.
+- **Kotlin, AndroidX, Jetpack Compose, Coil** — Apache-2.0.
+
+Posters and metadata remain the property of their respective rights holders and
+are displayed for identification purposes only. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the full list and
+attribution requirements.
+
+---
+
+## 📄 License
+
+Copyright 2026 The Seriee contributors.
+
+Licensed under the [Apache License, Version 2.0](LICENSE). You may use, modify,
+and distribute this software under the terms of that license, including its
+patent grant and attribution requirements. See [NOTICE](NOTICE) for the
+project and third-party attribution notices.
+
+Seriee is an independent project and is not affiliated with Netflix, Bilibili,
+YouTube, TMDB, JustWatch, AniList, TVmaze, OMDb, or IMDb.

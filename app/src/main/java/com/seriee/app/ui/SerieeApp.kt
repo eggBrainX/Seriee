@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
@@ -65,6 +66,7 @@ fun SerieeApp(vm: SerieeViewModel) {
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
     var showBackupRestore by rememberSaveable { mutableStateOf(false) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         containerColor = p.bg,
@@ -75,7 +77,8 @@ fun SerieeApp(vm: SerieeViewModel) {
                 currentLanguage = vm.language,
                 onLanguage = vm::setLanguage,
                 onOpenBackupRestore = { showBackupRestore = true },
-                onOpenChangelog = { vm.openChangelog() }
+                onOpenChangelog = { vm.openChangelog() },
+                onOpenAbout = { showAbout = true }
             )
         },
         bottomBar = {
@@ -201,6 +204,13 @@ fun SerieeApp(vm: SerieeViewModel) {
             onDismiss = { vm.dismissChangelog() }
         )
     }
+
+    if (showAbout) {
+        AboutDialog(
+            versionName = vm.currentVersionName,
+            onDismiss = { showAbout = false }
+        )
+    }
 }
 
 @Composable
@@ -210,7 +220,8 @@ private fun SerieeTopBar(
     currentLanguage: AppLanguage,
     onLanguage: (AppLanguage) -> Unit,
     onOpenBackupRestore: () -> Unit,
-    onOpenChangelog: () -> Unit
+    onOpenChangelog: () -> Unit,
+    onOpenAbout: () -> Unit
 ) {
     val p = LocalPalette.current
     var optionsMenu by remember { mutableStateOf(false) }
@@ -253,7 +264,7 @@ private fun SerieeTopBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Single overflow: changelog, backup & restore (incl. API keys),
-            // language, and theme — one option (matches: overflow when >4).
+            // about/credits, language, and theme.
             Box {
                 Box(
                     modifier = Modifier
@@ -269,7 +280,7 @@ private fun SerieeTopBar(
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.changelog_title)) },
                         leadingIcon = {
-                            Icon(Icons.Filled.Info, contentDescription = null, tint = p.muted, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.Campaign, contentDescription = null, tint = p.muted, modifier = Modifier.size(18.dp))
                         },
                         onClick = {
                             optionsMenu = false
@@ -284,6 +295,16 @@ private fun SerieeTopBar(
                         onClick = {
                             optionsMenu = false
                             onOpenBackupRestore()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.about_title)) },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Info, contentDescription = null, tint = p.muted, modifier = Modifier.size(18.dp))
+                        },
+                        onClick = {
+                            optionsMenu = false
+                            onOpenAbout()
                         }
                     )
                     HorizontalDivider()

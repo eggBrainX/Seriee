@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup rules for Android 11 and lower.
+  API keys live in their own preferences file so the user's library can still be
+  backed up while the keys are never copied off the device (cloud backup or
+  device-to-device transfer).
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="seriee_secrets.xml" />
+</full-backup-content>

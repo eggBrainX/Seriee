@@ -234,6 +234,26 @@
     <string name="reset_streak">Atur ulang streak</string>
     <string name="streak_reset_done">Streak diatur ulang</string>
 
+    <!-- About / credits -->
+    <string name="about_title">Tentang Seriee</string>
+    <string name="about_tagline">Pelacak progres tontonan yang mengutamakan data lokal untuk serial, anime, dan film.</string>
+    <string name="about_version">Versi %1$s</string>
+    <string name="about_data_sources">Sumber data &amp; kredit</string>
+    <string name="about_tmdb_notice">Produk ini menggunakan API TMDB tetapi tidak didukung atau disertifikasi oleh TMDB.</string>
+    <string name="about_justwatch_notice">Data penyedia streaming disediakan oleh JustWatch.</string>
+    <string name="about_other_sources">Metadata anime dari AniList, jadwal TV dari TVmaze, dan detail film/serial tambahan dari OMDb (data IMDb). Poster dan metadata tetap milik pemegang hak masing-masing.</string>
+    <string name="about_privacy">Privasi</string>
+    <string name="about_privacy_body">Seriee hanya menyimpan pustaka Anda di perangkat ini. Pencarian metadata mengirim judul yang Anda ketik ke penyedia yang dipilih (AniList, TVmaze, TMDB, OMDb). Tanpa analitik, iklan, atau akun. Kunci API tetap di perangkat dan tidak disertakan dalam cadangan sistem.</string>
+    <string name="about_privacy_link">Baca kebijakan privasi</string>
+    <string name="about_license">Lisensi</string>
+    <string name="about_license_value">Apache License 2.0</string>
+    <string name="about_license_link">Baca lisensi</string>
+    <string name="about_third_party_link">Pemberitahuan pihak ketiga</string>
+    <string name="about_source">Kode sumber di GitHub</string>
+    <string name="about_disclaimer">Seriee tidak berafiliasi dengan Netflix, Bilibili, YouTube, TMDB, atau layanan streaming lain. Aplikasi ini tidak menyimpan atau menyediakan konten berhak cipta; tautan pemutaran mengarah ke layanan yang sudah Anda gunakan.</string>
+    <string name="about_close">Tutup</string>
+    <string name="about_open_link">Buka tautan</string>
+
     <!-- Changelog -->
     <string name="changelog_title">Yang Baru</string>
     <string name="changelog_version">Versi %1$s</string>
@@ -248,6 +268,11 @@
     <string name="changelog_7">Streak harian — tonton satu episode setiap hari untuk membangun streak, dengan badge api, strip minggu, dan streak terbaik di Progres</string>
     <string name="changelog_8">Pencarian TVMaze (gratis, tanpa kunci) — jadwal tayang episode berikutnya yang akurat untuk TV Barat, melengkapi hitung mundur Segera Tayang bersama AniList dan TMDB</string>
     <string name="changelog_9">Pencarian OMDb (kunci opsional di Pengaturan Cadangan) — film dan serial berbasis IMDb sebagai sumber lain bersama AniList, TVMaze, dan TMDB</string>
+    <string name="changelog_10">Seriee kini berlisensi Apache-2.0 — kode sumber, file build, dan proses rilis terbuka untuk digunakan kembali, dengan kredit TMDB, JustWatch, AniList, TVmaze, dan OMDb di layar Tentang yang baru</string>
+    <string name="changelog_11">Kunci API dipindahkan ke file preferensi terpisah yang tidak pernah dicadangkan Android, dan HTTP tanpa enkripsi kini diblokir di seluruh aplikasi</string>
+    <string name="changelog_12">Build rilis kini diperkecil dengan R8 dan diterbitkan dengan checksum SHA-256; APK debug tanpa tanda tangan tidak lagi dibagikan ke pengguna</string>
+    <string name="changelog_13">Menargetkan Android 16 (API 36) dengan aturan pencadangan dan keamanan jaringan modern</string>
+    <string name="changelog_14">Application ID berubah menjadi com.seriee.app — ekspor cadangan sebelum memasang build ini, karena Android menganggapnya sebagai aplikasi baru</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Pengingat aktif untuk %1$s "%2$s"!</string>

@@ -1,3 +1,5 @@
+@file:Suppress("SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection")
+
 package com.seriee.app.ui
 
 import android.widget.Toast

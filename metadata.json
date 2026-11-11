@@ -1,6 +1,6 @@
 {
   "name": "Seriee",
-  "description": "Media and series tracking app to track TV shows, anime, movies, and reading progress",
+  "description": "A local-first watch-progress tracker for series, anime, and movies",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

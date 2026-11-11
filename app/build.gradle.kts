@@ -21,7 +21,7 @@ val hasReleaseSigning = releasePropsFile.exists() &&
 
 android {
     namespace = "com.seriee.app"
-    compileSdk = 34
+    compileSdk = 36
 
     signingConfigs {
         create("release") {
@@ -35,11 +35,14 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.aistudio.seriee.twvpmz"
+        // Renamed from the AI Studio default (com.aistudio.seriee.twvpmz) so the
+        // package is owned by this project. This changes the installed app identity:
+        // export a backup before installing 0.3.0 over an older build.
+        applicationId = "com.seriee.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 10
-        versionName = "0.2.7"
+        targetSdk = 36
+        versionCode = 11
+        versionName = "0.3.0"
     }
 
     buildTypes {
@@ -47,7 +50,8 @@ android {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -85,4 +89,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    testImplementation("junit:junit:4.13.2")
 }

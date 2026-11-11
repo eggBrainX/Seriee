@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Metadata providers and image CDNs are HTTPS-only. Reject cleartext HTTP so a
+  user-supplied http:// poster URL cannot downgrade a request.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

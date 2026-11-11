@@ -234,6 +234,26 @@
     <string name="reset_streak">Reset streak</string>
     <string name="streak_reset_done">Streak reset</string>
 
+    <!-- About / credits -->
+    <string name="about_title">About Seriee</string>
+    <string name="about_tagline">A local-first watch-progress tracker for series, anime, and movies.</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_data_sources">Data sources &amp; credits</string>
+    <string name="about_tmdb_notice">This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string name="about_justwatch_notice">Watch-provider data is provided by JustWatch.</string>
+    <string name="about_other_sources">Anime metadata from AniList, TV schedules from TVmaze, and additional movie/TV details from OMDb (IMDb data). Posters and metadata remain the property of their respective rights holders.</string>
+    <string name="about_privacy">Privacy</string>
+    <string name="about_privacy_body">Seriee stores your library only on this device. A metadata search sends the title you type to the selected providers (AniList, TVmaze, TMDB, OMDb). No analytics, ads, or accounts. API keys stay on-device and are excluded from system backups.</string>
+    <string name="about_privacy_link">Read the privacy policy</string>
+    <string name="about_license">License</string>
+    <string name="about_license_value">Apache License 2.0</string>
+    <string name="about_license_link">Read the license</string>
+    <string name="about_third_party_link">Third-party notices</string>
+    <string name="about_source">Source code on GitHub</string>
+    <string name="about_disclaimer">Seriee is not affiliated with Netflix, Bilibili, YouTube, TMDB, or any other streaming service. It does not host or provide copyrighted content; playback links point to services you already use.</string>
+    <string name="about_close">Close</string>
+    <string name="about_open_link">Open link</string>
+
     <!-- Changelog -->
     <string name="changelog_title">What\'s New</string>
     <string name="changelog_version">Version %1$s</string>
@@ -248,6 +268,11 @@
     <string name="changelog_7">Daily streak — watch an episode every day to build your streak, with a flame badge, week strip, and best streak in Progress</string>
     <string name="changelog_8">TVMaze search (free, no key) — precise next-episode airtimes for Western TV, backing up the Coming Soon countdown alongside AniList and TMDB</string>
     <string name="changelog_9">OMDb search (optional key in Backup settings) — IMDb-powered movies and series as another source alongside AniList, TVMaze, and TMDB</string>
+    <string name="changelog_10">Seriee is now Apache-2.0 licensed — the source, build files, and release process are open for reuse, with TMDB, JustWatch, AniList, TVmaze, and OMDb credits in the new About screen</string>
+    <string name="changelog_11">API keys moved to an isolated preferences file that Android never backs up, and cleartext HTTP is now blocked app-wide</string>
+    <string name="changelog_12">Release builds are minified with R8 and published with a SHA-256 checksum; unsigned debug APKs are no longer distributed to users</string>
+    <string name="changelog_13">Targets Android 16 (API 36) with modern backup and network-security rules</string>
+    <string name="changelog_14">Application ID changed to com.seriee.app — export a backup before installing this build, because Android treats it as a new app</string>
 
     <!-- ViewModel messages -->
     <string name="reminder_test_message">Reminder active for %1$s "%2$s"!</string>

@@ -9,6 +9,28 @@ class SerieeRepository(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences("seriee", Context.MODE_PRIVATE)
 
+    // API keys are kept in a separate preferences file that is excluded from
+    // Android Auto Backup and device-to-device transfer (see res/xml/backup_rules.xml
+    // and res/xml/data_extraction_rules.xml).
+    private val secretPrefs = context.applicationContext
+        .getSharedPreferences("seriee_secrets", Context.MODE_PRIVATE)
+
+    init {
+        migrateLegacyKeys()
+    }
+
+    /** Moves keys saved by versions <= 0.2.7 out of the backed-up prefs file. */
+    private fun migrateLegacyKeys() {
+        val legacyTmdb = prefs.getString(KEY_TMDB, null)
+        val legacyOmdb = prefs.getString(KEY_OMDB, null)
+        if (legacyTmdb == null && legacyOmdb == null) return
+        val editor = secretPrefs.edit()
+        if (legacyTmdb != null) editor.putString(KEY_TMDB, legacyTmdb)
+        if (legacyOmdb != null) editor.putString(KEY_OMDB, legacyOmdb)
+        editor.apply()
+        prefs.edit().remove(KEY_TMDB).remove(KEY_OMDB).apply()
+    }
+
     fun loadItems(): List<MediaItem> {
         val raw = prefs.getString(KEY_DATA, null)
         if (raw == null) {
@@ -50,14 +72,14 @@ class SerieeRepository(context: Context) {
         prefs.edit().putString(KEY_LANG, language.tag).apply()
     }
 
-    fun loadTmdbKey(): String = prefs.getString(KEY_TMDB, "") ?: ""
+    fun loadTmdbKey(): String = secretPrefs.getString(KEY_TMDB, "") ?: ""
     fun saveTmdbKey(key: String) {
-        prefs.edit().putString(KEY_TMDB, key.trim()).apply()
+        secretPrefs.edit().putString(KEY_TMDB, key.trim()).apply()
     }
 
-    fun loadOmdbKey(): String = prefs.getString(KEY_OMDB, "") ?: ""
+    fun loadOmdbKey(): String = secretPrefs.getString(KEY_OMDB, "") ?: ""
     fun saveOmdbKey(key: String) {
-        prefs.edit().putString(KEY_OMDB, key.trim()).apply()
+        secretPrefs.edit().putString(KEY_OMDB, key.trim()).apply()
     }
 
     fun loadLastSeenVersionCode(): Int = prefs.getInt(KEY_LAST_SEEN_VERSION, 0)

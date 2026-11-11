@@ -66,6 +66,7 @@ import com.seriee.app.data.MetadataRepository
 import com.seriee.app.data.MetadataResult
 import com.seriee.app.data.PosterStore
 import com.seriee.app.data.Season
+import com.seriee.app.data.SerieeRepository
 import com.seriee.app.data.WatchStatus
 import com.seriee.app.data.parseSeasonNumberFromText
 import com.seriee.app.reminder.ReminderScheduler
@@ -142,14 +143,10 @@ fun MediaFormDialog(
     var hasSearched by remember { mutableStateOf(false) }
     val metadataRepo = remember { MetadataRepository() }
 
-    val tmdbKey = remember {
-        context.getSharedPreferences("seriee", android.content.Context.MODE_PRIVATE)
-            .getString("tmdb_api_key", "") ?: ""
-    }
-    val omdbKey = remember {
-        context.getSharedPreferences("seriee", android.content.Context.MODE_PRIVATE)
-            .getString("omdb_api_key", "") ?: ""
-    }
+    // Keys live in the isolated, non-backed-up preferences file.
+    val keysRepo = remember { SerieeRepository(context) }
+    val tmdbKey = remember { keysRepo.loadTmdbKey() }
+    val omdbKey = remember { keysRepo.loadOmdbKey() }
 
     fun upsertDraft(idx: Int, updated: SeasonDraft) {
         if (idx in seasonsDraft.indices) {
