@@ -216,7 +216,7 @@ jobs:
             "$APK"
 
           "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" > dist/signing-certificate.txt
-          (cd dist && sha256sum "$APK" > SHA256SUMS.txt)
+          (cd dist && sha256sum "$(basename "$APK")" > SHA256SUMS.txt)
           echo "Signed and verified $APK"
 
       - name: Append signing certificate to release notes
