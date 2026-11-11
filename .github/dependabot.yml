@@ -6,6 +6,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # androidx.core 1.17+ requires AGP 9.1 and compileSdk 37, which this project
+    # does not use yet. Remove these ignores as part of the AGP 9 migration;
+    # until then Dependabot would only open PRs that cannot build.
+    ignore:
+      - dependency-name: "androidx.core:core"
+      - dependency-name: "androidx.core:core-ktx"
     groups:
       androidx:
         patterns:
