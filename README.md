@@ -21,7 +21,6 @@ local-first: there is no account, no server, no ads, and no analytics.
 - [Requirements](#-requirements)
 - [Install](#-install)
 - [Build](#-build)
-- [Release Signing](#-release-signing)
 - [Metadata Sources & API Keys](#-metadata-sources--api-keys)
 - [Data, Storage & Backup](#-data-storage--backup)
 - [Architecture](#-architecture)
@@ -29,7 +28,6 @@ local-first: there is no account, no server, no ads, and no analytics.
 - [Permissions](#-permissions)
 - [Security & Privacy](#-security--privacy)
 - [CI / CD](#-ci--cd)
-- [Repository hardening](#-repository-hardening)
 - [Troubleshooting](#-troubleshooting)
 - [Notes](#-notes)
 - [Contributing](#-contributing)
@@ -173,7 +171,7 @@ The Gradle wrapper is checked in, so no extra setup is needed.
 ### Terminal
 ```bash
 ./gradlew assembleDebug        # debug APK
-./gradlew assembleRelease      # minified release APK (requires signing config)
+./gradlew assembleRelease      # minified release APK (signing: docs/RELEASING.md)
 ./gradlew lintDebug            # Android lint
 ./gradlew testDebugUnitTest    # unit tests
 ```
@@ -191,6 +189,9 @@ Useful variants:
 ./gradlew clean                # clear build outputs
 ```
 
+Release signing, publishing and repository settings are maintainer tasks; see
+[docs/RELEASING.md](docs/RELEASING.md).
+
 ### Versioning
 App version is a single source of truth in [`app/build.gradle.kts`](app/build.gradle.kts):
 
@@ -200,43 +201,6 @@ versionName = "0.3.0"
 ```
 
 Both values are exposed to Kotlin through `BuildConfig` (for the changelog and About UI). Never hardcode version numbers elsewhere.
-
----
-
-## 🔐 Release Signing
-
-Debug builds work without any setup. Release builds are **unsigned** until a signing config exists.
-
-1. Generate a keystore (keep it and its passwords safe — losing it means you cannot update the app on Play Store):
-
-```bash
-keytool -genkeypair -v \
-  -keystore seriee-release.keystore \
-  -alias seriee \
-  -keyalg RSA -keysize 2048 -validity 10000
-```
-
-2. Copy the template and fill in your values:
-
-```bash
-cp keystore.properties.example keystore.properties
-```
-
-```properties
-storePassword=CHANGE_ME
-keyPassword=CHANGE_ME
-keyAlias=seriee
-storeFile=seriee-release.keystore
-```
-
-`storeFile` is resolved relative to the **repository root**. Both
-`keystore.properties` and `*.keystore` are git-ignored. For CI, see [CI / CD](#-ci--cd).
-
-3. Build:
-
-```bash
-./gradlew assembleRelease
-```
 
 ---
 
@@ -385,6 +349,7 @@ Seriee/
 ├── gradle.properties
 ├── gradle/wrapper/                   # checked-in Gradle wrapper
 ├── keystore.properties.example       # release signing template
+├── docs/RELEASING.md                 # maintainer release and repository guide
 ├── LICENSE, NOTICE
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, PRIVACY.md
@@ -427,83 +392,15 @@ Technical safeguards:
 
 ## ⚙️ CI / CD
 
-| Workflow | Trigger | Result |
-|---|---|---|
-| [`ci.yml`](.github/workflows/ci.yml) | Push/PR to `main` | Lint, unit tests, debug build, dependency review on PRs |
-| [`codeql.yml`](.github/workflows/codeql.yml) | Push/PR to `main`, weekly | CodeQL analysis for Kotlin |
-| [`build-apk.yml`](.github/workflows/build-apk.yml) | Push tag `v*`, manual | Signed release, checksums, certificate, GitHub Release, `stable-latest` |
-| [`dependabot.yml`](.github/dependabot.yml) | Weekly | Grouped dependency and Actions update PRs |
+Every push and pull request to `main` runs Android lint, the unit tests, a debug
+build, and dependency review; CodeQL analyses the Kotlin sources on a weekly
+schedule. Releases are built from `v*` tags by a two-job workflow: an
+unprivileged job compiles and tests, and a separate, manually approved job signs
+the APK and attaches `SHA256SUMS.txt` and `signing-certificate.txt`.
 
-`build-apk.yml` is split into two jobs so that the keystore never touches a job
-that compiles repository code:
-
-| Job | Secrets | What it does |
-|---|---|---|
-| `build` | none | Lint, unit tests, unsigned release build, changelog-derived release notes |
-| `publish` | signing keys | Signs with `apksigner`, verifies, computes checksums, publishes the release |
-
-`publish` runs in the **`release` environment**, which requires your approval
-and only accepts deployments from `v*` tags. Signing secrets therefore cannot
-be reached from a branch push, even by a collaborator with write access.
-
-`build-apk.yml` publishes:
-
-| Artifact | Published |
-|---|---|
-| `Seriee-v<version>.apk` | Yes |
-| `SHA256SUMS.txt` | Yes |
-| `signing-certificate.txt` | Yes |
-| Debug APK | No — workflow artifact only |
-
-Signing keys are **environment** secrets, not repository secrets:
-
-| Secret | Value |
-|---|---|
-| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 seriee-release.keystore` |
-| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
-| `ANDROID_KEY_ALIAS` | Key alias (e.g. `seriee`) |
-| `ANDROID_KEY_PASSWORD` | Key password |
-
-```bash
-base64 -w0 seriee-release.keystore > seriee-release.keystore.b64
-gh secret set ANDROID_KEYSTORE_BASE64 --env release < seriee-release.keystore.b64
-gh secret set ANDROID_KEYSTORE_PASSWORD --env release
-gh secret set ANDROID_KEY_ALIAS --env release
-gh secret set ANDROID_KEY_PASSWORD --env release
-```
-
-The signing job restores the keystore, signs and verifies the APK, and fails if
-a secret is missing. Passwords reach `apksigner` through the environment, never
-the command line. Release notes are generated from the `changelog_*` strings in
-`values/strings.xml`, so update those strings when you bump the version.
-
-GitHub Actions are pinned to commit SHAs and run with least privilege
-(`contents: read` by default; `contents: write` only in the signing job).
-
-### 🔒 Repository hardening
-
-Run once, as an admin, after creating the repository:
-
-```bash
-./scripts/harden-repo.sh          # DRY_RUN=1 to preview
-```
-
-It applies:
-
-- Actions limited to GitHub-owned and verified Marketplace actions.
-- A read-only default `GITHUB_TOKEN` (workflows opt in to more).
-- `main` protection: pull request + CI check required, no force-push or deletion.
-- `v*` tags protected from update and deletion.
-- The `release` environment with you as required reviewer and only `v*` tags
-  allowed to deploy.
-
-One setting is UI-only: **Settings → Actions → General → Fork pull request
-workflows → "Require approval for all outside collaborators"**.
-
-> Collaborators with **Write** can edit workflow files. They cannot open
-> Settings or read secrets, but they *can* run a modified workflow on a branch —
-> which is exactly why signing keys live in the tag-restricted environment
-> instead of repository secrets.
+Maintainer procedures — release signing, CI secrets, the release checklist and
+repository protection settings — are documented in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ---
 
@@ -534,7 +431,8 @@ workflows → "Require approval for all outside collaborators"**.
 - Run `chmod +x gradlew` (the file is executable in git; some archives drop the bit).
 
 **Release APK is unsigned or R8 fails**
-- Create `keystore.properties` as described in [Release Signing](#-release-signing).
+- Maintainers: create `keystore.properties` as described in
+  [docs/RELEASING.md](docs/RELEASING.md).
 - Do not disable minification; add a targeted rule to `app/proguard-rules.pro` instead.
 
 ---

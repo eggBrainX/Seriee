@@ -19,5 +19,7 @@ gradle/gradle-daemon-jvm.properties
 # Release signing secrets — never commit (back these up off-machine!)
 *.keystore
 *.jks
+*.keystore.b64
+*.jks.b64
 keystore.properties
 !keystore.properties.example

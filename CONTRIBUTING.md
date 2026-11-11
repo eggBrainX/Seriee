@@ -27,6 +27,9 @@ The Gradle wrapper is checked in, so use `./gradlew` (not a system Gradle):
 ./gradlew assembleRelease        # minified release build (needs signing config)
 ```
 
+Release signing and publishing are maintainer tasks and are not needed for
+normal development; see [docs/RELEASING.md](docs/RELEASING.md).
+
 Release builds use R8. Do not disable minification to work around a crash — add a
 targeted rule to `app/proguard-rules.pro` and explain why.
 
