@@ -44,6 +44,8 @@ fun ChangelogDialog(
 ) {
     val p = LocalPalette.current
 
+    // Only the current release is shown. When preparing a new version, add its
+    // changelog_* strings and replace this list; older entries stay in CHANGELOG.md.
     val items = listOf(
         stringResource(R.string.changelog_15),
         stringResource(R.string.changelog_16),
@@ -51,21 +53,7 @@ fun ChangelogDialog(
         stringResource(R.string.changelog_18),
         stringResource(R.string.changelog_19),
         stringResource(R.string.changelog_20),
-        stringResource(R.string.changelog_21),
-        stringResource(R.string.changelog_1),
-        stringResource(R.string.changelog_2),
-        stringResource(R.string.changelog_3),
-        stringResource(R.string.changelog_4),
-        stringResource(R.string.changelog_5),
-        stringResource(R.string.changelog_6),
-        stringResource(R.string.changelog_7),
-        stringResource(R.string.changelog_8),
-        stringResource(R.string.changelog_9),
-        stringResource(R.string.changelog_10),
-        stringResource(R.string.changelog_11),
-        stringResource(R.string.changelog_12),
-        stringResource(R.string.changelog_13),
-        stringResource(R.string.changelog_14)
+        stringResource(R.string.changelog_21)
     )
 
     Dialog(
