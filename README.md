@@ -1,6 +1,6 @@
 # 🎬 Seriee
 
-**A watch-progress tracker** for series, anime, and movies. A native Android app built with **Kotlin + Jetpack Compose + Material 3** (no WebView).
+**A watch-progress tracker** for series, anime, and movies — a native Android app built with **Kotlin + Jetpack Compose + Material 3** (no WebView).
 
 ![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
@@ -9,101 +9,31 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/eggBrainX/Seriee/actions/workflows/ci.yml/badge.svg)](https://github.com/eggBrainX/Seriee/actions/workflows/ci.yml)
 
-Seriee is free software, licensed under the [Apache License 2.0](LICENSE). It is
-local-first: there is no account, no server, no ads, and no analytics.
-
----
-
-## 📑 Table of Contents
-
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Requirements](#-requirements)
-- [Install](#-install)
-- [Build](#-build)
-- [Metadata Sources & API Keys](#-metadata-sources--api-keys)
-- [Data, Storage & Backup](#-data-storage--backup)
-- [Architecture](#-architecture)
-- [Project Structure](#-project-structure)
-- [Permissions](#-permissions)
-- [Security & Privacy](#-security--privacy)
-- [CI / CD](#-ci--cd)
-- [Troubleshooting](#-troubleshooting)
-- [Notes](#-notes)
-- [Contributing](#-contributing)
-- [Credits](#-credits)
-- [License](#-license)
+Seriee is free software under the [Apache License 2.0](LICENSE). It is local-first: no account, no server, no ads, no analytics.
 
 ---
 
 ## ✨ Features
 
-### 📈 Progress Tab
-- Episode progress cards with completion percentage (computed across all seasons).
-- Search plus filters: **All / Watching / Completed / Plan to Watch / Coming Soon / On Hold / Dropped**, with live counts.
-- Swipe left or right to switch between **Progress** and **Library**; the floating navigation pill follows the drag.
-- The **`+`** button advances one episode and automatically sets the status to *Completed* on the last one.
-- **Daily streak**: watch something every day to build a streak, with a flame badge, a 7-day activity strip, and a best-streak record. The streak can be reset from the same card.
+**Progress** — episode cards with completion percentage across seasons; search and filters for **All / Watching / Completed / Plan to Watch / Coming Soon / On Hold / Dropped** with live counts; the **`+`** button advances an episode and marks the last one *Completed*; a daily streak with flame badge, 7-day strip, best record, and reset.
 
-### 📚 Library Tab
-- Title search and type filter (**Series / Movie**), plus the same seven status filters.
-- **Adaptive grid** or **list** view, with real 2:3 poster proportions.
-- **Pin** your favorites; pinned items are shown first.
-- **Star rating** (0–5) and **tag/genre** badges on cards.
+**Library** — title search and type filter (**Series / Movie**), adaptive grid or list view with 2:3 posters, pinned favorites first, star ratings, and tag/genre badges.
 
-### 📝 Manage Media
-- Add, edit, and delete media: title, type, status, poster, season, current episode, total episodes, description, and release date.
-- Available statuses: `Watching`, `Completed`, `Plan to Watch`, `Coming Soon`, `On Hold`, `Dropped`.
-- Duplicate guard: saving the same title, type, and season twice is blocked.
-- **Multi-season tracking**: add/remove seasons, track progress per season, and attach local video files per episode.
-- **Poster sources**: remote image URL or upload from device storage (copied into the app's private files).
+**Manage media** — add, edit, and delete titles (title, type, status, poster, season, progress, description, release date). Six statuses, duplicate guard, multi-season tracking, per-episode local video files, and posters from URL or device storage.
 
-### 🔎 Fetch Metadata
-- Search once to auto-fill title, poster, description, genres, year, season counts, and release/air dates.
-- Aggregates several sources in one query:
-  - **AniList** — anime, no key required.
-  - **TVmaze** — Western TV, no key required; provides precise next-episode airtimes.
-  - **TMDB** — optional API key; adds official streaming-provider links.
-  - **OMDb** — optional API key; IMDb-backed movies and series.
-- Season numbers are detected from titles/queries (e.g. *Season 4*, *S4*, *Part 2*).
+**Metadata** — one search auto-fills title, poster, description, genres, year, seasons, and dates from **AniList** and **TVmaze** (no key) plus optional **TMDB** and **OMDb** keys. Season numbers are detected from titles/queries; failed sources are skipped.
 
-### 🔔 Release Reminders
-- Set a release date and time (presets: Tomorrow, 3 Days, 1 Week, 1 Month).
-- Countdown to release (e.g. `D-3`, "2 days 5 hours left") on cards and in the detail view.
-- Notification when the release time arrives (exact alarm; falls back to an inexact alarm when exact alarms are not permitted).
-- A **Test Alarm Now** button to verify that reminders work.
-- Reminders that are already in the past are skipped.
+**Reminders** — release date/time with presets, countdown (`D-3`, "2 days 5 hours left"), exact-alarm notification with an inexact fallback, **Test Alarm Now**, and past reminders skipped.
 
-### ▶️ Watch
-- **Streaming link** with presets for Netflix, Bilibili, and YouTube, opened in the app or browser.
-- **Offline video**: pick a file from storage, assign it to a specific episode, then open it in **VLC**, **MX Player**, or any other installed player.
-- Seriee does not host, scrape, or provide copyrighted video. Links point to services you already use; local files are played by a third-party player you choose.
+**Watch** — streaming links (Netflix, Bilibili, YouTube presets) opened in-app or in a browser, and local episode files opened in VLC, MX Player, or any installed player. Seriee hosts, scrapes, and provides no copyrighted video.
 
-### 💾 Backup & Restore
-- Export all your data to a **JSON** file (format version 3).
-- Import a backup file in two modes:
-  - **Merge**: adds items from the file without removing existing ones (recommended).
-  - **Replace**: overwrites all data with the contents of the file.
-- Item data and streak history are restored; active reminders are rescheduled automatically after a restore.
-- The same sheet is where optional **TMDB** and **OMDb** API keys are configured.
+**Backup & restore** — JSON export (format version 3) with merge or replace import; streak history is restored and reminders rescheduled. TMDB/OMDb keys are configured in the same sheet.
 
-### 📥 Collection Import
-- Import an existing anime list so you do not have to retype your library.
-- **AniList**: enter a public username (no token or OAuth needed).
-- **MyAnimeList**: choose an `.xml` or `.xml.gz` export from *Profile → Export*.
-- Preview new, updated, and unchanged counts before writing anything.
-- **Merge** adds new titles, only raises progress and totals, and only upgrades statuses, so local edits survive. **Replace** asks for confirmation first.
-- Entries are matched by source ID, then by normalized title and type. Imported IDs use the `anilist-…` / `mal-…` prefixes.
+**Collection import** — bring an existing list from **AniList** (public username, no token) or a **MyAnimeList** `.xml`/`.xml.gz` export. Preview new/updated/unchanged counts, merge without losing local edits, or replace after confirmation. Entries match by source ID, then normalized title and type; IDs use `anilist-…` / `mal-…`.
 
-### 🎨 Themes & Language
-- Seven themes: **Follow system**, **Dark**, **AMOLED**, **Frost Glass**, **Liquid Glass**, **Light**, and **Custom**.
-- The theme menu is two levels deep: pick a theme, or open **Customize Theme…** for eight accent presets and a solid/gradient background with a live preview.
-- Three language options: **System default**, **English**, and **Bahasa Indonesia** (applied immediately).
-- Theme, custom accent/background, view mode, language, and API keys are saved on the device.
+**Themes & language** — Follow system, Dark, AMOLED, Frost Glass, Liquid Glass, Light, and Custom; a two-level menu with eight accent presets and solid/gradient backgrounds (live preview), plus System default, English, and Bahasa Indonesia. Theme, accent, background, view mode, language, and API keys persist on-device.
 
-### 🆕 Changelog & About
-- A **What's New** dialog appears once per version upgrade and can be reopened from the overflow menu.
-- An **About** screen lists the version, data-source credits (TMDB, JustWatch, AniList, TVmaze, OMDb), the privacy policy, the license, and the source repository.
+**Changelog & About** — a What's New dialog once per version (reopenable from the overflow menu), and an About screen with version, data-source credits, privacy policy, license, and repository links.
 
 ---
 
@@ -112,172 +42,96 @@ local-first: there is no account, no server, no ads, and no analytics.
 | Component | Version / Library |
 |---|---|
 | Language | Kotlin `2.0.20` |
-| UI | Jetpack Compose + Material 3 (Compose BOM `2024.09.00`) |
+| UI | Jetpack Compose + Material 3 (BOM `2024.09.00`) |
 | Architecture | Single-Activity, `AndroidViewModel` + unidirectional state (`lifecycle-viewmodel-compose` `2.8.6`) |
 | Images | [Coil](https://coil-kt.github.io/coil/) `2.7.0` |
-| Storage | `SharedPreferences` (data serialized to JSON, stored locally) |
-| Networking | `HttpURLConnection` + `org.json` (no Retrofit/OkHttp) |
-| Android Gradle Plugin | `8.13.2` |
-| Gradle | Wrapper `9.5.1` (used locally and in CI) |
-| Java | `17` |
-| Min SDK / Target & Compile SDK | `26` (Android 8.0) / `36` (Android 16) |
-| Minification | R8 + resource shrinking in release builds |
+| Storage | `SharedPreferences` (JSON values) |
+| Networking | `HttpURLConnection` + `org.json` |
+| AGP / Gradle / Java | `8.13.2` / wrapper `9.5.1` / `17` |
+| SDK | min `26` (Android 8.0), target & compile `36` (Android 16) |
+| Minification | R8 + resource shrinking (release) |
 
-There is no DI framework, database, or navigation library — state lives in one `SerieeViewModel` and screens are plain Composables.
+No DI framework, database, or navigation library: state lives in one `SerieeViewModel` and screens are plain Composables.
 
 ---
 
 ## ✅ Requirements
 
-- **Android Studio** (current stable) or a command-line Android SDK setup.
-- **JDK 17**.
-- Android SDK Platform **36** (API 36) and Build Tools.
-- A device or emulator running **Android 8.0 (API 26)** or newer.
+Android Studio (current stable) or a command-line SDK setup, JDK 17, Android SDK Platform 36 with build tools, and a device or emulator on Android 8.0 (API 26)+.
 
 ---
 
 ## 📲 Install
 
-Signed releases are published on [GitHub Releases](https://github.com/eggBrainX/Seriee/releases/tag/stable-latest).
-
-| Channel | Source | Notes |
-|---|---|---|
-| **Stable** | Signed release builds from `v*` tags | [Latest stable release](https://github.com/eggBrainX/Seriee/releases/tag/stable-latest) |
-
-Each release includes:
-
-| Asset | Purpose |
-|---|---|
-| `Seriee-v<version>.apk` | The installable app |
-| `SHA256SUMS.txt` | Checksum to verify the download |
-| `signing-certificate.txt` | Certificate fingerprint used to sign the APK |
-
-Verify the APK before installing:
+Signed builds are published on [GitHub Releases](https://github.com/eggBrainX/Seriee/releases/tag/stable-latest). Each release ships `Seriee-v<version>.apk`, `SHA256SUMS.txt`, and `signing-certificate.txt`:
 
 ```bash
 sha256sum -c SHA256SUMS.txt
 ```
 
-Debug APKs are **not** distributed to users. They are build artifacts for
-contributors only (debug builds are debuggable and use the public AOSP debug
-key, so they are not safe to recommend as an install channel).
+Debug APKs are contributor build artifacts only — they use the public AOSP debug key and are not an install channel.
 
-> **Upgrading from 0.2.x:** version 0.3.0 changes the application ID from
-> `com.aistudio.seriee.twvpmz` to `com.seriee.app`. Android will treat it as a
-> new app. Export a backup from the old version first, install 0.3.0, then use
-> **Backup & Restore → Merge** to import it.
+> **Upgrading from 0.2.x:** 0.3.0 changed the application ID from `com.aistudio.seriee.twvpmz` to `com.seriee.app`, so Android treats it as a new app. Export a backup first, install, then **Backup & Restore → Merge**.
 
 ---
 
 ## 🔨 Build
 
-### Android Studio
-1. Open the project folder in **Android Studio**.
-2. Wait for the Gradle sync to finish.
-3. Select the `app` run configuration and press **Run**.
+Open the project in Android Studio and run the `app` configuration, or use the checked-in wrapper:
 
-The Gradle wrapper is checked in, so no extra setup is needed.
-
-### Terminal
 ```bash
 ./gradlew assembleDebug        # debug APK
 ./gradlew assembleRelease      # minified release APK (signing: docs/RELEASING.md)
 ./gradlew lintDebug            # Android lint
 ./gradlew testDebugUnitTest    # unit tests
+./gradlew installDebug         # build + install on a connected device
 ```
-
-Outputs:
 
 | Build | Path |
 |---|---|
 | Debug | `app/build/outputs/apk/debug/app-debug.apk` |
 | Release | `app/build/outputs/apk/release/app-release.apk` |
 
-Useful variants:
-```bash
-./gradlew installDebug         # build + install on a connected device
-./gradlew clean                # clear build outputs
-```
-
-Release signing, publishing and repository settings are maintainer tasks; see
-[docs/RELEASING.md](docs/RELEASING.md).
-
-### Versioning
-App version is a single source of truth in [`app/build.gradle.kts`](app/build.gradle.kts):
+Release signing and publishing are maintainer tasks; see [docs/RELEASING.md](docs/RELEASING.md). The version has a single source of truth in [`app/build.gradle.kts`](app/build.gradle.kts):
 
 ```kotlin
 versionCode = 12
 versionName = "0.4.0"
 ```
 
-Both values are exposed to Kotlin through `BuildConfig` (for the changelog and About UI). Never hardcode version numbers elsewhere.
+Both values reach Kotlin through `BuildConfig` for the changelog and About UI — never hardcode them elsewhere.
 
 ---
 
 ## 🔎 Metadata Sources & API Keys
 
-Open the overflow menu → **Backup & Restore** to configure keys. Keys are stored locally on the device and are **not** included in backup exports or Android system backups.
+Configure keys via overflow menu → **Backup & Restore**. Keys stay on-device and are excluded from exports and Android system backups.
 
-| Source | Key required | What it adds |
+| Source | Key | Adds |
 |---|---|---|
 | **AniList** (GraphQL) | No | Anime titles, covers, genres, episode counts, air schedule |
 | **TVmaze** | No | Western TV details and exact next-episode airtimes |
 | **TMDB** | Yes — [themoviedb.org](https://www.themoviedb.org/settings/api) | Movie/TV metadata and streaming-provider links (region `ID` by default) |
-| **OMDb** | Yes — free at [omdbapi.com](https://www.omdbapi.com/apikey.aspx) | IMDb-backed movies/series (1,000 requests/day on the free tier) |
+| **OMDb** | Yes — free at [omdbapi.com](https://www.omdbapi.com/apikey.aspx) | IMDb-backed movies/series (1,000 requests/day free) |
 
-Search tolerates partial failures: if one source fails or has no result, the remaining sources still return data. If every source fails, the app falls back to manual entry.
+Search tolerates partial failures; if every source fails, the app falls back to manual entry.
 
-> **Privacy:** metadata queries send the typed title to the selected providers. Nothing else is uploaded; all library data stays on-device. See [PRIVACY.md](PRIVACY.md) for details.
-
-> **Attribution:** TMDB requires the notice shown in the in-app About screen, and
-> watch-provider data must credit JustWatch. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-> before publishing a fork.
+> **Privacy:** metadata queries send only the typed title to the selected providers; library data stays on-device. See [PRIVACY.md](PRIVACY.md). **Attribution:** TMDB requires the in-app notice, and watch-provider data must credit JustWatch — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) before publishing a fork.
 
 ---
 
 ## 💾 Data, Storage & Backup
 
-### On-device storage
 | Data | Location |
 |---|---|
-| Library, theme, custom accent/background, view mode, language, streak | `SharedPreferences` file `seriee` (JSON values) |
+| Library, theme, accent/background, view mode, language, streak | `SharedPreferences` file `seriee` (JSON values) |
 | TMDB / OMDb API keys | `SharedPreferences` file `seriee_secrets` (excluded from system backup) |
-| Locally uploaded posters | `filesDir/posters/` (stored as `posters/<id>_<timestamp>.<ext>`) |
-| Remote posters | Plain URLs, loaded by Coil and cached by the image library |
+| Uploaded posters | `filesDir/posters/` (`posters/<id>_<timestamp>.<ext>`) |
+| Remote posters | URLs loaded and cached by Coil |
 
-### Backup format (version 3)
-```json
-{
-  "version": 3,
-  "appName": "Seriee",
-  "timestamp": 1730000000000,
-  "streakDays": 4,
-  "bestStreak": 12,
-  "lastWatchDay": "2026-11-11",
-  "watchDays": ["2026-11-05", "2026-11-09", "2026-11-10", "2026-11-11"],
-  "items": [
-    {
-      "id": "…",
-      "title": "Arcane",
-      "type": "Series",
-      "status": "Watching",
-      "poster": "https://…",
-      "seasons": [
-        { "number": 1, "currentEp": 5, "totalEp": 9, "episodes": [] }
-      ]
-    }
-  ]
-}
-```
+Backups are JSON (version 3) containing items and streak history. Older formats — a bare array or objects without streak fields — are still accepted, and imports are validated defensively. Local poster files are **not embedded**: `posters/…` paths will not resolve on a new device, so re-upload covers or use URLs. API keys are deliberately never exported.
 
-Notes:
-- Older backups (a bare JSON array, or objects without streak fields) are still accepted.
-- Imports are validated defensively; unknown/missing fields fall back to defaults.
-- Local poster files are **not embedded** in the backup. A backup from one device keeps the `posters/…` paths, which will not resolve after moving to a new phone — re-upload those covers or switch to image URLs before switching devices.
-- API keys are deliberately excluded from exports and from Android Auto Backup / device transfer.
-
-### Reinstalling
-Uninstalling the app removes its private storage. Export a backup first; Android Auto Backup is enabled (`android:allowBackup="true"`) but should not replace an explicit export.
+Uninstalling removes private storage; export a backup first. Android Auto Backup is enabled (`android:allowBackup="true"`) but should not replace an explicit export.
 
 ---
 
@@ -286,30 +140,28 @@ Uninstalling the app removes its private storage. Export a backup first; Android
 ```
 MainActivity
   └── SerieeTheme / SerieeApp (Compose UI)
-        ├── ProgressScreen
-        ├── LibraryScreen
-        ├── MediaFormDialog / DetailDialog      (bottom sheets)
-        ├── BackupRestoreDialog / ImportSheet   (bottom sheets)
-        ├── ThemeMenu (themes, customize, language)
-        ├── ChangelogDialog / AboutDialog
-              │  state + actions
+        ├── ProgressScreen · LibraryScreen
+        ├── MediaFormDialog · DetailDialog          (bottom sheets)
+        ├── BackupRestoreDialog · ImportSheet       (bottom sheets)
+        ├── ThemeMenu · ChangelogDialog · AboutDialog
+              │ state + actions
               ▼
         SerieeViewModel (AndroidViewModel)
-              ├── SerieeRepository      → SharedPreferences + JSON
-              ├── MetadataRepository    → AniList / TVmaze / TMDB / OMDb
-              ├── AniListListClient     → public collection import
-              ├── MalXmlParser          → on-device MAL export import
-              ├── PosterStore           → local poster files
-              └── ReminderScheduler     → AlarmManager + notifications
+              ├── SerieeRepository    → SharedPreferences + JSON
+              ├── MetadataRepository  → AniList / TVmaze / TMDB / OMDb
+              ├── AniListListClient   → public collection import
+              ├── MalXmlParser        → on-device MAL export import
+              ├── PosterStore         → local poster files
+              └── ReminderScheduler   → AlarmManager + notifications
 ```
 
-- **Single source of truth:** `SerieeViewModel.items` is a Compose `mutableStateOf` list. Every mutation commits to memory *and* persists immediately through `SerieeRepository`, so the UI recomposes from one place.
-- **Swipe tabs:** `SerieeApp` hosts a `HorizontalPager`; the custom navigation pill interpolates `currentPage + currentPageOffsetFraction`, and filter chips use `FlowRow` so drags reach the pager.
-- **No coroutines in the UI layer:** metadata search and collection import are the only suspending work and run on `Dispatchers.IO`.
-- **Reminders are stateless broadcasts:** `ReminderScheduler` schedules an `AlarmManager` alarm with a `PendingIntent` keyed by `item.id.hashCode()`; `ReminderReceiver` builds the notification. Alarms are re-scheduled on app start and after import.
-- **Movies vs series:** series count progress over `Seasons`; a movie is treated as a single unit and displays *Watched / Not watched*.
-- **Import mapping is pure Kotlin:** `ImportMapper` handles mapping, previews, merge, and replace without Android APIs, so the full matrix is covered by JVM tests.
-- **Localization:** user-visible strings live in `res/values/strings.xml` and `res/values-in/strings.xml`; language switching uses `AppCompatDelegate.setApplicationLocales`, with an empty locale list for *System default*.
+- **Single source of truth:** `SerieeViewModel.items` is a `mutableStateOf` list; every mutation commits to memory and persists immediately through `SerieeRepository`.
+- **Swipe tabs:** `SerieeApp` hosts a `HorizontalPager`; the nav pill interpolates `currentPage + currentPageOffsetFraction`, and filter chips use `FlowRow` so drags reach the pager.
+- **Concurrency:** metadata search and collection import are the only suspending work and run on `Dispatchers.IO`; there are no coroutines in the UI layer.
+- **Reminders:** stateless broadcasts — an `AlarmManager` alarm with a `PendingIntent` keyed by `item.id.hashCode()`, rebuilt on app start and after import.
+- **Import mapping is pure Kotlin:** `ImportMapper` handles mapping, previews, merge, and replace without Android APIs, so the full matrix runs as JVM tests.
+- **Movies vs series:** series count progress over seasons; a movie is one unit showing *Watched / Not watched*.
+- **Localization:** strings live in `res/values/strings.xml` and `res/values-in/strings.xml`; switching uses `AppCompatDelegate.setApplicationLocales` (empty list = System default).
 
 ---
 
@@ -317,66 +169,24 @@ MainActivity
 
 ```
 Seriee/
-├── .github/
-│   ├── workflows/ci.yml              # lint + tests + debug build, dependency review
-│   ├── workflows/codeql.yml           # CodeQL analysis
-│   ├── workflows/build-apk.yml        # signed releases from tags
-│   ├── ISSUE_TEMPLATE/                # bug/feature forms
-│   ├── PULL_REQUEST_TEMPLATE.md
-│   └── dependabot.yml
+├── .github/                      # CI, CodeQL, releases, issue/PR templates, Dependabot
 ├── app/
-│   ├── build.gradle.kts               # app config, dependencies, signing, R8
-│   ├── proguard-rules.pro
+│   ├── build.gradle.kts          # config, dependencies, signing, R8
 │   └── src/
 │       ├── main/
-│       │   ├── AndroidManifest.xml
-│       │   ├── res/
-│       │   │   ├── values/strings.xml        # English strings + changelog entries
-│       │   │   ├── values-in/strings.xml     # Indonesian strings
-│       │   │   ├── values/themes.xml, colors.xml
-│       │   │   └── xml/                      # locales, backup, network security
+│       │   ├── res/values/       # English strings + changelog entries
+│       │   ├── res/values-in/    # Indonesian strings
 │       │   └── java/com/seriee/app/
-│       │       ├── MainActivity.kt            # entry point, permission + locale setup
-│       │       ├── SerieeViewModel.kt         # UI state and all library actions
-│       │       ├── data/
-│       │       │   ├── Models.kt              # MediaItem, Season, EpisodeFile, enums
-│       │       │   ├── SerieeRepository.kt    # SharedPreferences + JSON backup/restore
-│       │       │   ├── MetadataRepository.kt  # AniList, TVmaze, TMDB, OMDb clients
-│       │       │   ├── ImportModels.kt        # import state, DTOs, errors
-│       │       │   ├── ImportMapper.kt        # mapping, preview, merge, replace
-│       │       │   ├── AniListListClient.kt   # paginated public AniList list
-│       │       │   ├── MalXmlParser.kt        # gzip sniff + MAL XML scanner
-│       │       │   └── PosterStore.kt         # local poster copy/delete helpers
-│       │       ├── reminder/
-│       │       │   ├── ReminderScheduler.kt   # alarms, notifications, countdown text
-│       │       │   └── ReminderReceiver.kt
-│       │       └── ui/
-│       │           ├── SerieeApp.kt           # scaffold, pager, top bar, overflow menu
-│       │           ├── ProgressScreen.kt
-│       │           ├── LibraryScreen.kt
-│       │           ├── MediaFormDialog.kt
-│       │           ├── DetailDialog.kt
-│       │           ├── BackupRestoreDialog.kt
-│       │           ├── ImportSheet.kt         # AniList / MAL import UX
-│       │           ├── ThemeMenu.kt           # themes, customize, language pages
-│       │           ├── DesignSystem.kt        # tokens and shared components
-│       │           ├── ChangelogDialog.kt
-│       │           ├── AboutDialog.kt         # version, credits, license links
-│       │           ├── Components.kt
-│       │           ├── Theme.kt
-│       │           └── Actions.kt
-│       └── test/java/com/seriee/app/          # JVM unit tests
-├── build.gradle.kts
-├── settings.gradle.kts
-├── gradle.properties
-├── gradle/wrapper/                   # checked-in Gradle wrapper
-├── keystore.properties.example       # release signing template
-├── docs/RELEASING.md                 # maintainer release and repository guide
-├── LICENSE, NOTICE
-├── CHANGELOG.md
-├── CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, PRIVACY.md
-├── THIRD_PARTY_NOTICES.md
-└── metadata.json
+│       │       ├── MainActivity.kt · SerieeViewModel.kt
+│       │       ├── data/         # models, repository, metadata, import, posters
+│       │       ├── reminder/     # scheduler + receiver
+│       │       └── ui/           # screens, sheets, theme menu, design system
+│       └── test/                 # JVM unit tests
+├── gradle/wrapper/               # checked-in wrapper
+├── docs/RELEASING.md             # maintainer release and repository guide
+├── CHANGELOG.md · CONTRIBUTING.md · CODE_OF_CONDUCT.md
+├── SECURITY.md · PRIVACY.md · THIRD_PARTY_NOTICES.md
+└── LICENSE · NOTICE · metadata.json
 ```
 
 ---
@@ -385,120 +195,75 @@ Seriee/
 
 | Permission | Purpose |
 |---|---|
-| `INTERNET` | Load posters, fetch metadata, import an AniList collection, and open streaming links |
-| `POST_NOTIFICATIONS` | Show release reminder notifications (Android 13+) |
-| `SCHEDULE_EXACT_ALARM` | Schedule reminders at the exact time |
-| `VIBRATE`, `WAKE_LOCK` | Vibrate and wake the device for reminders |
+| `INTERNET` | Posters, metadata, AniList import, streaming links |
+| `POST_NOTIFICATIONS` | Release reminders (Android 13+) |
+| `SCHEDULE_EXACT_ALARM` | Exact reminder timing |
+| `VIBRATE`, `WAKE_LOCK` | Vibration and wake-up for reminders |
 
-`POST_NOTIFICATIONS` is requested on first launch on Android 13+. Exact alarms cannot be forced: when the system denies them, `ReminderScheduler` degrades to `setAndAllowWhileIdle`, which may deliver the reminder slightly late.
-
-Seriee does not request location, contacts, camera, microphone, or broad storage access. Files are selected through Android's system picker.
+`POST_NOTIFICATIONS` is requested on first launch on Android 13+. Exact alarms cannot be forced; without them `ReminderScheduler` falls back to `setAndAllowWhileIdle`, which may deliver slightly late. Seriee requests no location, contacts, camera, microphone, or broad storage access — files come through Android's system picker.
 
 ---
 
 ## 🔒 Security & Privacy
 
-- [PRIVACY.md](PRIVACY.md) — what stays on the device, what a metadata query sends, and how to remove your data.
-- [SECURITY.md](SECURITY.md) — how to report a vulnerability privately and what is in scope.
+- [PRIVACY.md](PRIVACY.md) — what stays on-device, what a query sends, and how to delete your data.
+- [SECURITY.md](SECURITY.md) — private vulnerability reporting and scope.
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — libraries, data sources, and attribution.
 
-Technical safeguards:
-
-- Cleartext HTTP is disabled app-wide (`res/xml/network_security_config.xml`).
-- API keys live in a separate preferences file excluded from cloud backup and device transfer.
-- The only exported component under app control is the launcher activity. The reminder receiver is not exported and uses immutable `PendingIntent`s; the extra exported receiver (`androidx.profileinstaller.ProfileInstallReceiver`) ships with AndroidX and is protected by the system-only `DUMP` permission.
-- Release keystores are git-ignored and supplied to CI through encrypted secrets.
-- Release builds are minified with R8 and published with SHA-256 checksums and the signing certificate.
+Cleartext HTTP is disabled app-wide (`res/xml/network_security_config.xml`); API keys live in a preferences file excluded from cloud backup and device transfer. The only exported component under app control is the launcher activity — the reminder receiver is not exported and uses immutable `PendingIntent`s, while AndroidX's `ProfileInstallReceiver` is protected by the system-only `DUMP` permission. Release keystores are git-ignored and supplied to CI through encrypted secrets; release builds are minified with R8 and published with SHA-256 checksums and the signing certificate.
 
 ---
 
 ## ⚙️ CI / CD
 
-Every push and pull request to `main` runs Android lint, the unit tests, a debug
-build, and dependency review; CodeQL analyses the Kotlin sources on a weekly
-schedule. Releases are built from `v*` tags by a two-job workflow: an
-unprivileged job compiles and tests, and a separate, manually approved job signs
-the APK and attaches `SHA256SUMS.txt` and `signing-certificate.txt`.
-
-Maintainer procedures — release signing, CI secrets, the release checklist and
-repository protection settings — are documented in
-[docs/RELEASING.md](docs/RELEASING.md).
+Every push and pull request to `main` runs lint, unit tests, a debug build, and dependency review; CodeQL analyses Kotlin sources weekly. Releases from `v*` tags use a two-job workflow: an unprivileged build-and-test job, then a manually approved job that signs the APK and attaches `SHA256SUMS.txt` and `signing-certificate.txt`. Maintainer procedures are in [docs/RELEASING.md](docs/RELEASING.md).
 
 ---
 
 ## 🩺 Troubleshooting
 
-**Reminders don't fire**
-- Check that notifications are allowed for Seriee (Android 13+).
-- On Android 12+, allow *Alarms & reminders* in system settings for exact timing.
-- Some OEM battery savers kill alarms; exempt the app from battery optimization.
-- The release date must be in the future and **Reminder Alarm** must be on. Use **Test Alarm Now** to verify the channel works.
-
-**Posters don't load**
-- Remote posters need an internet connection and an `https://` URL. Cleartext `http://` URLs are blocked.
-- If the poster was uploaded locally, the file may have been cleared by uninstalling/clearing app data.
-
-**A restore didn't bring back local posters**
-- The JSON backup stores `posters/…` paths, not image bytes. Re-upload covers on the new device or use URLs.
-
-**Metadata search finds nothing**
-- Verify the title spelling. TMDB/OMDb need keys; AniList and TVmaze work without one.
-- A failed source is skipped, so partial results are normal.
-
-**Build fails with "SDK location not found"**
-- Set `sdk.dir` in `local.properties` or open the project in Android Studio once so it generates the file.
-- Install Android SDK Platform 36.
-
-**`./gradlew` is not executable**
-- Run `chmod +x gradlew` (the file is executable in git; some archives drop the bit).
-
-**Release APK is unsigned or R8 fails**
-- Maintainers: create `keystore.properties` as described in
-  [docs/RELEASING.md](docs/RELEASING.md).
-- Do not disable minification; add a targeted rule to `app/proguard-rules.pro` instead.
+- **Reminders don't fire** — allow notifications (Android 13+), allow *Alarms & reminders* (Android 12+), exempt the app from OEM battery savers, and make sure the date is in the future with **Reminder Alarm** on. Verify with **Test Alarm Now**.
+- **Posters don't load** — remote posters need internet and an `https://` URL; cleartext `http://` is blocked. Locally uploaded files disappear if app data is cleared or the app is uninstalled.
+- **Restore lost local posters** — the JSON backup stores paths, not image bytes. Re-upload covers or use URLs.
+- **Metadata search finds nothing** — check the spelling; TMDB/OMDb need keys, AniList and TVmaze do not. Failed sources are skipped, so partial results are normal.
+- **"SDK location not found"** — set `sdk.dir` in `local.properties` or open the project once in Android Studio; install SDK Platform 36.
+- **`./gradlew` is not executable** — run `chmod +x gradlew`.
+- **Unsigned release APK or R8 failure** — maintainers create `keystore.properties` per [docs/RELEASING.md](docs/RELEASING.md); never disable minification, add a targeted rule to `app/proguard-rules.pro` instead.
 
 ---
 
 ## 📝 Notes
 
-- Posters are loaded from URLs via Coil, so they need an internet connection.
-- All data is stored **locally on your device**. Use **Backup & Restore** before switching phones or uninstalling the app.
-- API keys are stored on-device and are not exported or auto-backed up.
-- Collection import is explicit: AniList sends only the username you type to `graphql.anilist.co`, and a MyAnimeList export is parsed entirely on-device.
-- The application ID is `com.seriee.app`; the Kotlin namespace is also `com.seriee.app`.
-- Version 0.3.0 changed the application ID from `com.aistudio.seriee.twvpmz`. The old and new versions can coexist; export/import a backup to move your library.
+- Remote posters load through Coil and need an internet connection.
+- All data is local. Use **Backup & Restore** before switching phones or uninstalling.
+- Collection import is explicit: AniList receives only the username you type at `graphql.anilist.co`, and a MyAnimeList export is parsed entirely on-device.
+- Application ID and Kotlin namespace are both `com.seriee.app`; the pre-0.3.0 ID was `com.aistudio.seriee.twvpmz`, and both versions can coexist.
 
 ---
 
 ## 🤝 Contributing
 
-Pull requests and suggestions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately via [SECURITY.md](SECURITY.md).
+Pull requests and suggestions are welcome — start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md); report security issues privately via [SECURITY.md](SECURITY.md).
 
-When contributing:
 - Keep strings localized in both `values/strings.xml` and `values-in/strings.xml`.
-- Update the `changelog_*` entries and `CHANGELOG.md` when adding user-visible changes.
+- Update the `changelog_*` entries and `CHANGELOG.md` for user-visible changes.
 - Run `./gradlew lintDebug testDebugUnitTest assembleDebug` before opening a PR.
-- Update `THIRD_PARTY_NOTICES.md` and the About screen when adding a data source or library.
+- Update `THIRD_PARTY_NOTICES.md` and the About screen when adding a source or library.
 - Sign off commits with `git commit -s` (DCO).
 
 ---
 
 ## 🙏 Credits
 
-Seriee relies on community data and open-source software:
-
 - **TMDB** — this product uses the TMDB API but is not endorsed or certified by TMDB.
-- **JustWatch** — watch-provider data is provided by JustWatch.
-- **AniList** — anime metadata, cover images, and public collection import.
-- **MyAnimeList** — the user-initiated XML export format used for collection import.
+- **JustWatch** — watch-provider data.
+- **AniList** — anime metadata, covers, and public collection import.
+- **MyAnimeList** — the user-initiated XML export format used for import.
 - **TVmaze** — TV metadata and episode schedules.
 - **OMDb / IMDb** — additional movie and TV metadata.
 - **Kotlin, AndroidX, Jetpack Compose, Coil** — Apache-2.0.
 
-Posters and metadata remain the property of their respective rights holders and
-are displayed for identification purposes only. See
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the full list and
-attribution requirements.
+Posters and metadata remain the property of their rights holders and are shown for identification only. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the full list and attribution requirements.
 
 ---
 
@@ -506,10 +271,6 @@ attribution requirements.
 
 Copyright 2026 The Seriee contributors.
 
-Licensed under the [Apache License, Version 2.0](LICENSE). You may use, modify,
-and distribute this software under the terms of that license, including its
-patent grant and attribution requirements. See [NOTICE](NOTICE) for the
-project and third-party attribution notices.
+Licensed under the [Apache License, Version 2.0](LICENSE), including its patent grant and attribution requirements. See [NOTICE](NOTICE) for project and third-party attribution.
 
-Seriee is an independent project and is not affiliated with Netflix, Bilibili,
-YouTube, TMDB, JustWatch, AniList, TVmaze, OMDb, or IMDb.
+Seriee is an independent project and is not affiliated with Netflix, Bilibili, YouTube, TMDB, JustWatch, AniList, TVmaze, OMDb, or IMDb.
