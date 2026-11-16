@@ -52,7 +52,11 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("debugConfig")
+            // Use the shared debug.keystore when it is committed; otherwise fall
+            // back to the default Android debug keystore (e.g. on CI).
+            if (rootProject.file("debug.keystore").exists()) {
+                signingConfig = signingConfigs.getByName("debugConfig")
+            }
         }
         release {
             if (hasReleaseSigning) {
