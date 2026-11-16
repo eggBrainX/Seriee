@@ -1,74 +1,56 @@
 package com.seriee.app.data
 
-/**
- * Portable snapshot of the user's theme, shared as a short text code.
- *
- * Colours are stored as unsigned 32-bit ARGB values so a code survives a
- * copy/paste round-trip through the clipboard without locale issues.
- */
 data class ThemePreset(
-    val mode: AppThemeMode = AppThemeMode.System,
-    val style: AppThemeStyle = AppThemeStyle.Classic,
-    val accent: Long = 0xFF3B82F6L,
-    val backgroundStart: Long = 0xFF1D4ED8L,
-    val backgroundEnd: Long = 0xFF7C2A64L,
-    val gradient: Boolean = true,
-    val reduceTransparency: Boolean = false
+    val mode: AppThemeMode,
+    val style: AppThemeStyle,
+    val accentArgb: Long,
+    val bgStartArgb: Long,
+    val bgEndArgb: Long,
+    val useGradient: Boolean,
 )
 
-/**
- * `seriee-theme:1;mode=Dark;style=Liquid;accent=FFF0559B;bg1=FF1D4ED8;...`
- *
- * Unknown fields are ignored and missing ones fall back to defaults, so older
- * codes keep working when new fields are added.
- */
 object ThemePresetCodec {
-
-    private const val PREFIX = "seriee-theme:1"
+    private const val PREFIX = "seriee-theme:1;"
 
     fun encode(preset: ThemePreset): String {
-        val fields = linkedMapOf(
-            "mode" to preset.mode.name,
-            "style" to preset.style.name,
-            "accent" to hex(preset.accent),
-            "bg1" to hex(preset.backgroundStart),
-            "bg2" to hex(preset.backgroundEnd),
-            "gradient" to if (preset.gradient) "1" else "0",
-            "flat" to if (preset.reduceTransparency) "1" else "0"
-        )
-        return "$PREFIX;" + fields.entries.joinToString(";") { "${it.key}=${it.value}" }
+        fun hex(v: Long) = (v and 0xFFFFFFFFL).toString(16).padStart(8, '0').lowercase()
+        return PREFIX + listOf(
+            "mode=${preset.mode.name.lowercase()}",
+            "style=${preset.style.name.lowercase()}",
+            "accent=${hex(preset.accentArgb)}",
+            "bg=${hex(preset.bgStartArgb)}",
+            "bg2=${hex(preset.bgEndArgb)}",
+            "grad=${if (preset.useGradient) "1" else "0"}",
+        ).joinToString(";")
     }
 
-    /** Returns null when the text is not a Seriee theme code. */
-    fun decode(raw: String?): ThemePreset? {
-        val text = raw?.trim().orEmpty()
-        if (!text.startsWith("seriee-theme:")) return null
-        val head = text.substringBefore(';')
-        if (head != PREFIX) return null
-        val fields = text.split(';')
-            .drop(1)
-            .mapNotNull { entry ->
-                val key = entry.substringBefore('=', "").trim()
-                val value = entry.substringAfter('=', "").trim()
-                if (key.isEmpty() || value.isEmpty()) null else key to value
+    fun decode(raw: String): ThemePreset? {
+        val trimmed = raw.trim()
+        if (!trimmed.startsWith(PREFIX)) return null
+        val map = HashMap<String, String>()
+        for (part in trimmed.removePrefix(PREFIX).split(";")) {
+            val eq = part.indexOf('=')
+            if (eq > 0) {
+                map[part.substring(0, eq).trim().lowercase()] = part.substring(eq + 1).trim()
             }
-            .toMap(LinkedHashMap())
-
-        val defaults = ThemePreset()
+        }
+        val mode = when (map["mode"]) {
+            "light" -> AppThemeMode.Light
+            "dark" -> AppThemeMode.Dark
+            else -> AppThemeMode.System
+        }
+        val style = AppThemeStyle.entries.firstOrNull { it.name.lowercase() == map["style"] }
+            ?: AppThemeStyle.Custom
+        val accent = map["accent"]?.toLongOrNull(16) ?: return null
+        val bg1 = map["bg"]?.toLongOrNull(16) ?: return null
+        val bg2 = map["bg2"]?.toLongOrNull(16) ?: return null
         return ThemePreset(
-            mode = fields["mode"]?.let { AppThemeMode.fromName(it) } ?: defaults.mode,
-            style = fields["style"]?.let { AppThemeStyle.fromName(it) } ?: defaults.style,
-            accent = fields["accent"]?.let(::parseColor) ?: defaults.accent,
-            backgroundStart = fields["bg1"]?.let(::parseColor) ?: defaults.backgroundStart,
-            backgroundEnd = fields["bg2"]?.let(::parseColor) ?: defaults.backgroundEnd,
-            gradient = fields["gradient"]?.let { it != "0" } ?: defaults.gradient,
-            reduceTransparency = fields["flat"]?.let { it != "0" } ?: defaults.reduceTransparency
+            mode = mode,
+            style = style,
+            accentArgb = accent,
+            bgStartArgb = bg1,
+            bgEndArgb = bg2,
+            useGradient = map["grad"] == "1",
         )
     }
-
-    private fun hex(value: Long): String =
-        value.toInt().toUInt().toString(16).uppercase().padStart(8, '0')
-
-    private fun parseColor(value: String): Long? =
-        runCatching { value.removePrefix("#").toLong(16) and 0xFFFFFFFFL }.getOrNull()
 }

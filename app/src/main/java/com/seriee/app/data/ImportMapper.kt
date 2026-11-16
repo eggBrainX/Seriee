@@ -1,246 +1,262 @@
 package com.seriee.app.data
 
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/**
- * Pure mapping and merge logic for collection imports.
- *
- * Kept free of Android APIs so the whole matrix can be covered by JVM unit
- * tests: `ImportMapperTest` and `ImportMergeTest`.
- */
+data class AniListListRow(
+    val mediaId: Int,
+    val title: String,
+    val format: String,
+    val episodes: Int,
+    val status: String,
+    val progress: Int,
+    val score100: Int,
+    val poster: String,
+    val genres: List<String>,
+    val description: String,
+)
+
+data class MalRawEntry(
+    val id: String,
+    val title: String,
+    val type: String,
+    val episodes: Int,
+    val watched: Int,
+    val status: String,
+    val score: Int,
+)
+
 object ImportMapper {
+    private val statusRank = mapOf(
+        WatchStatus.PlanToWatch to 0,
+        WatchStatus.ComingSoon to 0,
+        WatchStatus.OnHold to 1,
+        WatchStatus.Dropped to 2,
+        WatchStatus.Watching to 3,
+        WatchStatus.Completed to 4,
+    )
 
-    const val SOURCE_ANILIST = "AniList"
-    const val SOURCE_MAL = "MyAnimeList"
+    private fun normTitle(t: String): String =
+        t.trim().lowercase().replace(Regex("\\s+"), " ")
 
-    // ---------------------------------------------------------------- mapping
-
-    fun fromAniList(entries: List<AniListEntry>): List<MediaItem> =
-        entries.mapNotNull { row ->
-            val title = row.title.trim().ifBlank { return@mapNotNull null }
-            val movie = row.format.equals("MOVIE", ignoreCase = true)
-            val progress = if (movie) {
-                if (row.progress > 0) 1 else 0
-            } else {
-                row.progress.coerceAtLeast(0)
-            }
-            val total = if (movie) 1 else row.totalEpisodes.takeIf { it > 0 } ?: progress.coerceAtLeast(1)
-            val tags = row.genres.cleanTags()
-            val description = stripHtml(row.description).ifBlank { row.notes.trim() }
-            MediaItem(
-                id = stableId(SOURCE_ANILIST, row.id.toString(), title),
-                title = title,
-                type = if (movie) MediaType.Movie else MediaType.Series,
-                status = anilistStatus(row.status),
-                poster = row.poster.trim(),
-                season = if (movie) 1 else (parseSeasonNumberFromText(title) ?: 1),
-                currentEp = if (movie) progress else progress.coerceAtMost(total),
-                totalEp = total,
-                tags = tags,
-                rating = (row.score10 / 2.0).roundToInt().coerceIn(0, 5),
-                updatedAt = System.currentTimeMillis(),
-                description = description,
-                source = SOURCE_ANILIST,
-                sourceId = row.id.toString()
-            )
-        }
-
-    fun fromMal(entries: List<MalEntry>): List<MediaItem> =
-        entries.mapNotNull { row ->
-            val title = row.title.trim().ifBlank { return@mapNotNull null }
-            val movie = row.type.equals("movie", ignoreCase = true) ||
-                row.type.equals("Movie", ignoreCase = true)
-            val progress = if (movie) {
-                if (row.watchedEpisodes > 0) 1 else 0
-            } else {
-                row.watchedEpisodes.coerceAtLeast(0)
-            }
-            val total = if (movie) 1 else row.totalEpisodes.takeIf { it > 0 } ?: progress.coerceAtLeast(1)
-            MediaItem(
-                id = stableId(SOURCE_MAL, row.id, title),
-                title = title,
-                type = if (movie) MediaType.Movie else MediaType.Series,
-                status = malStatus(row.status),
-                poster = row.image.trim(),
-                season = if (movie) 1 else (parseSeasonNumberFromText(title) ?: 1),
-                currentEp = if (movie) progress else progress.coerceAtMost(total),
-                totalEp = total,
-                tags = row.tags.cleanTags(),
-                rating = (row.score / 2.0).roundToInt().coerceIn(0, 5),
-                updatedAt = System.currentTimeMillis(),
-                description = stripHtml(row.comments),
-                source = SOURCE_MAL,
-                sourceId = row.id
-            )
-        }
-
-    fun anilistStatus(raw: String?): WatchStatus = when (raw?.trim()?.uppercase()) {
-        "CURRENT", "REPEATING" -> WatchStatus.Watching
-        "COMPLETED" -> WatchStatus.Completed
-        "PLANNING" -> WatchStatus.PlanToWatch
-        "PAUSED" -> WatchStatus.OnHold
-        "DROPPED" -> WatchStatus.Dropped
-        else -> WatchStatus.PlanToWatch
-    }
-
-    fun malStatus(raw: String?): WatchStatus {
-        val key = raw.orEmpty().lowercase().filter { it.isLetterOrDigit() }
-        return when {
-            key == "watching" || key == "current" || key == "repeating" -> WatchStatus.Watching
-            key == "completed" -> WatchStatus.Completed
-            key == "plantowatch" || key == "planning" -> WatchStatus.PlanToWatch
-            key == "onhold" || key == "paused" -> WatchStatus.OnHold
-            key == "dropped" -> WatchStatus.Dropped
+    fun fromAniList(rows: List<AniListListRow>): List<ImportedEntry> = rows.map { r ->
+        val isMovie = r.format == "MOVIE"
+        val type = if (isMovie) MediaType.Movie else MediaType.Series
+        val status = when (r.status) {
+            "CURRENT", "REPEATING" -> WatchStatus.Watching
+            "COMPLETED" -> WatchStatus.Completed
+            "PAUSED" -> WatchStatus.OnHold
+            "DROPPED" -> WatchStatus.Dropped
             else -> WatchStatus.PlanToWatch
         }
+        val total = if (isMovie) 1 else maxOf(1, r.episodes, r.progress)
+        val current = if (isMovie) {
+            if (status == WatchStatus.Completed || r.progress > 0) 1 else 0
+        } else {
+            r.progress.coerceIn(0, total)
+        }
+        val rating = if (r.score100 > 0) (r.score100 / 20f).roundToInt().coerceIn(1, 5) else 0
+        ImportedEntry(
+            title = r.title,
+            type = type,
+            status = status,
+            currentEp = current,
+            totalEp = total,
+            rating = rating,
+            poster = r.poster,
+            tags = r.genres.take(6),
+            description = r.description,
+            source = ImportSource.ANILIST,
+            sourceId = r.mediaId.toString(),
+        )
     }
 
-    // ------------------------------------------------------------------ merge
+    fun fromMal(entries: List<MalRawEntry>): List<ImportedEntry> = entries.map { e ->
+        val isMovie = e.type.trim().equals("movie", ignoreCase = true)
+        val type = if (isMovie) MediaType.Movie else MediaType.Series
+        val status = when (e.status.trim().lowercase()) {
+            "watching" -> WatchStatus.Watching
+            "completed" -> WatchStatus.Completed
+            "on-hold" -> WatchStatus.OnHold
+            "dropped" -> WatchStatus.Dropped
+            else -> WatchStatus.PlanToWatch
+        }
+        val total = if (isMovie) 1 else maxOf(1, e.episodes, e.watched)
+        val current = if (isMovie) {
+            if (status == WatchStatus.Completed || e.watched > 0) 1 else 0
+        } else {
+            e.watched.coerceIn(0, total)
+        }
+        val rating = if (e.score > 0) (e.score / 2f).roundToInt().coerceIn(1, 5) else 0
+        ImportedEntry(
+            title = e.title,
+            type = type,
+            status = status,
+            currentEp = current,
+            totalEp = total,
+            rating = rating,
+            poster = "",
+            tags = emptyList(),
+            description = "",
+            source = ImportSource.MAL,
+            sourceId = e.id,
+        )
+    }
 
-    /** Computes counts without writing anything; used by the preview step. */
-    fun preview(imported: List<MediaItem>, existing: List<MediaItem>): ImportPreview {
-        val lookup = Lookup(existing)
-        val unique = uniqueById(imported)
+    private fun findMatchIndex(existing: List<MediaItem>, entry: ImportedEntry): Int {
+        val bySource = existing.indexOfFirst {
+            it.source.equals(entry.source.name, ignoreCase = true) &&
+                entry.sourceId.isNotBlank() &&
+                it.sourceId == entry.sourceId
+        }
+        if (bySource >= 0) return bySource
+        val targetTitle = normTitle(entry.title)
+        return existing.indexOfFirst { normTitle(it.title) == targetTitle && it.type == entry.type }
+    }
+
+    private fun toMediaItem(entry: ImportedEntry, now: Long): MediaItem {
+        val idPrefix = if (entry.source == ImportSource.ANILIST) "anilist" else "mal"
+        val id = if (entry.sourceId.isNotBlank()) "$idPrefix-${entry.sourceId}" else java.util.UUID.randomUUID().toString()
+        val seasons = if (entry.type == MediaType.Series) {
+            listOf(Season(1, entry.currentEp, entry.totalEp.coerceAtLeast(1)))
+        } else emptyList()
+        return MediaItem(
+            id = id,
+            title = entry.title,
+            type = entry.type,
+            status = entry.status,
+            poster = entry.poster,
+            season = 1,
+            currentEp = entry.currentEp,
+            totalEp = entry.totalEp.coerceAtLeast(1),
+            tags = entry.tags,
+            rating = entry.rating,
+            updatedAt = now,
+            seasons = seasons,
+            description = entry.description,
+            source = entry.source.name,
+            sourceId = entry.sourceId,
+        )
+    }
+
+    private fun mergeItem(existing: MediaItem, entry: ImportedEntry, now: Long): Pair<MediaItem, Boolean> {
+        var changed = false
+        val rankNew = statusRank[entry.status] ?: 0
+        val rankOld = statusRank[existing.status] ?: 0
+        val nextStatus = if (rankNew > rankOld) entry.status else existing.status
+        if (nextStatus != existing.status) changed = true
+
+        val nextRating = if (existing.rating > 0) existing.rating else entry.rating
+        if (nextRating != existing.rating) changed = true
+
+        val nextPoster = existing.poster.ifBlank { entry.poster }
+        if (nextPoster != existing.poster) changed = true
+
+        val nextDesc = existing.description.ifBlank { entry.description }
+        if (nextDesc != existing.description) changed = true
+
+        val nextSource = existing.source.ifBlank { entry.source.name }
+        val nextSourceId = existing.sourceId.ifBlank { entry.sourceId }
+        if (nextSource != existing.source || nextSourceId != existing.sourceId) changed = true
+
+        val tagMap = LinkedHashMap<String, String>()
+        for (t in existing.tags + entry.tags) {
+            val trimmed = t.trim()
+            if (trimmed.isNotEmpty()) tagMap.putIfAbsent(trimmed.lowercase(), trimmed)
+        }
+        val nextTags = tagMap.values.take(8)
+        if (nextTags.size != existing.tags.size) changed = true
+
+        var nextSeasons = existing.seasons
+        var nextCur = existing.currentEp
+        var nextTot = existing.totalEp
+
+        if (existing.type == MediaType.Series) {
+            val eff = existing.effectiveSeasons
+            if (eff.size == 1) {
+                val s1 = eff.first()
+                val mTot = maxOf(s1.totalEp, entry.totalEp, 1)
+                val mCur = maxOf(s1.currentEp, entry.currentEp).coerceIn(0, mTot)
+                if (mTot != s1.totalEp || mCur != s1.currentEp) changed = true
+                nextSeasons = listOf(s1.copy(currentEp = mCur, totalEp = mTot))
+                nextCur = mCur
+                nextTot = mTot
+            } else {
+                val mCur = maxOf(existing.currentEp, entry.currentEp)
+                val mTot = maxOf(existing.totalEp, entry.totalEp, 1)
+                if (mCur != existing.currentEp || mTot != existing.totalEp) changed = true
+                nextCur = mCur
+                nextTot = mTot
+            }
+        } else {
+            val mCur = maxOf(existing.currentEp, entry.currentEp)
+            if (mCur != existing.currentEp) changed = true
+            nextCur = mCur
+            nextTot = 1
+        }
+
+        if (!changed) return existing to false
+        return existing.copy(
+            status = nextStatus,
+            rating = nextRating,
+            poster = nextPoster,
+            description = nextDesc,
+            tags = nextTags,
+            source = nextSource,
+            sourceId = nextSourceId,
+            seasons = nextSeasons,
+            currentEp = nextCur,
+            totalEp = nextTot,
+            updatedAt = now,
+        ) to true
+    }
+
+    fun preview(existing: List<MediaItem>, entries: List<ImportedEntry>): ImportPreview {
+        var newCount = 0
+        var updatedCount = 0
+        var unchangedCount = 0
+        var seriesCount = 0
+        var movieCount = 0
         val now = System.currentTimeMillis()
+        for (e in entries) {
+            if (e.type == MediaType.Movie) movieCount++ else seriesCount++
+            val idx = findMatchIndex(existing, e)
+            if (idx < 0) newCount++
+            else if (mergeItem(existing[idx], e, now).second) updatedCount++
+            else unchangedCount++
+        }
+        return ImportPreview(entries.size, newCount, updatedCount, unchangedCount, seriesCount, movieCount)
+    }
+
+    fun merge(
+        existing: List<MediaItem>,
+        entries: List<ImportedEntry>,
+        now: Long = System.currentTimeMillis(),
+    ): Pair<List<MediaItem>, ImportSummary> {
+        val list = existing.toMutableList()
         var added = 0
         var updated = 0
-        var unchanged = 0
-        unique.forEach { row ->
-            val local = lookup.find(row)
-            if (local == null) {
+        var skipped = 0
+        for (e in entries) {
+            val idx = findMatchIndex(list, e)
+            if (idx < 0) {
+                list.add(toMediaItem(e, now))
                 added++
             } else {
-                val merged = mergeOne(local, row, now)
-                if (merged.copy(updatedAt = local.updatedAt) == local) unchanged++ else updated++
+                val (merged, changed) = mergeItem(list[idx], e, now)
+                if (changed) {
+                    list[idx] = merged
+                    updated++
+                } else skipped++
             }
         }
-        return ImportPreview(
-            entries = unique,
-            total = added + updated + unchanged,
-            newCount = added,
-            updatedCount = updated,
-            unchangedCount = unchanged,
-            seriesCount = unique.count { it.type == MediaType.Series },
-            movieCount = unique.count { it.type == MediaType.Movie }
-        )
+        return list to ImportSummary(added, updated, skipped)
     }
 
-    /**
-     * Non-destructive merge: progress and totals only grow, status only
-     * upgrades, ratings/descriptions fill blanks, local-only fields survive.
-     */
-    fun merge(imported: List<MediaItem>, existing: List<MediaItem>): Pair<List<MediaItem>, ImportResult> {
-        val lookup = Lookup(existing)
-        val now = System.currentTimeMillis()
-        val replaced = HashMap<String, MediaItem>()
-        val additions = ArrayList<MediaItem>()
-        var updated = 0
-        var skipped = 0
-
-        uniqueById(imported).forEach { row ->
-            val local = lookup.find(row)
-            if (local == null) {
-                additions.add(row)
-            } else if (replaced.containsKey(local.id)) {
-                skipped++
-            } else {
-                val merged = mergeOne(local, row, now)
-                replaced[local.id] = merged
-                if (merged.copy(updatedAt = local.updatedAt) == local) skipped++ else updated++
-            }
-        }
-
-        val items = existing.map { replaced[it.id] ?: it } + additions
-        return items to ImportResult(added = additions.size, updated = updated, skipped = skipped)
-    }
-
-    fun replace(imported: List<MediaItem>): Pair<List<MediaItem>, ImportResult> {
-        val items = uniqueById(imported)
-        return items to ImportResult(added = items.size, updated = 0, skipped = 0)
-    }
-
-    private fun mergeOne(local: MediaItem, imported: MediaItem, now: Long): MediaItem =
-        local.copy(
-            currentEp = maxOf(local.currentEp, imported.currentEp),
-            totalEp = maxOf(local.totalEp, imported.totalEp),
-            status = upgradeStatus(local.status, imported.status),
-            rating = if (local.rating > 0) local.rating else imported.rating,
-            description = local.description.ifBlank { imported.description },
-            tags = (local.tags + imported.tags).cleanTags(),
-            poster = local.poster.ifBlank { imported.poster },
-            source = local.source.ifBlank { imported.source },
-            sourceId = local.sourceId.ifBlank { imported.sourceId },
-            updatedAt = now
-        )
-
-    private fun upgradeStatus(local: WatchStatus, imported: WatchStatus): WatchStatus =
-        if (statusRank(imported) > statusRank(local)) imported else local
-
-    private fun statusRank(status: WatchStatus): Int = when (status) {
-        WatchStatus.PlanToWatch -> 0
-        WatchStatus.OnHold -> 1
-        WatchStatus.Dropped -> 1
-        WatchStatus.Watching -> 2
-        WatchStatus.ComingSoon -> 2
-        WatchStatus.Completed -> 3
-    }
-
-    private class Lookup(existing: List<MediaItem>) {
-        private val bySource = existing
-            .filter { it.sourceId.isNotBlank() }
-            .associateBy { it.source.trim().lowercase() to it.sourceId.trim() }
-        private val byTitle = existing.associateBy { normalize(it.title) to it.type }
-
-        fun find(imported: MediaItem): MediaItem? {
-            if (imported.sourceId.isNotBlank()) {
-                bySource[imported.source.lowercase() to imported.sourceId]?.let { return it }
-            }
-            return byTitle[normalize(imported.title) to imported.type]
-        }
-    }
-
-    // ---------------------------------------------------------------- helpers
-
-    fun normalize(title: String): String =
-        title.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
-
-    private fun stableId(source: String, sourceId: String, title: String): String {
-        val prefix = if (source == SOURCE_ANILIST) "anilist" else "mal"
-        val key = sourceId.trim().ifBlank { abs(title.lowercase().hashCode()).toString() }
-        return "$prefix-$key"
-    }
-
-    private fun uniqueById(items: List<MediaItem>): List<MediaItem> {
-        val seen = HashSet<String>()
-        return items.filter { seen.add(it.id) }
-    }
-
-    private fun splitTags(raw: String): List<String> =
-        raw.split(',', ';', '|').map { it.trim() }.filter { it.isNotEmpty() }
-
-    private fun List<String>.cleanTags(): List<String> {
-        val seen = HashSet<String>()
-        return map { it.trim() }
-            .filter { it.isNotEmpty() && seen.add(it.lowercase()) }
-            .take(8)
-    }
-
-    /** Minimal HTML stripping for AniList descriptions (`<br>`, entities). */
-    fun stripHtml(html: String?): String {
-        if (html.isNullOrBlank()) return ""
-        return html
-            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
-            .replace(Regex("<[^>]+>"), "")
-            .replace("&amp;", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&#039;", "'")
-            .replace("&apos;", "'")
-            .replace("&nbsp;", " ")
-            .replace(Regex("[ \\t]+"), " ")
-            .replace(Regex("\\n{3,}"), "\n\n")
-            .trim()
+    fun replace(
+        entries: List<ImportedEntry>,
+        now: Long = System.currentTimeMillis(),
+    ): Pair<List<MediaItem>, ImportSummary> {
+        val items = entries.map { toMediaItem(it, now) }
+        return items to ImportSummary(items.size, 0, 0)
     }
 }

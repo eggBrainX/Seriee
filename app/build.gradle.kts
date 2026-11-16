@@ -8,9 +8,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Release signing credentials live in <root>/keystore.properties (git-ignored).
-// See keystore.properties.example. Debug builds work without it; release builds
-// stay unsigned until the file exists — create it once and back up both files.
 val releasePropsFile = rootProject.file("keystore.properties")
 val releaseProps = Properties().apply {
     if (releasePropsFile.exists()) {
@@ -25,9 +22,6 @@ android {
     compileSdk = 36
 
     lint {
-        // The Compose BOM is pinned to 2024.09.00 (see dependencies), which has no
-        // LocalResources. The Toast/getString calls flagged by this check run in
-        // click callbacks, so it is disabled until the BOM is upgraded.
         disable += "LocalContextGetResourceValueCall"
     }
 
@@ -49,9 +43,6 @@ android {
     }
 
     defaultConfig {
-        // Renamed from the AI Studio default (com.aistudio.seriee.twvpmz) so the
-        // package is owned by this project. This changes the installed app identity:
-        // export a backup before installing 0.3.0 over an older build.
         applicationId = "com.seriee.app"
         minSdk = 26
         targetSdk = 36
@@ -82,9 +73,6 @@ android {
     }
     buildFeatures {
         compose = true
-        // Expose versionCode/versionName to app code via BuildConfig.
-        // Single source of truth: defaultConfig below — never hardcode
-        // version fallbacks in Kotlin code.
         buildConfig = true
     }
 
@@ -93,8 +81,6 @@ android {
     }
 }
 
-// `kotlinOptions` was removed from the Kotlin Android plugin; configure the
-// Kotlin compiler through the canonical `compilerOptions` API instead.
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
@@ -108,8 +94,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
 
-    // Pinned to the last BOM whose Compose runtime works on AGP 8.x.
-    // Compose 1.10+ (BOM 2025.xx and later) requires AGP 9.1 and compileSdk 37.
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")

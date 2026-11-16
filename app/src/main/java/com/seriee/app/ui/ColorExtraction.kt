@@ -2,105 +2,66 @@ package com.seriee.app.ui
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import android.graphics.Color as AndroidColor
+import androidx.core.graphics.drawable.toBitmap
 import coil.imageLoader
 import coil.request.ImageRequest
+import coil.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.max
+import java.io.File
 
-/**
- * Loads a (possibly remote) poster and derives a vivid accent colour from its
- * dominant hue, so the custom theme can follow the artwork.
- */
-suspend fun accentFromPoster(context: Context, data: String): Color? =
-    withContext(Dispatchers.IO) {
-        val request = ImageRequest.Builder(context)
-            .data(data)
-            .size(64)
-            .allowHardware(false)
-            .build()
-        val result = runCatching { context.imageLoader.execute(request) }.getOrNull()
-        val bitmap = (result?.drawable as? BitmapDrawable)?.bitmap ?: return@withContext null
-        dominantAccent(bitmap)
+suspend fun accentFromPoster(context: Context, poster: String): Long? {
+    if (poster.isBlank()) return null
+    val data: Any = if (poster.startsWith("/")) File(poster) else poster
+    return withContext(Dispatchers.IO) {
+        runCatching {
+            val req = ImageRequest.Builder(context)
+                .data(data)
+                .size(120)
+                .allowHardware(false)
+                .build()
+            val result = context.imageLoader.execute(req) as? SuccessResult ?: return@runCatching null
+            val bmp = result.drawable.toBitmap()
+            dominantAccent(bmp)
+        }.getOrNull()
     }
-
-private class HueBucket {
-    var count = 0
-    var red = 0L
-    var green = 0L
-    var blue = 0L
-    var saturation = 0f
-    var value = 0f
-
-    fun add(r: Int, g: Int, b: Int, s: Float, v: Float) {
-        count++
-        red += r
-        green += g
-        blue += b
-        saturation += s
-        value += v
-    }
-
-    /** Favour frequent, saturated, reasonably bright colours. */
-    fun score(): Float = if (count == 0) 0f else {
-        val avgS = saturation / count
-        val avgV = value / count
-        count * (0.35f + avgS) * (0.35f + avgV)
-    }
-
-    fun color(): Color = Color(
-        (red / count).toInt(),
-        (green / count).toInt(),
-        (blue / count).toInt()
-    )
 }
 
-/** Pure sampler kept separate so it can be unit-tested with a tiny bitmap. */
-fun dominantAccent(bitmap: Bitmap): Color? {
-    if (bitmap.width <= 0 || bitmap.height <= 0) return null
-    val stepX = max(1, bitmap.width / 48)
-    val stepY = max(1, bitmap.height / 48)
+fun dominantAccent(bitmap: Bitmap): Long? {
+    val w = bitmap.width
+    val h = bitmap.height
+    if (w <= 0 || h <= 0) return null
+    val stepX = maxOf(1, w / 24)
+    val stepY = maxOf(1, h / 24)
+    val buckets = HashMap<Int, Pair<Int, Float>>()
     val hsv = FloatArray(3)
-    val buckets = HashMap<Int, HueBucket>()
-
     var y = 0
-    while (y < bitmap.height) {
+    while (y < h) {
         var x = 0
-        while (x < bitmap.width) {
-            val argb = bitmap.getPixel(x, y)
-            val alpha = android.graphics.Color.alpha(argb)
-            if (alpha >= 200) {
-                val r = android.graphics.Color.red(argb)
-                val g = android.graphics.Color.green(argb)
-                val b = android.graphics.Color.blue(argb)
-                android.graphics.Color.RGBToHSV(r, g, b, hsv)
-                val hue = hsv[0]
-                val saturation = hsv[1]
-                val value = hsv[2]
-                // Skip near-grey pixels: they carry no usable hue.
-                if (saturation >= 0.18f && value >= 0.15f) {
-                    val key = (hue / 15f).toInt()
-                    val bucket = buckets.getOrPut(key) { HueBucket() }
-                    bucket.add(r, g, b, saturation, value)
+        while (x < w) {
+            val px = bitmap.getPixel(x, y)
+            if (AndroidColor.alpha(px) >= 180) {
+                AndroidColor.colorToHSV(px, hsv)
+                val sat = hsv[1]
+                val v = hsv[2]
+                if (sat >= 0.28f && v in 0.25f..0.95f) {
+                    val key = ((AndroidColor.red(px) shr 4) shl 8) or
+                        ((AndroidColor.green(px) shr 4) shl 4) or
+                        (AndroidColor.blue(px) shr 4)
+                    val score = sat * (1f - kotlin.math.abs(v - 0.65f))
+                    val prev = buckets[key]
+                    buckets[key] = if (prev == null) px to score else prev.first to (prev.second + score)
                 }
             }
             x += stepX
         }
         y += stepY
     }
-
-    val best = buckets.values.maxByOrNull { it.score() } ?: return null
-    return ensureVivid(best.color())
-}
-
-/** Lifts dull artwork colours into an accent that stays readable as a fill. */
-private fun ensureVivid(color: Color): Color {
-    val hsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(color.toArgb(), hsv)
-    hsv[1] = max(hsv[1], 0.55f)
-    hsv[2] = hsv[2].coerceIn(0.55f, 0.86f)
-    return Color(android.graphics.Color.HSVToColor(hsv))
+    val best = buckets.values.maxByOrNull { it.second }?.first ?: return null
+    AndroidColor.colorToHSV(best, hsv)
+    hsv[1] = hsv[1].coerceAtLeast(0.55f)
+    hsv[2] = hsv[2].coerceIn(0.62f, 0.92f)
+    val vivid = AndroidColor.HSVToColor(0xFF, hsv)
+    return vivid.toLong() and 0xFFFFFFFFL
 }

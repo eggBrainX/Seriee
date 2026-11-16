@@ -1,570 +1,346 @@
 package com.seriee.app.data
 
+import com.seriee.app.debug.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
-import java.net.URLEncoder
 import java.net.URL
+import java.net.URLEncoder
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import kotlin.math.roundToInt
 
-data class StreamCandidate(val name: String, val url: String)
-
-private val ROMAN_SEASONS = mapOf(
-    "i" to 1, "ii" to 2, "iii" to 3, "iv" to 4, "v" to 5,
-    "vi" to 6, "vii" to 7, "viii" to 8, "ix" to 9, "x" to 10
-)
-
-/**
- * Extracts the season number a source entry *is* from its title / query text.
- * AniList splits later seasons into separate entries ("… - Season 4"); TMDB
- * titles usually don't, so the search query is checked too.
- * Matches: "Season 4", "Season IV", "S4", "Part 2", "4th Season", "Season-4".
- * Returns null when no explicit season is present (caller defaults to 1 / all seasons).
- */
-fun parseSeasonNumberFromText(text: String?): Int? {
-    if (text.isNullOrBlank()) return null
-    fun num(s: String?): Int? = s?.toIntOrNull()?.takeIf { it in 1..50 }
-    fun roman(s: String?): Int? = s?.lowercase()?.let { ROMAN_SEASONS[it] }
-    // "4th Season" / "2nd Season"
-    Regex("""\b0*(\d{1,2})(?:st|nd|rd|th)\s*season\b""", RegexOption.IGNORE_CASE)
-        .find(text)?.let { if (num(it.groupValues[1]) != null) return num(it.groupValues[1]) }
-    // "Season 4", "Season-4", "Season: 4"
-    Regex("""\bseason\s*[-:=]?\s*0*(\d{1,2})\b""", RegexOption.IGNORE_CASE)
-        .find(text)?.let { if (num(it.groupValues[1]) != null) return num(it.groupValues[1]) }
-    // "Season IV"
-    Regex("""\bseason\s*[-:=]?\s*(viii|vii|vi|iv|ix|iii|ii|x|v|i)\b""", RegexOption.IGNORE_CASE)
-        .find(text)?.let { if (roman(it.groupValues[1]) != null) return roman(it.groupValues[1]) }
-    // "Part 2" (split-cour continuation treated as next season)
-    Regex("""\bpart\s*[-:=]?\s*0*(\d{1,2})\b""", RegexOption.IGNORE_CASE)
-        .find(text)?.let { if (num(it.groupValues[1]) != null) return num(it.groupValues[1]) }
-    // "S4" / " S04 " (standalone code, not inside a word)
-    Regex("""(?:^|[\s\-:])S0*(\d{1,2})(?=$|[\s\-:.])""", RegexOption.IGNORE_CASE)
-        .find(text)?.let { if (num(it.groupValues[1]) != null) return num(it.groupValues[1]) }
-    return null
-}
-
-data class MetadataResult(
-    val source: String,
-    val sourceId: String,
+data class MediaMetadata(
     val title: String,
+    val type: MediaType,
     val posterUrl: String,
+    val totalEp: Int,
+    val seasonCount: Int?,
+    val seasonNumber: Int?,
+    val rating5: Int,
     val description: String,
     val tags: List<String>,
-    val seasonEpisodeCounts: List<Int>,
-    val streamCandidates: List<StreamCandidate>,
-    val year: String = "",
-    val type: MediaType = MediaType.Series,
-    /** Season number per entry in [seasonEpisodeCounts] (parallel list). Empty = [1]. */
-    val seasonNumbers: List<Int> = emptyList(),
-    /** Epoch millis of the first air time when the source exposes it (e.g. AniList `airingAt`). */
-    val releaseAt: Long? = null,
-    /** Source says the title has not aired yet (e.g. AniList status NOT_YET_RELEASED). */
-    val upcoming: Boolean = false
+    val streamUrl: String,
+    val releaseDate: Long?,
+    val source: String,
+    val sourceId: String,
 )
 
-class MetadataRepository {
+object MetadataRepository {
+    private val seasonRegexes = listOf(
+        Regex("""\bS(\d{1,2})\b""", RegexOption.IGNORE_CASE),
+        Regex("""\bSeason\s+(\d{1,2})\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(\d{1,2})(?:st|nd|rd|th)\s+Season\b""", RegexOption.IGNORE_CASE),
+        Regex("""\bPart\s+(\d{1,2})\b""", RegexOption.IGNORE_CASE),
+    )
 
-    suspend fun search(query: String, tmdbKey: String? = null, omdbKey: String? = null, region: String = "ID"): Result<List<MetadataResult>> =
-        withContext(Dispatchers.IO) {
-            val trimmed = query.trim()
-            if (trimmed.isBlank()) return@withContext Result.failure(IllegalArgumentException("blank query"))
-            val results = mutableListOf<MetadataResult>()
-            val anilist = runCatching { searchAniList(trimmed) }
-            anilist.getOrNull()?.let { results.addAll(it) }
-            // TVMaze: free, no key. Best source of precise next-episode airtimes
-            // for Western TV, so it sits between AniList and TMDB.
-            val tvmaze = runCatching { searchTVMaze(trimmed) }
-            tvmaze.getOrNull()?.let { results.addAll(it) }
-            if (!tmdbKey.isNullOrBlank()) {
-                val tmdb = runCatching { searchTmdb(trimmed, tmdbKey.trim(), region) }
-                tmdb.getOrNull()?.let { results.addAll(it) }
-            }
-            // OMDb: optional key (free 1000/day at omdbapi.com). IMDb-backed
-            // movies & series; sits last so AniList/TVMaze/TMDB win ties.
-            if (!omdbKey.isNullOrBlank()) {
-                val omdb = runCatching { searchOmdb(trimmed, omdbKey.trim()) }
-                omdb.getOrNull()?.let { results.addAll(it) }
-            }
-            if (results.isEmpty()) {
-                Result.failure(IllegalStateException("No results"))
-            } else Result.success(results)
+    fun parseSeasonNumberFromText(title: String): Int? {
+        for (rx in seasonRegexes) {
+            val match = rx.find(title) ?: continue
+            val n = match.groupValues.getOrNull(1)?.toIntOrNull() ?: continue
+            if (n in 1..30) return n
         }
-
-    private fun searchAniList(query: String): List<MetadataResult> {
-        val body = JSONObject().apply {
-            put("query", """
-                query (${'$'}search: String) {
-                  Media(search: ${'$'}search, type: ANIME) {
-                    id title { english romaji }
-                    coverImage { large } description genres episodes format
-                    status
-                    startDate { year month day }
-                    nextAiringEpisode { airingAt episode }
-                    externalLinks { url site type }
-                  }
-                }
-            """.trimIndent())
-            put("variables", JSONObject().put("search", query))
-        }
-        val json = postJson("https://graphql.anilist.co", body)
-        val media = json.optJSONObject("data")?.optJSONObject("Media") ?: return emptyList()
-        val titleObj = media.optJSONObject("title")
-        val title = titleObj?.optString("english")?.takeIf { it.isNotBlank() }
-            ?: titleObj?.optString("romaji") ?: ""
-        val poster = media.optJSONObject("coverImage")?.optString("large") ?: ""
-        val descRaw = media.optString("description")
-        val desc = stripHtml(descRaw)
-        val tags = mutableListOf<String>()
-        val genres = media.optJSONArray("genres")
-        if (genres != null) for (i in 0 until genres.length()) tags.add(genres.optString(i))
-        val total = media.optInt("episodes", 0)
-        val isMovie = media.optString("format").equals("MOVIE", ignoreCase = true)
-        val mediaType = if (isMovie) MediaType.Movie else MediaType.Series
-        // AniList models each season as its own entry ("…Season 4"). Its `season`
-        // field is the release season (WINTER/SPRING…), not the sequel number,
-        // so the number comes from the entry's title (then the search query).
-        val detectedSeason = if (isMovie) null
-            else parseSeasonNumberFromText(title) ?: parseSeasonNumberFromText(query)
-        val seasons = when {
-            isMovie -> listOf(1)
-            total > 0 -> listOf(total)
-            else -> emptyList()
-        }
-        val seasonNumbers = when {
-            isMovie -> listOf(1)
-            seasons.isNotEmpty() -> listOf(detectedSeason ?: 1)
-            else -> emptyList()
-        }
-        val streams = mutableListOf<StreamCandidate>()
-        val links = media.optJSONArray("externalLinks")
-        if (links != null) for (i in 0 until links.length()) {
-            val link = links.optJSONObject(i) ?: continue
-            val site = link.optString("site")
-            val url = link.optString("url")
-            // AniList ExternalLinkType: INFO | STREAMING | SOCIAL.
-            // Only STREAMING links are playback candidates — INFO (wiki/official sites)
-            // or SOCIAL links must not become the item's streamUrl via applyFetch.
-            val linkType = link.optString("type")
-            if (!linkType.equals("STREAMING", ignoreCase = true)) continue
-            if (url.isNotBlank()) streams.add(StreamCandidate(site.ifBlank { "Official" }, url))
-        }
-        val year = media.optJSONObject("startDate")?.optInt("year", 0)?.takeIf { it > 0 }?.toString() ?: ""
-        // AniList knows the real schedule: `nextAiringEpisode.airingAt` is the exact
-        // epoch timestamp of the upcoming episode (episode 1 for a not-yet-released
-        // title). Only use it for unreleased entries — once a show is airing it points
-        // at a later episode, not at its release date.
-        val sourceStatus = media.optString("status")
-        val upcoming = sourceStatus.equals("NOT_YET_RELEASED", ignoreCase = true)
-        val nextAirAt = media.optJSONObject("nextAiringEpisode")
-            ?.optLong("airingAt", 0L)
-            ?.takeIf { it > 0L }
-            ?.times(1000L)
-        val startAt = startDateMillis(media.optJSONObject("startDate"))
-        val releaseAt = if (upcoming) nextAirAt ?: startAt else null
-        return listOf(
-            MetadataResult(
-                source = "AniList",
-                sourceId = media.optString("id"),
-                title = title,
-                posterUrl = poster,
-                description = desc,
-                tags = tags,
-                seasonEpisodeCounts = seasons,
-                streamCandidates = streams,
-                year = year,
-                type = mediaType,
-                seasonNumbers = seasonNumbers,
-                releaseAt = releaseAt,
-                upcoming = upcoming
-            )
-        )
+        return null
     }
 
-    private fun startDateMillis(date: JSONObject?): Long? {
-        if (date == null) return null
-        val year = date.optInt("year", 0)
-        val month = date.optInt("month", 0)
-        val day = date.optInt("day", 0)
-        if (year <= 0 || month !in 1..12 || day !in 1..31) return null
-        return runCatching {
-            java.time.LocalDate.of(year, month, day)
-                .atStartOfDay(java.time.ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli()
-        }.getOrNull()
+    suspend fun searchAll(
+        query: String,
+        tmdbKey: String,
+        omdbKey: String,
+    ): List<MediaMetadata> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.isEmpty()) return@withContext emptyList()
+        val out = ArrayList<MediaMetadata>()
+        runCatching { out.addAll(searchAniList(q)) }.onFailure { AppLogger.e("Metadata", "AniList search failed", it) }
+        runCatching { out.addAll(searchTvMaze(q)) }.onFailure { AppLogger.e("Metadata", "TVmaze search failed", it) }
+        if (tmdbKey.isNotBlank()) runCatching { out.addAll(searchTmdb(q, tmdbKey)) }.onFailure { AppLogger.e("Metadata", "TMDB search failed", it) }
+        if (omdbKey.isNotBlank()) runCatching { out.addAll(searchOmdb(q, omdbKey)) }.onFailure { AppLogger.e("Metadata", "OMDb search failed", it) }
+        out
     }
 
-    private fun parseIsoDateMillis(text: String?): Long? {
-        val raw = text?.trim().orEmpty()
-        if (raw.length < 10) return null
-        return runCatching {
-            java.time.LocalDate.parse(raw.substring(0, 10))
-                .atStartOfDay(java.time.ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli()
-        }.getOrNull()
-    }
-
-    /**
-     * TVMaze search (free, no key): GET /search/shows?q=...
-     * For each hit we fetch /shows/{id}/episodes once to derive
-     * (a) real season/episode counts and (b) the next future airstamp —
-     * the countdown source for Coming Soon when AniList/TMDB dates are coarse.
-     */
-    private fun searchTVMaze(query: String): List<MetadataResult> {
-        val encoded = URLEncoder.encode(query, "UTF-8")
-        val array = getJsonArray("https://api.tvmaze.com/search/shows?q=$encoded")
-        val list = mutableListOf<MetadataResult>()
-        for (i in 0 until minOf(3, array.length())) {
-            val entry = array.optJSONObject(i) ?: continue
-            val show = entry.optJSONObject("show") ?: entry
-            val id = show.optString("id")
-            if (id.isBlank()) continue
-            val title = show.optString("name")
-            if (title.isBlank()) continue
-            val image = show.optJSONObject("image")
-            val poster = image?.optString("original")
-                ?: image?.optString("medium") ?: ""
-            val description = stripHtml(show.optString("summary"))
-            val tags = mutableListOf<String>()
-            val genres = show.optJSONArray("genres")
-            if (genres != null) {
-                for (g in 0 until genres.length()) {
-                    genres.optString(g).trim().takeIf { it.isNotEmpty() }?.let { tags.add(it) }
-                }
-            }
-            val status = show.optString("status")
-            val premiered = show.optString("premiered")
-            val year = if (premiered.length >= 4) premiered.take(4) else ""
-
-            // Episodes give both season structure and the next airtime.
-            val (seasonCounts, nextAir) = fetchTvmazeEpisodes(id)
-            val seasonEpisodeCounts = if (seasonCounts.isEmpty()) listOf(1) else seasonCounts.map { it.second }
-            val seasonNumbers = if (seasonCounts.isEmpty()) listOf(1) else seasonCounts.map { it.first }
-            val upcoming = status.equals("Running", ignoreCase = true) &&
-                nextAir != null && nextAir > System.currentTimeMillis()
-
-            list.add(
-                MetadataResult(
-                    source = "TVMaze",
-                    sourceId = id,
-                    title = title,
-                    posterUrl = poster,
-                    description = description,
-                    tags = tags,
-                    seasonEpisodeCounts = seasonEpisodeCounts,
-                    streamCandidates = emptyList(),
-                    year = year,
-                    type = MediaType.Series,
-                    seasonNumbers = seasonNumbers,
-                    releaseAt = nextAir,
-                    upcoming = upcoming
-                )
-            )
-        }
-        return list
-    }
-
-    /** Returns ((season, episodeCount) sorted, next future airstamp millis or null). */
-    private fun fetchTvmazeEpisodes(showId: String): Pair<List<Pair<Int, Int>>, Long?> {
-        return try {
-            val arr = getJsonArray("https://api.tvmaze.com/shows/$showId/episodes")
-            val bySeason = mutableMapOf<Int, Int>()
-            var nextAir: Long? = null
-            val now = System.currentTimeMillis()
-            for (i in 0 until arr.length()) {
-                val ep = arr.optJSONObject(i) ?: continue
-                val season = ep.optInt("season", 0)
-                // season 0 = specials; skip so Pick Folder targets regular seasons.
-                if (season > 0) bySeason[season] = (bySeason[season] ?: 0) + 1
-                val airstamp = ep.optString("airstamp")
-                if (airstamp.isNotBlank()) {
-                    val air = parseAirstampMillis(airstamp)
-                    if (air != null && air > now && (nextAir == null || air < nextAir)) nextAir = air
-                }
-            }
-            Pair(bySeason.toList().sortedBy { it.first }, nextAir)
-        } catch (_: Exception) {
-            Pair(emptyList(), null)
-        }
-    }
-
-    /** TVMaze airstamp is ISO-8601 with offset, e.g. 2027-01-17T15:00:00+00:00. */
-    private fun parseAirstampMillis(text: String): Long? {
-        return runCatching {
-            java.time.OffsetDateTime.parse(text.trim()).toInstant().toEpochMilli()
-        }.getOrNull()
-    }
-
-    private fun searchTmdb(query: String, key: String, region: String): List<MetadataResult> {
-        val encoded = URLEncoder.encode(query, "UTF-8")
-        val list = mutableListOf<MetadataResult>()
-        // search movie
-        val movieJson = getJson("https://api.themoviedb.org/3/search/movie?api_key=${URLEncoder.encode(key, "UTF-8")}&query=$encoded&include_adult=false")
-        movieJson.optJSONArray("results")?.let { arr ->
-            for (i in 0 until minOf(5, arr.length())) {
-                val item = arr.optJSONObject(i) ?: continue
-                val id = item.optString("id")
-                val title = item.optString("title") ?: item.optString("original_title") ?: ""
-                val posterPath = item.optString("poster_path")
-                val poster = if (posterPath.isNotBlank()) "https://image.tmdb.org/t/p/w500$posterPath" else ""
-                val desc = item.optString("overview")
-                val tags = mutableListOf<String>()
-                // TMDB search does not include genre names, only ids — skip.
-                val releaseAt = parseIsoDateMillis(item.optString("release_date"))
-                val year = (item.optString("release_date").take(4))
-                val providers = fetchTmdbProviders(key, "movie", id, region)
-                list.add(
-                    MetadataResult(
-                        source = "TMDB",
-                        sourceId = id,
-                        title = title,
-                        posterUrl = poster,
-                        description = desc,
-                        tags = tags,
-                        seasonEpisodeCounts = listOf(1),
-                        streamCandidates = providers,
-                        year = year,
-                        type = MediaType.Movie,
-                        seasonNumbers = listOf(1),
-                        releaseAt = releaseAt,
-                        upcoming = releaseAt != null && releaseAt > System.currentTimeMillis()
-                    )
-                )
-            }
-        }
-        // search tv
-        val tvJson = getJson("https://api.themoviedb.org/3/search/tv?api_key=${URLEncoder.encode(key, "UTF-8")}&query=$encoded&include_adult=false")
-        tvJson.optJSONArray("results")?.let { arr ->
-            for (i in 0 until minOf(5, arr.length())) {
-                val item = arr.optJSONObject(i) ?: continue
-                val id = item.optString("id")
-                val title = item.optString("name") ?: item.optString("original_name") ?: ""
-                val posterPath = item.optString("poster_path")
-                val poster = if (posterPath.isNotBlank()) "https://image.tmdb.org/t/p/w500$posterPath" else ""
-                val desc = item.optString("overview")
-                val firstAir = item.optString("first_air_date")
-                val releaseAt = parseIsoDateMillis(firstAir)
-                val year = (firstAir.take(4))
-                // episode count requires detail call — keep (season_number, episode_count)
-                val allSeasons = fetchTmdbSeasons(key, id)
-                // TMDB returns the whole show; if the query/title names one season
-                // ("re:zero season 4") expose only that season so Pick Folder lands on it.
-                val wantedSeason = parseSeasonNumberFromText(title)
-                    ?: parseSeasonNumberFromText(query)
-                val pickedSeasons = if (wantedSeason != null && allSeasons.any { it.first == wantedSeason }) {
-                    allSeasons.filter { it.first == wantedSeason }
-                } else allSeasons
-                val providers = fetchTmdbProviders(key, "tv", id, region)
-                list.add(
-                    MetadataResult(
-                        source = "TMDB",
-                        sourceId = id,
-                        title = title,
-                        posterUrl = poster,
-                        description = desc,
-                        tags = emptyList(),
-                        seasonEpisodeCounts = pickedSeasons.map { it.second },
-                        streamCandidates = providers,
-                        year = year,
-                        type = MediaType.Series,
-                        seasonNumbers = pickedSeasons.map { it.first },
-                        releaseAt = releaseAt,
-                        upcoming = releaseAt != null && releaseAt > System.currentTimeMillis()
-                    )
-                )
-            }
-        }
-        return list
-    }
-
-    /**
-     * OMDb search (optional key, free 1000/day): GET ?s=query then a detail
-     * call (?i=imdbID&plot=short) per hit to fill plot/genres.
-     * Season counts are only prefilled for single-season series; multi-season
-     * counts are left empty so the user edits totals (OMDb has no season
-     * list endpoint — counting each season would need one call per season).
-     */
-    private fun searchOmdb(query: String, key: String): List<MetadataResult> {
-        val encoded = URLEncoder.encode(query, "UTF-8")
-        val encodedKey = URLEncoder.encode(key, "UTF-8")
-        val searchJson = getJson("https://www.omdbapi.com/?apikey=$encodedKey&s=$encoded")
-        if (!searchJson.optString("Response").equals("True", ignoreCase = true)) return emptyList()
-        val searchArr = searchJson.optJSONArray("Search") ?: return emptyList()
-        val list = mutableListOf<MetadataResult>()
-        for (i in 0 until minOf(5, searchArr.length())) {
-            val item = searchArr.optJSONObject(i) ?: continue
-            val imdbId = item.optString("imdbID").trim()
-            if (imdbId.isBlank()) continue
-            val detail = runCatching {
-                getJson("https://www.omdbapi.com/?apikey=$encodedKey&i=${URLEncoder.encode(imdbId, "UTF-8")}&plot=short")
-            }.getOrNull() ?: continue
-            if (!detail.optString("Response").equals("True", ignoreCase = true)) continue
-
-            val title = detail.optString("Title").ifBlank { item.optString("Title") }
-            if (title.isBlank()) continue
-            val typeStr = detail.optString("Type").ifBlank { item.optString("Type") }
-            val mediaType = if (typeStr.equals("movie", ignoreCase = true)) MediaType.Movie else MediaType.Series
-            val yearRaw = detail.optString("Year").ifBlank { item.optString("Year") }
-            val year = yearRaw.take(4).takeIf { it.all(Char::isDigit) } ?: ""
-            val posterRaw = detail.optString("Poster").ifBlank { item.optString("Poster") }
-            val poster = if (posterRaw.equals("N/A", ignoreCase = true)) "" else posterRaw
-            val description = detail.optString("Plot").takeUnless { it.equals("N/A", ignoreCase = true) } ?: ""
-            val genreRaw = detail.optString("Genre")
-            val tags = if (genreRaw.equals("N/A", ignoreCase = true)) emptyList()
-                else genreRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() && !it.equals("N/A", ignoreCase = true) }
-            val releaseAt = parseOmdbDateMillis(detail.optString("Released"))
-            val upcoming = releaseAt != null && releaseAt > System.currentTimeMillis()
-
-            val (counts, numbers) = when {
-                mediaType == MediaType.Movie -> Pair(listOf(1), listOf(1))
-                else -> {
-                    val totalSeasons = detail.optString("totalSeasons").toIntOrNull()
-                    if (totalSeasons == 1) {
-                        val count = fetchOmdbSeasonEpisodeCount(encodedKey, imdbId, 1)
-                        if (count != null) Pair(listOf(count), listOf(1)) else Pair(listOf(1), listOf(1))
-                    } else Pair(emptyList(), emptyList())
-                }
-            }
-
-            list.add(
-                MetadataResult(
-                    source = "OMDb",
-                    sourceId = imdbId,
-                    title = title,
-                    posterUrl = poster,
-                    description = description,
-                    tags = tags,
-                    seasonEpisodeCounts = counts,
-                    streamCandidates = emptyList(),
-                    year = year,
-                    type = mediaType,
-                    seasonNumbers = numbers,
-                    releaseAt = releaseAt,
-                    upcoming = upcoming
-                )
-            )
-        }
-        return list
-    }
-
-    /** Episode count of one season via ?i=&Season=n (Episodes array length), or null. */
-    private fun fetchOmdbSeasonEpisodeCount(encodedKey: String, imdbId: String, season: Int): Int? {
-        return runCatching {
-            val json = getJson("https://www.omdbapi.com/?apikey=$encodedKey&i=${URLEncoder.encode(imdbId, "UTF-8")}&Season=$season")
-            if (!json.optString("Response").equals("True", ignoreCase = true)) return@runCatching null
-            json.optJSONArray("Episodes")?.length()?.takeIf { it > 0 }
-        }.getOrNull()
-    }
-
-    /** OMDb Released looks like "24 Sep 2008" (English names, arbitrary day padding). */
-    private fun parseOmdbDateMillis(text: String?): Long? {
-        val raw = text?.trim().orEmpty()
-        if (raw.isBlank() || raw.equals("N/A", ignoreCase = true)) return null
-        return runCatching {
-            java.time.LocalDate.parse(
-                raw,
-                java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH)
-            ).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        }.getOrNull()
-    }
-
-    /** (season_number, episode_count) pairs, e.g. (4, 19) for Season 4. */
-    private fun fetchTmdbSeasons(key: String, tvId: String): List<Pair<Int, Int>> {
-        return try {
-            val detail = getJson("https://api.themoviedb.org/3/tv/${URLEncoder.encode(tvId, "UTF-8")}?api_key=${URLEncoder.encode(key, "UTF-8")}")
-            val seasonsArr = detail.optJSONArray("seasons") ?: return emptyList()
-            val out = mutableListOf<Pair<Int, Int>>()
-            for (i in 0 until seasonsArr.length()) {
-                val s = seasonsArr.optJSONObject(i) ?: continue
-                val seasonNumber = s.optInt("season_number", 0)
-                if (seasonNumber <= 0) continue
-                val epCount = s.optInt("episode_count", 0)
-                if (epCount > 0) out.add(seasonNumber to epCount)
-            }
-            out.sortedBy { it.first }
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
-
-    private fun fetchTmdbProviders(key: String, type: String, id: String, region: String): List<StreamCandidate> {
-        return try {
-            val json = getJson(
-                "https://api.themoviedb.org/3/$type/${URLEncoder.encode(id, "UTF-8")}/watch/providers?api_key=${URLEncoder.encode(key, "UTF-8")}&region=${URLEncoder.encode(region, "UTF-8")}"
-            )
-            val results = json.optJSONObject("results") ?: return emptyList()
-            val regionObj = results.optJSONObject(region.uppercase())
-                ?: results.optJSONObject(region) ?: return emptyList()
-            val flat = regionObj.optJSONArray("flatrate") ?: JSONArray()
-            val out = mutableListOf<StreamCandidate>()
-            val fallbackUrl = "https://www.themoviedb.org/$type/$id"
-            for (i in 0 until flat.length()) {
-                val p = flat.optJSONObject(i) ?: continue
-                val name = p.optString("provider_name")
-                // TMDB flatrate has no direct watch URL; point to TMDB title page where providers are listed.
-                val url = p.optString("link").ifBlank { fallbackUrl }
-                if (name.isNotBlank() && url.isNotBlank()) out.add(StreamCandidate(name, url))
-            }
-            out
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
-
-    private fun getJson(urlStr: String): JSONObject {
-        val conn = URL(urlStr).openConnection() as HttpURLConnection
-        conn.requestMethod = "GET"
-        conn.connectTimeout = 15000
-        conn.readTimeout = 15000
-        val code = conn.responseCode
-        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        conn.disconnect()
-        if (code !in 200..299) throw IllegalStateException("HTTP $code: $text")
-        return JSONObject(text)
-    }
-
-    private fun getJsonArray(urlStr: String): JSONArray {
-        val conn = URL(urlStr).openConnection() as HttpURLConnection
-        conn.requestMethod = "GET"
-        conn.connectTimeout = 15000
-        conn.readTimeout = 15000
-        val code = conn.responseCode
-        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        conn.disconnect()
-        if (code !in 200..299) throw IllegalStateException("HTTP $code: $text")
-        return JSONArray(text)
-    }
-
-    private fun postJson(urlStr: String, body: JSONObject): JSONObject {
-        val conn = URL(urlStr).openConnection() as HttpURLConnection
-        conn.requestMethod = "POST"
-        conn.connectTimeout = 15000
-        conn.readTimeout = 15000
-        conn.doOutput = true
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-        conn.setRequestProperty("Accept", "application/json")
-        conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-        val code = conn.responseCode
-        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        conn.disconnect()
-        if (code !in 200..299) throw IllegalStateException("HTTP $code: $text")
-        return JSONObject(text)
-    }
-
-    private fun stripHtml(html: String): String {
-        if (html.isBlank()) return ""
-        return html
-            .replace(Regex("<[^>]*>"), "")
+    private fun stripHtml(s: String): String =
+        s.replace(Regex("<[^>]*>"), " ")
             .replace("&amp;", "&")
             .replace("&lt;", "<")
             .replace("&gt;", ">")
             .replace("&quot;", "\"")
-            .replace("&#039;", "'")
+            .replace("&#39;", "'")
+            .replace(Regex("\\s+"), " ")
             .trim()
+
+    private fun searchAniList(query: String): List<MediaMetadata> {
+        val gql = """
+            query (${'$'}search: String) {
+              Page(perPage: 5) {
+                media(search: ${'$'}search, type: ANIME, sort: POPULARITY_DESC) {
+                  id format episodes averageScore description(asHtml: false) genres
+                  title { romaji english native }
+                  coverImage { extraLarge large }
+                  nextAiringEpisode { airingAt }
+                }
+              }
+            }
+        """.trimIndent()
+        val payload = JSONObject().apply {
+            put("query", gql)
+            put("variables", JSONObject().put("search", query))
+        }.toString()
+        val conn = (URL("https://graphql.anilist.co").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 10_000
+            readTimeout = 10_000
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "application/json")
+            doOutput = true
+        }
+        conn.outputStream.use { it.write(payload.toByteArray()) }
+        if (conn.responseCode !in 200..299) return emptyList()
+        val body = conn.inputStream.bufferedReader().use { it.readText() }
+        val mediaArr = JSONObject(body)
+            .optJSONObject("data")
+            ?.optJSONObject("Page")
+            ?.optJSONArray("media") ?: return emptyList()
+        val out = ArrayList<MediaMetadata>()
+        for (i in 0 until mediaArr.length()) {
+            val m = mediaArr.optJSONObject(i) ?: continue
+            val tObj = m.optJSONObject("title")
+            val title = listOf("english", "romaji", "native")
+                .firstNotNullOfOrNull { k -> tObj?.optString(k)?.takeIf { it.isNotBlank() && it != "null" } }
+                ?: query
+            val format = m.optString("format", "")
+            val type = if (format == "MOVIE") MediaType.Movie else MediaType.Series
+            val cover = m.optJSONObject("coverImage")
+            val poster = cover?.optString("extraLarge")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: cover?.optString("large")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: ""
+            val eps = m.optInt("episodes", 1).coerceAtLeast(1)
+            val score = m.optInt("averageScore", 0)
+            val rating5 = if (score > 0) (score / 20f).roundToInt().coerceIn(1, 5) else 0
+            val gArr = m.optJSONArray("genres") ?: JSONArray()
+            val tags = (0 until minOf(4, gArr.length())).mapNotNull { gArr.optString(it).takeIf { s -> s.isNotBlank() } }
+            val nextAir = m.optJSONObject("nextAiringEpisode")?.optLong("airingAt", 0L) ?: 0L
+            out.add(
+                MediaMetadata(
+                    title = title,
+                    type = type,
+                    posterUrl = poster,
+                    totalEp = if (type == MediaType.Movie) 1 else eps,
+                    seasonCount = if (type == MediaType.Series) 1 else null,
+                    seasonNumber = if (type == MediaType.Series) parseSeasonNumberFromText(title) else null,
+                    rating5 = rating5,
+                    description = stripHtml(m.optString("description", "")),
+                    tags = tags,
+                    streamUrl = "https://anilist.co/anime/${m.optInt("id")}",
+                    releaseDate = if (nextAir > 0L) nextAir * 1000L else null,
+                    source = "anilist",
+                    sourceId = m.optInt("id").toString(),
+                )
+            )
+        }
+        return out
+    }
+
+    private fun getUrl(urlStr: String): String? {
+        val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 10_000
+        }
+        if (conn.responseCode !in 200..299) return null
+        return conn.inputStream.bufferedReader().use { it.readText() }
+    }
+
+    private fun searchTvMaze(query: String): List<MediaMetadata> {
+        val enc = URLEncoder.encode(query, "UTF-8")
+        val body = getUrl("https://api.tvmaze.com/search/shows?q=$enc") ?: return emptyList()
+        val arr = JSONArray(body)
+        val out = ArrayList<MediaMetadata>()
+        val now = System.currentTimeMillis()
+        for (i in 0 until minOf(4, arr.length())) {
+            val show = arr.optJSONObject(i)?.optJSONObject("show") ?: continue
+            val id = show.optInt("id")
+            val title = show.optString("name", query)
+            val img = show.optJSONObject("image")
+            val poster = img?.optString("original")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: img?.optString("medium")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: ""
+            val avg = show.optJSONObject("rating")?.optDouble("average", 0.0) ?: 0.0
+            val rating5 = if (!avg.isNaN() && avg > 0.0) (avg / 2.0).roundToInt().coerceIn(1, 5) else 0
+            val gArr = show.optJSONArray("genres") ?: JSONArray()
+            val tags = (0 until minOf(4, gArr.length())).mapNotNull { gArr.optString(it).takeIf { s -> s.isNotBlank() } }
+
+            var totalEp = 12
+            var seasonsCount = 1
+            var nextRelease: Long? = null
+            runCatching {
+                val epBody = getUrl("https://api.tvmaze.com/shows/$id/episodes")
+                if (epBody != null) {
+                    val eps = JSONArray(epBody)
+                    if (eps.length() > 0) {
+                        totalEp = eps.length()
+                        val sSet = HashSet<Int>()
+                        val upcoming = ArrayList<Long>()
+                        for (j in 0 until eps.length()) {
+                            val ep = eps.optJSONObject(j) ?: continue
+                            sSet.add(ep.optInt("season", 1))
+                            val air = ep.optString("airstamp", "")
+                            if (air.isNotBlank()) {
+                                runCatching { Instant.parse(air).toEpochMilli() }.getOrNull()?.let { ms ->
+                                    if (ms > now) upcoming.add(ms)
+                                }
+                            }
+                        }
+                        seasonsCount = sSet.size.coerceAtLeast(1)
+                        nextRelease = upcoming.minOrNull()
+                    }
+                }
+            }
+
+            out.add(
+                MediaMetadata(
+                    title = title,
+                    type = MediaType.Series,
+                    posterUrl = poster,
+                    totalEp = totalEp,
+                    seasonCount = seasonsCount,
+                    seasonNumber = parseSeasonNumberFromText(title),
+                    rating5 = rating5,
+                    description = stripHtml(show.optString("summary", "")),
+                    tags = tags,
+                    streamUrl = show.optString("officialSite", "").ifBlank { show.optString("url", "") },
+                    releaseDate = nextRelease,
+                    source = "tvmaze",
+                    sourceId = id.toString(),
+                )
+            )
+        }
+        return out
+    }
+
+    private fun parseDateMs(iso: String): Long? {
+        if (iso.isBlank() || iso == "null") return null
+        return runCatching {
+            LocalDate.parse(iso.take(10)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        }.getOrNull()
+    }
+
+    private fun searchTmdb(query: String, apiKey: String): List<MediaMetadata> {
+        val encQ = URLEncoder.encode(query, "UTF-8")
+        val encK = URLEncoder.encode(apiKey, "UTF-8")
+        val body = getUrl("https://api.themoviedb.org/3/search/multi?api_key=$encK&query=$encQ&include_adult=false")
+            ?: return emptyList()
+        val arr = JSONObject(body).optJSONArray("results") ?: return emptyList()
+        val out = ArrayList<MediaMetadata>()
+        val now = System.currentTimeMillis()
+        for (i in 0 until minOf(4, arr.length())) {
+            val item = arr.optJSONObject(i) ?: continue
+            val mType = item.optString("media_type", "")
+            if (mType != "movie" && mType != "tv") continue
+            val isMovie = mType == "movie"
+            val id = item.optInt("id")
+            val title = item.optString("title").ifBlank { item.optString("name", query) }
+            val pPath = item.optString("poster_path", "")
+            val poster = if (pPath.isNotBlank() && pPath != "null") "https://image.tmdb.org/t/p/w500$pPath" else ""
+            val vote = item.optDouble("vote_average", 0.0)
+            val rating5 = if (!vote.isNaN() && vote > 0.0) (vote / 2.0).roundToInt().coerceIn(1, 5) else 0
+            var totalEp = 1
+            var seasonCount: Int? = null
+            var tags: List<String> = emptyList()
+            var streamUrl = "https://www.themoviedb.org/$mType/$id"
+            var release = parseDateMs(item.optString("release_date").ifBlank { item.optString("first_air_date") })
+
+            runCatching {
+                val detBody = getUrl("https://api.themoviedb.org/3/$mType/$id?api_key=$encK&append_to_response=watch/providers")
+                if (detBody != null) {
+                    val det = JSONObject(detBody)
+                    val gArr = det.optJSONArray("genres")
+                    if (gArr != null) {
+                        tags = (0 until minOf(4, gArr.length())).mapNotNull {
+                            gArr.optJSONObject(it)?.optString("name")?.takeIf { n -> n.isNotBlank() }
+                        }
+                    }
+                    if (!isMovie) {
+                        totalEp = det.optInt("number_of_episodes", 1).coerceAtLeast(1)
+                        seasonCount = det.optInt("number_of_seasons", 1).coerceAtLeast(1)
+                        det.optJSONObject("next_episode_to_air")?.optString("air_date")?.let { air ->
+                            parseDateMs(air)?.let { release = it }
+                        }
+                    }
+                    val prov = det.optJSONObject("watch/providers")?.optJSONObject("results")
+                    val link = prov?.optJSONObject("ID")?.optString("link")?.takeIf { it.isNotBlank() }
+                        ?: prov?.optJSONObject("US")?.optString("link")?.takeIf { it.isNotBlank() }
+                    if (link != null) streamUrl = link
+                }
+            }
+
+            out.add(
+                MediaMetadata(
+                    title = title,
+                    type = if (isMovie) MediaType.Movie else MediaType.Series,
+                    posterUrl = poster,
+                    totalEp = totalEp,
+                    seasonCount = seasonCount,
+                    seasonNumber = if (isMovie) null else parseSeasonNumberFromText(title),
+                    rating5 = rating5,
+                    description = item.optString("overview", "").trim(),
+                    tags = tags,
+                    streamUrl = streamUrl,
+                    releaseDate = release?.takeIf { it > now },
+                    source = "tmdb",
+                    sourceId = id.toString(),
+                )
+            )
+        }
+        return out
+    }
+
+    private fun searchOmdb(query: String, apiKey: String): List<MediaMetadata> {
+        val encQ = URLEncoder.encode(query, "UTF-8")
+        val encK = URLEncoder.encode(apiKey, "UTF-8")
+        val body = getUrl("https://www.omdbapi.com/?apikey=$encK&s=$encQ") ?: return emptyList()
+        val obj = JSONObject(body)
+        if (obj.optString("Response") != "True") return emptyList()
+        val arr = obj.optJSONArray("Search") ?: return emptyList()
+        val out = ArrayList<MediaMetadata>()
+        for (i in 0 until minOf(3, arr.length())) {
+            val entry = arr.optJSONObject(i) ?: continue
+            val imdbId = entry.optString("imdbID", "")
+            if (imdbId.isBlank()) continue
+            val detBody = getUrl("https://www.omdbapi.com/?apikey=$encK&i=$imdbId&plot=short") ?: continue
+            val d = JSONObject(detBody)
+            if (d.optString("Response") != "True") continue
+            val isMovie = d.optString("Type") == "movie"
+            val type = if (isMovie) MediaType.Movie else MediaType.Series
+            val title = d.optString("Title", entry.optString("Title", query))
+            val imdbRating = d.optString("imdbRating", "").toDoubleOrNull() ?: 0.0
+            val rating5 = if (imdbRating > 0.0) (imdbRating / 2.0).roundToInt().coerceIn(1, 5) else 0
+            val tags = d.optString("Genre", "")
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && it != "N/A" }
+                .take(4)
+            val poster = d.optString("Poster", "").takeIf { it != "N/A" } ?: ""
+            val seasons = if (isMovie) null else d.optString("totalSeasons", "1").toIntOrNull()?.coerceAtLeast(1) ?: 1
+            out.add(
+                MediaMetadata(
+                    title = title,
+                    type = type,
+                    posterUrl = poster,
+                    totalEp = if (isMovie) 1 else (seasons ?: 1) * 10,
+                    seasonCount = seasons,
+                    seasonNumber = if (isMovie) null else parseSeasonNumberFromText(title),
+                    rating5 = rating5,
+                    description = d.optString("Plot", "").takeIf { it != "N/A" } ?: "",
+                    tags = tags,
+                    streamUrl = "https://www.imdb.com/title/$imdbId/",
+                    releaseDate = null,
+                    source = "omdb",
+                    sourceId = imdbId,
+                )
+            )
+        }
+        return out
     }
 }

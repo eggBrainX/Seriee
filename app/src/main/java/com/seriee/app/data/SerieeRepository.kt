@@ -3,421 +3,367 @@ package com.seriee.app.data
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
+import java.time.LocalDate
 
-/** Parsed contents of an export file. [history] is null when the file has no history field. */
-data class BackupPayload(
-    val items: List<MediaItem>,
-    val history: List<WatchEvent>?
+data class StreakState(
+    val streakDays: Int = 0,
+    val bestStreak: Int = 0,
+    val lastWatchDay: String? = null,
+    val watchDays: Set<String> = emptySet(),
+)
+
+data class CustomThemeConfig(
+    val accentArgb: Long = 0xFF3B82F6L,
+    val bgStartArgb: Long = 0xFF0F172AL,
+    val bgEndArgb: Long = 0xFF1E293BL,
+    val useGradient: Boolean = false,
 )
 
 class SerieeRepository(context: Context) {
-
-    private val prefs = context.applicationContext
-        .getSharedPreferences("seriee", Context.MODE_PRIVATE)
-
-    // API keys are kept in a separate preferences file that is excluded from
-    // Android Auto Backup and device-to-device transfer (see res/xml/backup_rules.xml
-    // and res/xml/data_extraction_rules.xml).
-    private val secretPrefs = context.applicationContext
-        .getSharedPreferences("seriee_secrets", Context.MODE_PRIVATE)
-
-    init {
-        migrateLegacyKeys()
-    }
-
-    /** Moves keys saved by versions <= 0.2.7 out of the backed-up prefs file. */
-    private fun migrateLegacyKeys() {
-        val legacyTmdb = prefs.getString(KEY_TMDB, null)
-        val legacyOmdb = prefs.getString(KEY_OMDB, null)
-        if (legacyTmdb == null && legacyOmdb == null) return
-        val editor = secretPrefs.edit()
-        if (legacyTmdb != null) editor.putString(KEY_TMDB, legacyTmdb)
-        if (legacyOmdb != null) editor.putString(KEY_OMDB, legacyOmdb)
-        editor.apply()
-        prefs.edit().remove(KEY_TMDB).remove(KEY_OMDB).apply()
-    }
+    private val prefs = context.getSharedPreferences("seriee", Context.MODE_PRIVATE)
+    private val secretPrefs = context.getSharedPreferences("seriee_secrets", Context.MODE_PRIVATE)
 
     fun loadItems(): List<MediaItem> {
-        val raw = prefs.getString(KEY_DATA, null)
-        if (raw == null) {
-            return emptyList()
-        }
-        return try {
-            val arr = JSONArray(raw)
-            (0 until arr.length())
-                .map { fromJson(arr.getJSONObject(it)) }
-                .distinctBy { it.id }
-        } catch (e: Exception) {
-            emptyList()
-        }
+        val raw = prefs.getString("items", null) ?: return emptyList()
+        return runCatching { parseItemsArray(JSONArray(raw)) }.getOrDefault(emptyList())
     }
 
     fun saveItems(items: List<MediaItem>) {
-        val arr = JSONArray()
-        items.forEach { arr.put(toJson(it)) }
-        prefs.edit().putString(KEY_DATA, arr.toString()).apply()
+        prefs.edit().putString("items", itemsToJsonArray(items).toString()).apply()
     }
 
-    /** Watch events, newest first. Malformed entries are skipped. */
     fun loadHistory(): List<WatchEvent> {
-        val raw = prefs.getString(KEY_HISTORY, null) ?: return emptyList()
-        return try {
-            val arr = JSONArray(raw)
-            (0 until arr.length()).mapNotNull { i ->
-                runCatching { historyFromJson(arr.getJSONObject(i)) }.getOrNull()
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
+        val raw = prefs.getString("watch_history", null) ?: return emptyList()
+        return runCatching {
+            WatchHistoryRules.trim(parseHistoryArray(JSONArray(raw)))
+        }.getOrDefault(emptyList())
     }
 
     fun saveHistory(events: List<WatchEvent>) {
-        val arr = JSONArray()
-        events.forEach { arr.put(historyToJson(it)) }
-        prefs.edit().putString(KEY_HISTORY, arr.toString()).apply()
+        val trimmed = WatchHistoryRules.trim(events)
+        prefs.edit().putString("watch_history", historyToJsonArray(trimmed).toString()).apply()
     }
 
     fun clearHistory() {
-        prefs.edit().remove(KEY_HISTORY).apply()
+        prefs.edit().putString("watch_history", "[]").apply()
     }
 
-    /**
-     * Appearance (light/dark/system). Falls back to the legacy flat theme list so
-     * users upgrading from 0.4.1 keep the look they picked.
-     */
+    fun loadStreak(): StreakState {
+        return StreakState(
+            streakDays = prefs.getInt("streak_days", 0),
+            bestStreak = prefs.getInt("best_streak", 0),
+            lastWatchDay = prefs.getString("last_watch_day", null),
+            watchDays = prefs.getStringSet("watch_days", emptySet()) ?: emptySet(),
+        )
+    }
+
+    fun recordWatchToday(today: LocalDate = LocalDate.now()): StreakState {
+        val todayStr = today.toString()
+        val yesterdayStr = today.minusDays(1).toString()
+        val cur = loadStreak()
+        val nextStreak = when {
+            cur.lastWatchDay == todayStr -> cur.streakDays.coerceAtLeast(1)
+            cur.lastWatchDay == yesterdayStr -> cur.streakDays + 1
+            else -> 1
+        }
+        val nextBest = maxOf(cur.bestStreak, nextStreak)
+        val cutoff = today.minusDays(6).toString()
+        val nextDays = (cur.watchDays + todayStr).filter { it >= cutoff }.toSet()
+        prefs.edit()
+            .putInt("streak_days", nextStreak)
+            .putInt("best_streak", nextBest)
+            .putString("last_watch_day", todayStr)
+            .putStringSet("watch_days", nextDays)
+            .apply()
+        return StreakState(nextStreak, nextBest, todayStr, nextDays)
+    }
+
+    fun resetStreak(): StreakState {
+        prefs.edit()
+            .putInt("streak_days", 0)
+            .putInt("best_streak", 0)
+            .remove("last_watch_day")
+            .putStringSet("watch_days", emptySet())
+            .apply()
+        return StreakState()
+    }
+
     fun loadThemeMode(): AppThemeMode {
-        val stored = prefs.getString(KEY_THEME_MODE, null)
-        if (stored != null) return AppThemeMode.fromName(stored)
-        val legacy = prefs.getString(KEY_THEME, null) ?: return AppThemeMode.Light
-        return LegacyThemeMap.migrate(legacy).first
+        val name = prefs.getString("theme_mode", AppThemeMode.Light.name)
+        return AppThemeMode.entries.firstOrNull { it.name == name } ?: AppThemeMode.Light
     }
 
-    /** Visual style, migrated from the legacy flat theme list when needed. */
+    fun saveThemeMode(mode: AppThemeMode) {
+        prefs.edit().putString("theme_mode", mode.name).apply()
+    }
+
     fun loadThemeStyle(): AppThemeStyle {
-        val stored = prefs.getString(KEY_THEME_STYLE, null)
-        if (stored != null) return AppThemeStyle.fromName(stored)
-        val legacy = prefs.getString(KEY_THEME, null) ?: return AppThemeStyle.NeoBrutalism
-        return LegacyThemeMap.migrate(legacy).second
+        val name = prefs.getString("theme_style", AppThemeStyle.NeoBrutalism.name)
+        return AppThemeStyle.entries.firstOrNull { it.name == name } ?: AppThemeStyle.NeoBrutalism
     }
 
-    fun saveTheme(mode: AppThemeMode, style: AppThemeStyle) {
-        prefs.edit()
-            .putString(KEY_THEME_MODE, mode.name)
-            .putString(KEY_THEME_STYLE, style.name)
-            .apply()
+    fun saveThemeStyle(style: AppThemeStyle) {
+        prefs.edit().putString("theme_style", style.name).apply()
     }
 
-    /** Custom theme accent, stored as ARGB. Defaults to the blue primary. */
-    fun loadCustomAccent(): Int = prefs.getInt(KEY_CUSTOM_ACCENT, 0xFF3B82F6.toInt())
-
-    fun saveCustomAccent(argb: Int) {
-        prefs.edit().putInt(KEY_CUSTOM_ACCENT, argb).apply()
-    }
-
-    /** Custom gradient stops, stored as ARGB. */
-    fun loadCustomBackgroundStart(): Int = prefs.getInt(KEY_CUSTOM_BG_START, 0xFF1D4ED8.toInt())
-    fun loadCustomBackgroundEnd(): Int = prefs.getInt(KEY_CUSTOM_BG_END, 0xFF7C2A64.toInt())
-
-    fun saveCustomBackground(start: Int, end: Int) {
-        prefs.edit()
-            .putInt(KEY_CUSTOM_BG_START, start)
-            .putInt(KEY_CUSTOM_BG_END, end)
-            .apply()
-    }
-
-    /** Custom theme background: true = gradient, false = solid. */
-    fun loadCustomGradient(): Boolean = prefs.getBoolean(KEY_CUSTOM_GRADIENT, false)
-
-    fun saveCustomGradient(gradient: Boolean) {
-        prefs.edit().putBoolean(KEY_CUSTOM_GRADIENT, gradient).apply()
-    }
-
-    /** Accessibility: collapse translucent glass surfaces to opaque ones. */
-    fun loadReduceTransparency(): Boolean = prefs.getBoolean(KEY_REDUCE_TRANSPARENCY, false)
-
-    fun saveReduceTransparency(value: Boolean) {
-        prefs.edit().putBoolean(KEY_REDUCE_TRANSPARENCY, value).apply()
-    }
-
-    /** Smart theme: switch the dark Classic style to AMOLED while battery saver runs. */
-    fun loadBatterySaverAmoled(): Boolean = prefs.getBoolean(KEY_BATTERY_AMOLED, false)
-
-    fun saveBatterySaverAmoled(value: Boolean) {
-        prefs.edit().putBoolean(KEY_BATTERY_AMOLED, value).apply()
-    }
-
-    fun loadGridView(): Boolean = prefs.getBoolean(KEY_GRID, true)
-
-    fun saveGridView(grid: Boolean) {
-        prefs.edit().putBoolean(KEY_GRID, grid).apply()
-    }
-
-    fun loadLanguage(): AppLanguage =
-        AppLanguage.fromTag(prefs.getString(KEY_LANG, ""))
-
-    fun saveLanguage(language: AppLanguage) {
-        prefs.edit().putString(KEY_LANG, language.tag).apply()
-    }
-
-    fun loadTmdbKey(): String = secretPrefs.getString(KEY_TMDB, "") ?: ""
-    fun saveTmdbKey(key: String) {
-        secretPrefs.edit().putString(KEY_TMDB, key.trim()).apply()
-    }
-
-    fun loadOmdbKey(): String = secretPrefs.getString(KEY_OMDB, "") ?: ""
-    fun saveOmdbKey(key: String) {
-        secretPrefs.edit().putString(KEY_OMDB, key.trim()).apply()
-    }
-
-    fun loadLastSeenVersionCode(): Int = prefs.getInt(KEY_LAST_SEEN_VERSION, 0)
-    fun saveLastSeenVersionCode(code: Int) {
-        prefs.edit().putInt(KEY_LAST_SEEN_VERSION, code).apply()
-    }
-
-    // Daily streak. lastWatchDay is ISO yyyy-MM-dd; watchDays holds the last 7 activity days.
-    fun loadStreakDays(): Int = prefs.getInt(KEY_STREAK_DAYS, 0)
-    fun loadBestStreak(): Int = prefs.getInt(KEY_BEST_STREAK, 0)
-    fun loadLastWatchDay(): String = prefs.getString(KEY_LAST_WATCH_DAY, "") ?: ""
-    fun loadWatchDays(): Set<String> =
-        (prefs.getString(KEY_WATCH_DAYS, "") ?: "")
-            .split(",").map { it.trim() }.filter { it.length == 10 }.toSet()
-
-    fun saveStreak(streakDays: Int, bestStreak: Int, lastWatchDay: String, watchDays: Set<String>) {
-        prefs.edit()
-            .putInt(KEY_STREAK_DAYS, streakDays)
-            .putInt(KEY_BEST_STREAK, bestStreak)
-            .putString(KEY_LAST_WATCH_DAY, lastWatchDay)
-            .putString(KEY_WATCH_DAYS, watchDays.sorted().joinToString(","))
-            .apply()
-    }
-
-    private fun toJson(m: MediaItem): JSONObject = JSONObject().apply {
-        put("id", m.id)
-        put("title", m.title)
-        put("type", m.type.name)
-        put("status", m.status.name)
-        put("poster", m.poster)
-        put("season", m.season)
-        put("currentEp", m.currentEp)
-        put("totalEp", m.totalEp)
-        put("pinned", m.pinned)
-        put("streamUrl", m.streamUrl)
-        put("videoPath", m.videoPath)
-        put("videoUri", m.videoUri)
-        put("releaseDate", m.releaseDate ?: -1L)
-        put("reminderEnabled", m.reminderEnabled)
-        val tagsArr = JSONArray()
-        m.tags.forEach { tagsArr.put(it) }
-        put("tags", tagsArr)
-        put("rating", m.rating)
-        put("updatedAt", m.updatedAt)
-        put("description", m.description)
-        put("source", m.source)
-        put("sourceId", m.sourceId)
-        val seasonsArr = JSONArray()
-        m.seasons.forEach { s ->
-            val sj = JSONObject()
-            sj.put("number", s.number)
-            sj.put("currentEp", s.currentEp)
-            sj.put("totalEp", s.totalEp)
-            val eps = JSONArray()
-            s.episodes.forEach { ep ->
-                val ej = JSONObject()
-                ej.put("number", ep.number)
-                ej.put("uri", ep.uri)
-                ej.put("displayName", ep.displayName)
-                eps.put(ej)
-            }
-            sj.put("episodes", eps)
-            seasonsArr.put(sj)
-        }
-        put("seasons", seasonsArr)
-    }
-
-    private fun fromJson(o: JSONObject): MediaItem {
-        val rel = o.optLong("releaseDate", -1L)
-        val tagsArr = o.optJSONArray("tags")
-        val parsedTags = if (tagsArr != null) {
-            (0 until tagsArr.length()).mapNotNull { i ->
-                tagsArr.optString(i).trim().takeIf { it.isNotEmpty() }
-            }
-        } else {
-            val tagsStr = o.optString("tags")
-            if (tagsStr.isNotBlank()) tagsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            else emptyList()
-        }
-        val parsedRating = o.optInt("rating", 0).coerceIn(0, 5)
-        val parsedSeasons: List<Season> = runCatching {
-            val arr = o.optJSONArray("seasons") ?: return@runCatching emptyList()
-            (0 until arr.length()).map { i ->
-                val sj = arr.getJSONObject(i)
-                val epsArr = sj.optJSONArray("episodes")
-                val eps = if (epsArr != null) {
-                    (0 until epsArr.length()).map { j ->
-                        val ej = epsArr.getJSONObject(j)
-                        EpisodeFile(
-                            number = ej.optInt("number", j + 1),
-                            uri = ej.optString("uri"),
-                            displayName = ej.optString("displayName")
-                        )
-                    }
-                } else emptyList()
-                Season(
-                    number = sj.optInt("number", 1),
-                    currentEp = sj.optInt("currentEp", 0),
-                    totalEp = sj.optInt("totalEp", 1),
-                    episodes = eps
-                )
-            }
-        }.getOrDefault(emptyList())
-
-        val rawId = o.optString("id").trim()
-        val safeId = rawId.ifEmpty { UUID.randomUUID().toString() }
-        val safeTotalEp = o.optInt("totalEp", 1).coerceAtLeast(1)
-        val safeCurrentEp = o.optInt("currentEp", 1).coerceAtLeast(0)
-
-        return MediaItem(
-            id = safeId,
-            title = o.optString("title"),
-            type = runCatching { MediaType.valueOf(o.optString("type")) }.getOrDefault(MediaType.Series),
-            status = runCatching { WatchStatus.valueOf(o.optString("status")) }.getOrDefault(WatchStatus.Watching),
-            poster = o.optString("poster"),
-            season = o.optInt("season", 1).coerceAtLeast(1),
-            currentEp = safeCurrentEp,
-            totalEp = safeTotalEp,
-            pinned = o.optBoolean("pinned", false),
-            streamUrl = o.optString("streamUrl"),
-            videoPath = o.optString("videoPath"),
-            videoUri = o.optString("videoUri"),
-            releaseDate = if (rel > 0) rel else null,
-            reminderEnabled = o.optBoolean("reminderEnabled", false),
-            tags = parsedTags,
-            rating = parsedRating,
-            updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
-            seasons = parsedSeasons,
-            description = o.optString("description"),
-            source = o.optString("source"),
-            sourceId = o.optString("sourceId")
+    fun loadCustomTheme(): CustomThemeConfig {
+        return CustomThemeConfig(
+            accentArgb = prefs.getLong("custom_accent", 0xFF3B82F6L),
+            bgStartArgb = prefs.getLong("custom_bg_start", 0xFF0F172AL),
+            bgEndArgb = prefs.getLong("custom_bg_end", 0xFF1E293BL),
+            useGradient = prefs.getBoolean("custom_gradient", false),
         )
     }
 
-    private fun historyToJson(event: WatchEvent): JSONObject = JSONObject().apply {
-        put("itemId", event.itemId)
-        put("title", event.title)
-        put("type", event.type.name)
-        put("season", event.season)
-        put("episode", event.episode)
-        put("count", event.count)
-        put("watchedAt", event.watchedAt)
+    fun saveCustomAccent(argb: Long) {
+        prefs.edit().putLong("custom_accent", argb).apply()
     }
 
-    private fun historyFromJson(o: JSONObject): WatchEvent? {
-        val itemId = o.optString("itemId").trim()
-        val watchedAt = o.optLong("watchedAt", 0L)
-        if (itemId.isEmpty() || watchedAt <= 0L) return null
-        return WatchEvent(
-            itemId = itemId,
-            title = o.optString("title"),
-            type = runCatching { MediaType.valueOf(o.optString("type")) }
-                .getOrDefault(MediaType.Series),
-            season = o.optInt("season", 1).coerceAtLeast(0),
-            episode = o.optInt("episode", 1).coerceAtLeast(0),
-            count = o.optInt("count", 1).coerceAtLeast(1),
-            watchedAt = watchedAt
-        )
+    fun saveCustomBackground(startArgb: Long, endArgb: Long, useGradient: Boolean) {
+        prefs.edit()
+            .putLong("custom_bg_start", startArgb)
+            .putLong("custom_bg_end", endArgb)
+            .putBoolean("custom_gradient", useGradient)
+            .apply()
     }
 
-    fun exportBackupJson(
-        items: List<MediaItem>,
-        history: List<WatchEvent> = loadHistory()
-    ): String {
-        val root = JSONObject()
-        root.put("version", 4)
-        root.put("appName", "Seriee")
-        root.put("timestamp", System.currentTimeMillis())
-        root.put("streakDays", loadStreakDays())
-        root.put("bestStreak", loadBestStreak())
-        root.put("lastWatchDay", loadLastWatchDay())
-        val daysArr = JSONArray()
-        loadWatchDays().forEach { daysArr.put(it) }
-        root.put("watchDays", daysArr)
-        val historyArr = JSONArray()
-        history.forEach { historyArr.put(historyToJson(it)) }
-        root.put("history", historyArr)
-        val arr = JSONArray()
-        items.forEach { arr.put(toJson(it)) }
-        root.put("items", arr)
-        return root.toString(2)
+    fun loadReduceTransparency(): Boolean = prefs.getBoolean("reduce_transparency", false)
+    fun saveReduceTransparency(v: Boolean) = prefs.edit().putBoolean("reduce_transparency", v).apply()
+
+    fun loadBatteryAmoled(): Boolean = prefs.getBoolean("battery_amoled", true)
+    fun saveBatteryAmoled(v: Boolean) = prefs.edit().putBoolean("battery_amoled", v).apply()
+
+    fun loadGridView(): Boolean = prefs.getBoolean("grid_view", true)
+    fun saveGridView(v: Boolean) = prefs.edit().putBoolean("grid_view", v).apply()
+
+    fun loadLanguage(): AppLanguage {
+        val tag = prefs.getString("language", "") ?: ""
+        return AppLanguage.entries.firstOrNull { it.tag == tag } ?: AppLanguage.System
     }
 
-    /**
-     * Reads a backup without touching items or history storage. The streak side
-     * effect stays here so callers keep the existing restore behaviour.
-     */
-    fun importBackupJson(rawJson: String): BackupPayload {
-        val json = rawJson.trim()
-        if (!json.startsWith("{")) {
-            val arr = JSONArray(json)
-            return BackupPayload(
-                items = (0 until arr.length())
-                    .map { fromJson(arr.getJSONObject(it)) }
-                    .distinctBy { it.id },
-                history = null
-            )
-        }
-        val root = JSONObject(json)
-        // Restore streak when the backup carries it (v3+); older backups keep current streak.
-        if (root.has("streakDays")) {
-            val daysArr = root.optJSONArray("watchDays")
-            val days = mutableSetOf<String>()
-            if (daysArr != null) for (i in 0 until daysArr.length()) days.add(daysArr.optString(i))
-            saveStreak(
-                root.optInt("streakDays", 0),
-                root.optInt("bestStreak", 0),
-                root.optString("lastWatchDay"),
-                days
-            )
-        }
-        val history = if (root.has("history")) {
-            val historyArr = root.optJSONArray("history")
-            if (historyArr == null) {
-                emptyList()
+    fun saveLanguage(lang: AppLanguage) = prefs.edit().putString("language", lang.tag).apply()
+
+    fun loadTmdbKey(): String = secretPrefs.getString("tmdb_api_key", "") ?: ""
+    fun saveTmdbKey(k: String) = secretPrefs.edit().putString("tmdb_api_key", k.trim()).apply()
+
+    fun loadOmdbKey(): String = secretPrefs.getString("omdb_api_key", "") ?: ""
+    fun saveOmdbKey(k: String) = secretPrefs.edit().putString("omdb_api_key", k.trim()).apply()
+
+    fun loadLastSeenVersionCode(): Int = prefs.getInt("last_seen_version_code", 0)
+    fun saveLastSeenVersionCode(code: Int) = prefs.edit().putInt("last_seen_version_code", code).apply()
+
+    fun exportBackupJson(items: List<MediaItem>, history: List<WatchEvent>): String {
+        val st = loadStreak()
+        return JSONObject().apply {
+            put("version", 4)
+            put("appName", "Seriee")
+            put("timestamp", System.currentTimeMillis())
+            put("streakDays", st.streakDays)
+            put("bestStreak", st.bestStreak)
+            put("lastWatchDay", st.lastWatchDay ?: JSONObject.NULL)
+            put("watchDays", JSONArray(st.watchDays.toList()))
+            put("history", historyToJsonArray(WatchHistoryRules.trim(history)))
+            put("items", itemsToJsonArray(items))
+        }.toString(2)
+    }
+
+    data class ParsedBackup(
+        val items: List<MediaItem>,
+        val history: List<WatchEvent>,
+        val streak: StreakState,
+    )
+
+    fun parseBackupJson(jsonText: String): ParsedBackup? {
+        val trimmed = jsonText.trim()
+        if (trimmed.isEmpty()) return null
+        return runCatching {
+            if (trimmed.startsWith("[")) {
+                ParsedBackup(parseItemsArray(JSONArray(trimmed)), emptyList(), StreakState())
             } else {
-                (0 until historyArr.length()).mapNotNull { i ->
-                    runCatching { historyFromJson(historyArr.getJSONObject(i)) }.getOrNull()
+                val obj = JSONObject(trimmed)
+                val itemsArr = obj.optJSONArray("items") ?: return null
+                val items = parseItemsArray(itemsArr)
+                val historyArr = obj.optJSONArray("history")
+                val history = if (historyArr != null) WatchHistoryRules.trim(parseHistoryArray(historyArr)) else emptyList()
+                val streakDays = obj.optInt("streakDays", 0).coerceAtLeast(0)
+                val bestStreak = obj.optInt("bestStreak", streakDays).coerceAtLeast(streakDays)
+                val lastDay = obj.optString("lastWatchDay", "").ifBlank { null }
+                val daysArr = obj.optJSONArray("watchDays")
+                val watchDays = HashSet<String>()
+                if (daysArr != null) {
+                    for (i in 0 until daysArr.length()) {
+                        val s = daysArr.optString(i, "")
+                        if (s.isNotBlank()) watchDays.add(s)
+                    }
+                }
+                ParsedBackup(items, history, StreakState(streakDays, bestStreak, lastDay, watchDays))
+            }
+        }.getOrNull()
+    }
+
+    fun restoreStreak(streak: StreakState) {
+        prefs.edit()
+            .putInt("streak_days", streak.streakDays)
+            .putInt("best_streak", streak.bestStreak)
+            .apply {
+                if (streak.lastWatchDay != null) putString("last_watch_day", streak.lastWatchDay)
+                else remove("last_watch_day")
+            }
+            .putStringSet("watch_days", streak.watchDays)
+            .apply()
+    }
+
+    private fun itemsToJsonArray(items: List<MediaItem>): JSONArray {
+        val arr = JSONArray()
+        for (item in items) {
+            arr.put(JSONObject().apply {
+                put("id", item.id)
+                put("title", item.title)
+                put("type", item.type.name)
+                put("status", item.status.name)
+                put("poster", item.poster)
+                put("season", item.season)
+                put("currentEp", item.currentEp)
+                put("totalEp", item.totalEp)
+                put("pinned", item.pinned)
+                put("streamUrl", item.streamUrl)
+                put("videoPath", item.videoPath)
+                put("videoUri", item.videoUri)
+                if (item.releaseDate != null) put("releaseDate", item.releaseDate)
+                put("reminderEnabled", item.reminderEnabled)
+                put("tags", JSONArray(item.tags))
+                put("rating", item.rating)
+                put("updatedAt", item.updatedAt)
+                put("description", item.description)
+                put("source", item.source)
+                put("sourceId", item.sourceId)
+                put("seasons", JSONArray().apply {
+                    for (sec in item.seasons) {
+                        put(JSONObject().apply {
+                            put("number", sec.number)
+                            put("currentEp", sec.currentEp)
+                            put("totalEp", sec.totalEp)
+                            put("episodes", JSONArray().apply {
+                                for (ep in sec.episodes) {
+                                    put(JSONObject().apply {
+                                        put("number", ep.number)
+                                        put("uri", ep.uri)
+                                        put("displayName", ep.displayName)
+                                    })
+                                }
+                            })
+                        })
+                    }
+                })
+            })
+        }
+        return arr
+    }
+
+    private fun parseItemsArray(arr: JSONArray): List<MediaItem> {
+        val out = ArrayList<MediaItem>(arr.length())
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val type = if (o.optString("type") == MediaType.Movie.name) MediaType.Movie else MediaType.Series
+            val statusStr = o.optString("status", WatchStatus.Watching.name)
+            val status = WatchStatus.entries.firstOrNull {
+                it.name.equals(statusStr, ignoreCase = true) ||
+                    it.name.equals(statusStr.replace(" ", ""), ignoreCase = true)
+            } ?: WatchStatus.Watching
+            val tags = ArrayList<String>()
+            o.optJSONArray("tags")?.let { tArr ->
+                for (j in 0 until tArr.length()) {
+                    val t = tArr.optString(j, "").trim()
+                    if (t.isNotEmpty()) tags.add(t)
                 }
             }
-        } else {
-            null
+            val seasons = ArrayList<Season>()
+            o.optJSONArray("seasons")?.let { sArr ->
+                for (j in 0 until sArr.length()) {
+                    val sObj = sArr.optJSONObject(j) ?: continue
+                    val eps = ArrayList<EpisodeFile>()
+                    sObj.optJSONArray("episodes")?.let { eArr ->
+                        for (k in 0 until eArr.length()) {
+                            val eObj = eArr.optJSONObject(k) ?: continue
+                            eps.add(
+                                EpisodeFile(
+                                    number = eObj.optInt("number", 1),
+                                    uri = eObj.optString("uri", ""),
+                                    displayName = eObj.optString("displayName", "video")
+                                )
+                            )
+                        }
+                    }
+                    val tot = sObj.optInt("totalEp", 1).coerceAtLeast(1)
+                    val cur = sObj.optInt("currentEp", 0).coerceIn(0, tot)
+                    seasons.add(Season(sObj.optInt("number", j + 1), cur, tot, eps))
+                }
+            }
+            out.add(
+                MediaItem(
+                    id = o.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
+                    title = o.optString("title", ""),
+                    type = type,
+                    status = status,
+                    poster = o.optString("poster", ""),
+                    season = o.optInt("season", 1).coerceAtLeast(1),
+                    currentEp = o.optInt("currentEp", 0).coerceAtLeast(0),
+                    totalEp = o.optInt("totalEp", 1).coerceAtLeast(1),
+                    pinned = o.optBoolean("pinned", false),
+                    streamUrl = o.optString("streamUrl", ""),
+                    videoPath = o.optString("videoPath", ""),
+                    videoUri = o.optString("videoUri", ""),
+                    releaseDate = if (o.has("releaseDate") && !o.isNull("releaseDate")) o.optLong("releaseDate") else null,
+                    reminderEnabled = o.optBoolean("reminderEnabled", false),
+                    tags = tags,
+                    rating = o.optInt("rating", 0).coerceIn(0, 5),
+                    updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+                    seasons = seasons,
+                    description = o.optString("description", ""),
+                    source = o.optString("source", ""),
+                    sourceId = o.optString("sourceId", ""),
+                )
+            )
         }
-        val itemsArray = root.optJSONArray("items") ?: JSONArray()
-        val items = (0 until itemsArray.length())
-            .map { fromJson(itemsArray.getJSONObject(it)) }
-            .distinctBy { it.id }
-        return BackupPayload(items = items, history = history)
+        return out
     }
 
-    private companion object {
-        const val KEY_DATA = "seriee_data_v2"
-        const val KEY_THEME = "seriee_theme"
-        const val KEY_THEME_MODE = "seriee_theme_mode"
-        const val KEY_THEME_STYLE = "seriee_theme_style"
-        const val KEY_CUSTOM_ACCENT = "custom_accent"
-        const val KEY_CUSTOM_BG_START = "custom_background_start"
-        const val KEY_CUSTOM_BG_END = "custom_background_end"
-        const val KEY_CUSTOM_GRADIENT = "custom_background_gradient"
-        const val KEY_REDUCE_TRANSPARENCY = "seriee_reduce_transparency"
-        const val KEY_BATTERY_AMOLED = "seriee_battery_amoled"
-        const val KEY_GRID = "seriee_grid"
-        const val KEY_LANG = "seriee_lang"
-        const val KEY_TMDB = "tmdb_api_key"
-        const val KEY_OMDB = "omdb_api_key"
-        const val KEY_LAST_SEEN_VERSION = "last_seen_version_code"
-        const val KEY_STREAK_DAYS = "streak_days"
-        const val KEY_BEST_STREAK = "best_streak"
-        const val KEY_LAST_WATCH_DAY = "last_watch_day"
-        const val KEY_WATCH_DAYS = "watch_days"
-        const val KEY_HISTORY = "watch_history_v1"
+    private fun historyToJsonArray(events: List<WatchEvent>): JSONArray {
+        val arr = JSONArray()
+        for (ev in events) {
+            arr.put(JSONObject().apply {
+                put("itemId", ev.itemId)
+                put("title", ev.title)
+                put("type", ev.type.name)
+                put("season", ev.season)
+                put("episode", ev.episode)
+                put("count", ev.count)
+                put("watchedAt", ev.watchedAt)
+            })
+        }
+        return arr
+    }
+
+    private fun parseHistoryArray(arr: JSONArray): List<WatchEvent> {
+        val out = ArrayList<WatchEvent>(arr.length())
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val count = o.optInt("count", 0)
+            val watchedAt = o.optLong("watchedAt", 0L)
+            if (count <= 0 || watchedAt <= 0L) continue
+            val type = if (o.optString("type") == MediaType.Movie.name) MediaType.Movie else MediaType.Series
+            out.add(
+                WatchEvent(
+                    itemId = o.optString("itemId", ""),
+                    title = o.optString("title", ""),
+                    type = type,
+                    season = o.optInt("season", 1),
+                    episode = o.optInt("episode", 1),
+                    count = count,
+                    watchedAt = watchedAt,
+                )
+            )
+        }
+        return out
     }
 }

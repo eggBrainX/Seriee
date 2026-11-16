@@ -1,34 +1,50 @@
 package com.seriee.app.data
 
-/**
- * A compact log of explicit watch actions.
- *
- * [title] and [type] are snapshots so the timeline survives a rename or a
- * delete. When the item still exists the UI shows its current title; the
- * snapshot is only the fallback.
- */
 data class WatchEvent(
     val itemId: String,
     val title: String,
     val type: MediaType,
     val season: Int,
     val episode: Int,
-    /** Episodes covered by this action: 1 for a normal +, the delta for a jump. */
-    val count: Int = 1,
-    val watchedAt: Long
+    val count: Int,
+    val watchedAt: Long,
 )
 
-/** Caps and retention for [WatchEvent] storage. Pure so it is JVM-testable. */
 object WatchHistoryRules {
     const val MAX_EVENTS = 500
-    const val RETENTION_DAYS = 365
+    const val RETENTION_DAYS = 365L
+    private const val DAY_MS = 86_400_000L
 
-    fun trim(events: List<WatchEvent>, now: Long = System.currentTimeMillis()): List<WatchEvent> {
-        val cutoff = now - RETENTION_DAYS * 86_400_000L
+    fun trim(events: List<WatchEvent>, nowMs: Long = System.currentTimeMillis()): List<WatchEvent> {
+        val cutoff = nowMs - RETENTION_DAYS * DAY_MS
         return events
-            .filter { it.watchedAt >= cutoff }
+            .filter { it.watchedAt >= cutoff && it.count > 0 }
             .sortedByDescending { it.watchedAt }
-            .distinctBy { it.itemId to (it.season to (it.episode to it.watchedAt)) }
             .take(MAX_EVENTS)
+    }
+
+    fun append(
+        existing: List<WatchEvent>,
+        event: WatchEvent,
+        nowMs: Long = System.currentTimeMillis(),
+    ): List<WatchEvent> {
+        if (event.count <= 0) return trim(existing, nowMs)
+        return trim(listOf(event) + existing, nowMs)
+    }
+
+    fun merge(
+        existing: List<WatchEvent>,
+        incoming: List<WatchEvent>,
+        nowMs: Long = System.currentTimeMillis(),
+    ): List<WatchEvent> {
+        val seen = HashSet<String>()
+        val out = ArrayList<WatchEvent>(existing.size + incoming.size)
+        for (ev in existing + incoming) {
+            val key = "${ev.itemId}|${ev.season}|${ev.episode}|${ev.watchedAt}"
+            if (seen.add(key)) {
+                out.add(ev)
+            }
+        }
+        return trim(out, nowMs)
     }
 }

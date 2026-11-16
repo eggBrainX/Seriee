@@ -27,6 +27,8 @@
     <string name="status_completed">Completed</string>
     <string name="status_plan_to_watch">Plan to Watch</string>
     <string name="status_coming_soon">Coming Soon</string>
+    <string name="status_on_hold">On Hold</string>
+    <string name="status_dropped">Dropped</string>
 
     <!-- Progress -->
     <string name="active_progress">Active Progress</string>
@@ -38,6 +40,8 @@
     <string name="filter_completed">Completed</string>
     <string name="filter_coming_soon">Coming Soon</string>
     <string name="filter_plan_to_watch">Plan to Watch</string>
+    <string name="filter_on_hold">On Hold</string>
+    <string name="filter_dropped">Dropped</string>
     <string name="no_search_results">No results for "%1$s"</string>
     <string name="no_shows">No shows.</string>
     <string name="season_format">Season %1$d</string>
@@ -137,11 +141,11 @@
     <string name="time_weeks_ago">%1$d weeks ago</string>
     <string name="time_months_ago">%1$d months ago</string>
 
-    <!-- Reminders / scheduler -->
+    <!-- Reminders -->
     <string name="notification_channel_name">Series &amp; Movie Reminders</string>
     <string name="notification_channel_desc">Notifications when a series or movie starts airing</string>
-    <string name="reminder_title_prefix">🔔 Reminder: %1$s</string>
-    <string name="airing_today_title">🔔 %1$s Airing Today!</string>
+    <string name="reminder_title_prefix">Reminder: %1$s</string>
+    <string name="airing_today_title">%1$s Airing Today!</string>
     <string name="airing_today_body">%1$s "%2$s" is now airing. Open Seriee to start watching!</string>
     <string name="default_series_title">Series Airing</string>
     <string name="date_not_set">Not set</string>
@@ -170,7 +174,7 @@
     <string name="pick_release_date_title">Pick Release Date</string>
 
     <!-- Backup & restore -->
-    <string name="current_data">📦 Current data: %1$d items saved</string>
+    <string name="current_data">Current data: %1$d items saved</string>
     <string name="backup_to_json">Back up to JSON file</string>
     <string name="backup_description">Save your full list of series, episodes, poster covers, and release schedules to a JSON file on your device storage.</string>
     <string name="save_backup_file">Save backup file (.json)</string>
@@ -182,14 +186,12 @@
     <string name="replace_data">Replace all data</string>
     <string name="replace_data_desc">All current data will be replaced with the backup file contents</string>
     <string name="pick_backup_file">Pick backup file (.json)</string>
-    <string name="backup_success">✅ Successfully backed up %1$d items to JSON!</string>
+    <string name="backup_success">Successfully backed up %1$d items to JSON!</string>
     <string name="backup_failed">Backup failed: %1$s</string>
-    <string name="restore_success">✅ Successfully restored %1$d items from backup!</string>
+    <string name="restore_success">Successfully restored %1$d items from backup!</string>
     <string name="restore_failed">Restore failed: %1$s</string>
-    <string name="backup_to_json_title">Back up to JSON file</string>
-    <string name="backup_to_json_desc">Save your full list of series, episodes, poster covers, and release schedules to a JSON file on your device storage.</string>
 
-    <!-- New features: poster, fetch, seasons -->
+    <!-- Metadata / seasons -->
     <string name="poster_source_storage">Upload from device</string>
     <string name="poster_source_url">Image URL</string>
     <string name="fetch_metadata_title">Fetch cover &amp; info</string>
@@ -241,49 +243,29 @@
     <string name="about_data_sources">Data sources &amp; credits</string>
     <string name="about_tmdb_notice">This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
     <string name="about_justwatch_notice">Watch-provider data is provided by JustWatch.</string>
-    <string name="about_other_sources">Anime metadata from AniList, TV schedules from TVmaze, and additional movie/TV details from OMDb (IMDb data). Collection import supports public AniList lists and MyAnimeList XML exports. Posters and metadata remain the property of their respective rights holders.</string>
+    <string name="about_other_sources">Anime metadata from AniList, TV schedules from TVmaze, and additional movie/TV details from OMDb (IMDb data). Collection import supports public AniList lists and MyAnimeList XML exports.</string>
     <string name="about_privacy">Privacy</string>
-    <string name="about_privacy_body">Seriee stores your library only on this device. A metadata search sends the title you type to the selected providers (AniList, TVmaze, TMDB, OMDb); an AniList import sends only the username you type. MyAnimeList exports are parsed on-device. No analytics, ads, or accounts. API keys stay on-device and are excluded from system backups.</string>
+    <string name="about_privacy_body">Seriee stores your library only on this device. A metadata search sends the title you type to the selected providers; an AniList import sends only the username you type. MyAnimeList exports are parsed on-device.</string>
     <string name="about_privacy_link">Read the privacy policy</string>
     <string name="about_license">License</string>
     <string name="about_license_value">Apache License 2.0</string>
     <string name="about_license_link">Read the license</string>
     <string name="about_third_party_link">Third-party notices</string>
     <string name="about_source">Source code on GitHub</string>
-    <string name="about_disclaimer">Seriee is not affiliated with Netflix, Bilibili, YouTube, TMDB, or any other streaming service. It does not host or provide copyrighted content; playback links point to services you already use.</string>
+    <string name="about_disclaimer">Seriee is not affiliated with Netflix, Bilibili, YouTube, TMDB, or any other streaming service.</string>
     <string name="about_close">Close</string>
-    <string name="about_open_link">Open link</string>
 
     <!-- Changelog -->
     <string name="changelog_title">What\'s New</string>
     <string name="changelog_version">Version %1$s</string>
     <string name="changelog_got_it">Got it</string>
     <string name="changelog_close">Close changelog</string>
-    <string name="changelog_15">Seven themes in a new two-level menu — Follow system, Dark, AMOLED, Frost Glass, Liquid Glass, Light, and a Custom theme with your own accent and solid or gradient background</string>
-    <string name="changelog_16">On Hold and Dropped are now real statuses, so you can filter and colour-code paused and abandoned titles everywhere</string>
-    <string name="changelog_17">Swipe left or right to move between Progress and Library, with a floating navigation pill that follows your drag</string>
-    <string name="changelog_18">Import your collection from AniList or a MyAnimeList export, preview the result, and choose merge (never lowers progress) or replace</string>
-    <string name="changelog_19">Redesigned header, filled search pill, gradient progress bars, and detail, edit, and backup screens that open as bottom sheets</string>
-    <string name="changelog_20">System default language option, plus localised import errors and empty states</string>
-    <string name="changelog_21">Fixed: the FAB hides while scrolling, and Progress and Library swipes no longer fight the filter chips</string>
-    <string name="changelog_22">Themes now have two independent axes: appearance (Follow system, Light, Dark) and style (Classic, AMOLED, Frost Glass, Liquid Glass, Material You, Custom)</string>
-    <string name="changelog_23">Every style ships both a light and a dark variant, so Frost Glass and Liquid Glass work in daylight too</string>
-    <string name="changelog_24">New Material You style follows your wallpaper palette on Android 12 and newer</string>
-    <string name="changelog_25">Custom theme: pick any two-stop gradient, grab an accent from a poster’s artwork, and copy or paste a theme code to share it</string>
-    <string name="changelog_26">New Reduce transparency switch, plus an optional AMOLED mode that turns on with battery saver</string>
-    <string name="changelog_27">Dialogs, text fields, switches and gradients now all follow the active palette, with a complete Material 3 colour scheme</string>
-    <string name="changelog_28">Fixed: light themes no longer flash a dark window while the app starts</string>
     <string name="changelog_29">A new Insights tab shows episodes watched, estimated watch time, completion rate, and average rating at a glance</string>
     <string name="changelog_30">Status breakdown, star ratings, and top genres come as accessible, theme-aware charts</string>
     <string name="changelog_31">A 12-week activity heatmap and a recent watch timeline, including titles you have since deleted</string>
     <string name="changelog_32">Watch history is logged automatically when you advance or jump episodes, and backups now use format version 4 with history included</string>
     <string name="changelog_33">Clear watch history from Insights without touching your library, progress, or streak</string>
 
-    <!-- Current release, in display order. The What's New dialog and the
-         release-notes generator in .github/workflows/build-apk.yml both read
-         this list, so shipping a version only means adding its changelog_*
-         strings and listing them here. Never renumber existing changelog_N
-         entries: the numbering is monotonic across releases. -->
     <string-array name="changelog_current">
         <item>@string/changelog_29</item>
         <item>@string/changelog_30</item>
@@ -292,17 +274,10 @@
         <item>@string/changelog_33</item>
     </string-array>
 
-    <!-- ViewModel messages -->
     <string name="reminder_test_message">Reminder active for %1$s \"%2$s\"!</string>
     <string name="error_open_output">Could not open output stream</string>
     <string name="error_read_backup">Could not read backup file</string>
     <string name="error_empty_backup">Backup file is empty or format is not supported</string>
-
-    <!-- Statuses: On Hold / Dropped -->
-    <string name="status_on_hold">On Hold</string>
-    <string name="status_dropped">Dropped</string>
-    <string name="filter_on_hold">On Hold</string>
-    <string name="filter_dropped">Dropped</string>
 
     <!-- Theme -->
     <string name="theme_appearance">Appearance</string>
@@ -347,14 +322,9 @@
     <string name="language_system">System default</string>
     <string name="language_english">English</string>
     <string name="language_indonesian">Bahasa Indonesia</string>
-    <string name="new_badge">New</string>
     <string name="back">Back</string>
-
-    <!-- Header quick actions -->
     <string name="search">Search</string>
     <string name="schedule">Schedule</string>
-    <string name="nav_next_tab">Next tab</string>
-    <string name="nav_previous_tab">Previous tab</string>
 
     <!-- Insights -->
     <string name="insights_title">Insights</string>
@@ -381,13 +351,7 @@
     <string name="insights_clear_history_confirm">Clear</string>
     <string name="insights_event_season_episode">S%1$d E%2$d</string>
     <string name="insights_heatmap_cell">%1$s: %2$d episodes</string>
-    <string name="insights_status_row">%1$s: %2$d titles, %3$d%%</string>
-    <string name="insights_rating_row">%1$d stars: %2$d titles</string>
     <string name="insights_tag_chip">#%1$s %2$d</string>
-    <plurals name="insights_a11y_hero">
-        <item quantity="one">%1$d episode watched across %2$d series</item>
-        <item quantity="other">%1$d episodes watched across %2$d series</item>
-    </plurals>
     <plurals name="insights_completed_titles">
         <item quantity="one">%1$d of %2$d title</item>
         <item quantity="other">%1$d of %2$d titles</item>
@@ -395,10 +359,6 @@
     <plurals name="insights_episode_count">
         <item quantity="one">%1$d episode</item>
         <item quantity="other">%1$d episodes</item>
-    </plurals>
-    <plurals name="insights_recent_count">
-        <item quantity="one">%1$d recent event</item>
-        <item quantity="other">%1$d recent events</item>
     </plurals>
     <plurals name="insights_title_count">
         <item quantity="one">%1$d title</item>
@@ -449,7 +409,25 @@
     <string name="import_error_network">Network error. Check your connection.</string>
     <string name="import_error_parse">Could not read that list</string>
     <string name="import_error_file_invalid">That file is not a valid MyAnimeList export</string>
-    <string name="import_error_cancelled">Import cancelled</string>
     <string name="import_error_unknown">Import failed. Try again.</string>
     <string name="import_no_entries">No entries found in that list</string>
+
+    <!-- Debug overlay & crash dialog -->
+    <string name="debug_overlay">Debug Logs Overlay</string>
+    <string name="debug_overlay_title">Debug Log Overlay</string>
+    <string name="debug_filter_all">All</string>
+    <string name="debug_filter_errors">Errors &amp; Crashes</string>
+    <string name="debug_copy_logs">Copy Logs</string>
+    <string name="debug_clear_logs">Clear</string>
+    <string name="debug_logs_copied">Logs copied to clipboard</string>
+    <string name="debug_no_logs">No log entries captured yet.</string>
+    <string name="crash_dialog_title">Something went wrong</string>
+    <string name="crash_dialog_subtitle">Seriee caught an unexpected error instead of force closing. Your saved library is intact.</string>
+    <string name="crash_dialog_thread">Thread: %1$s</string>
+    <string name="crash_dialog_show_trace">View stack trace</string>
+    <string name="crash_dialog_hide_trace">Hide stack trace</string>
+    <string name="crash_dialog_copy">Copy Error</string>
+    <string name="crash_dialog_open_overlay">Debug Overlay</string>
+    <string name="crash_dialog_continue">Continue</string>
+    <string name="crash_copied_toast">Error details copied to clipboard</string>
 </resources>

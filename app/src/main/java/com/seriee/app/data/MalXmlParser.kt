@@ -1,111 +1,87 @@
 package com.seriee.app.data
 
-import java.io.ByteArrayInputStream
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
+import java.io.BufferedInputStream
 import java.io.InputStream
+import java.io.StringReader
 import java.util.zip.GZIPInputStream
 
-/**
- * Streaming reader for MyAnimeList XML exports.
- *
- * MAL downloads are gzip files (`myanimelist_<user>.xml.gz`), so the first two
- * bytes are sniffed and the stream is wrapped in [GZIPInputStream]. The parsed
- * data never leaves the device.
- *
- * A small tag scanner is used instead of `XmlPullParser` so this stays a pure
- * JVM class that unit tests can exercise without Robolectric.
- */
 object MalXmlParser {
-
-    fun parse(input: InputStream): List<MalEntry> = parseBytes(input.readBytes())
-
-    fun parseBytes(bytes: ByteArray): List<MalEntry> {
-        val decoded = try {
-            if (isGzip(bytes)) {
-                GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readBytes() }
-            } else {
-                bytes
-            }
-        } catch (e: Exception) {
-            throw ImportException(ImportError.FileInvalid, e)
-        }
-
-        val text = decoded.toString(Charsets.UTF_8)
-            .removePrefix("\uFEFF")
-            .trim()
-
-        if (text.isBlank()) throw ImportException(ImportError.FileInvalid)
-        if (!text.contains("<myanimelist", ignoreCase = true) &&
-            !text.contains("<anime", ignoreCase = true)
-        ) {
-            throw ImportException(ImportError.FileInvalid)
-        }
-        if (text.contains("<anime", ignoreCase = true) &&
-            !text.contains("</anime>", ignoreCase = true) &&
-            !text.contains("</entry>", ignoreCase = true)
-        ) {
-            throw ImportException(ImportError.FileInvalid)
-        }
-
-        val animeRegex = Regex("<anime(?:\\s[^>]*)?>(.*?)</anime>", RegexOption.DOT_MATCHES_ALL)
-        val entryRegex = Regex("<entry>(.*?)</entry>", RegexOption.DOT_MATCHES_ALL)
-        val entries = ArrayList<MalEntry>()
-
-        animeRegex.findAll(text).forEach { anime ->
-            entryRegex.findAll(anime.groupValues[1]).forEach { match ->
-                val block = match.groupValues[1]
-                val title = tag(block, "series_title")
-                if (title.isBlank()) return@forEach
-                entries.add(
-                    MalEntry(
-                        id = tag(block, "series_animedb_id"),
-                        title = title,
-                        type = tag(block, "series_type"),
-                        totalEpisodes = tag(block, "series_episodes").toIntOrNull() ?: 0,
-                        watchedEpisodes = tag(block, "my_watched_episodes").toIntOrNull() ?: 0,
-                        score = tag(block, "my_score").toIntOrNull() ?: 0,
-                        status = tag(block, "my_status"),
-                        image = tag(block, "series_image"),
-                        tags = tag(block, "my_tags")
-                            .split(',')
-                            .map { it.trim() }
-                            .filter { it.isNotEmpty() },
-                        comments = tag(block, "my_comments")
-                    )
-                )
-            }
-        }
-
-        return entries
+    fun parseStream(input: InputStream): List<MalRawEntry> {
+        val buffered = BufferedInputStream(input)
+        buffered.mark(4)
+        val header = ByteArray(2)
+        val read = buffered.read(header)
+        buffered.reset()
+        val isGzip = read == 2 && header[0] == 0x1F.toByte() && header[1] == 0x8B.toByte()
+        val xmlStream = if (isGzip) GZIPInputStream(buffered) else buffered
+        val xmlText = xmlStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        return parseXmlString(xmlText)
     }
 
-    fun isGzip(bytes: ByteArray): Boolean =
-        bytes.size >= 2 && bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()
+    fun parseXmlString(xml: String): List<MalRawEntry> {
+        val factory = XmlPullParserFactory.newInstance()
+        val parser = factory.newPullParser()
+        parser.setInput(StringReader(xml))
 
-    private fun tag(block: String, name: String): String {
-        val match = Regex("<$name(?:\\s[^>]*)?>(.*?)</$name>", RegexOption.DOT_MATCHES_ALL)
-            .find(block) ?: return ""
-        var value = match.groupValues[1].trim()
-        if (value.startsWith("<![CDATA[")) {
-            value = value.removePrefix("<![CDATA[")
-            val end = value.indexOf("]]>")
-            if (end >= 0) value = value.substring(0, end)
-        }
-        return decodeEntities(value).trim()
-    }
+        var sawRoot = false
+        val out = ArrayList<MalRawEntry>()
+        var inAnime = false
+        var currentTag = ""
+        var id = ""
+        var title = ""
+        var type = "TV"
+        var episodes = 0
+        var watched = 0
+        var status = "Plan to Watch"
+        var score = 0
 
-    private fun decodeEntities(value: String): String {
-        var out = value
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&apos;", "'")
-            .replace("&amp;", "&")
-        out = Regex("&#x([0-9a-fA-F]+);").replace(out) { match ->
-            match.groupValues[1].toIntOrNull(16)?.let { String(Character.toChars(it)) } ?: match.value
+        var eventType = parser.eventType
+        while (eventType != XmlPullParser.END_DOCUMENT) {
+            when (eventType) {
+                XmlPullParser.START_TAG -> {
+                    val tag = parser.name ?: ""
+                    if (!sawRoot) {
+                        if (!tag.equals("myanimelist", ignoreCase = true)) {
+                            throw IllegalArgumentException("Invalid MAL XML root: $tag")
+                        }
+                        sawRoot = true
+                    } else if (tag == "anime") {
+                        inAnime = true
+                        id = ""; title = ""; type = "TV"; episodes = 0; watched = 0; status = "Plan to Watch"; score = 0
+                    } else if (inAnime) {
+                        currentTag = tag
+                    }
+                }
+                XmlPullParser.TEXT, XmlPullParser.CDSECT -> {
+                    if (inAnime && currentTag.isNotEmpty()) {
+                        val txt = parser.text?.trim() ?: ""
+                        when (currentTag) {
+                            "series_animedb_id" -> id = txt
+                            "series_title" -> title = txt
+                            "series_type" -> if (txt.isNotEmpty()) type = txt
+                            "series_episodes" -> episodes = txt.toIntOrNull() ?: 0
+                            "my_watched_episodes" -> watched = txt.toIntOrNull() ?: 0
+                            "my_status" -> if (txt.isNotEmpty()) status = txt
+                            "my_score" -> score = txt.toIntOrNull() ?: 0
+                        }
+                    }
+                }
+                XmlPullParser.END_TAG -> {
+                    val tag = parser.name ?: ""
+                    if (tag == "anime" && inAnime) {
+                        if (title.isNotBlank()) {
+                            out.add(MalRawEntry(id, title, type, episodes, watched, status, score))
+                        }
+                        inAnime = false
+                    }
+                    currentTag = ""
+                }
+            }
+            eventType = parser.next()
         }
-        out = Regex("&#(\\d+);").replace(out) { match ->
-            match.groupValues[1].toIntOrNull()?.let { String(Character.toChars(it)) } ?: match.value
-        }
+        if (!sawRoot) throw IllegalArgumentException("Empty XML")
         return out
     }
 }

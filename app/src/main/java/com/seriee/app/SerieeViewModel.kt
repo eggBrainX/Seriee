@@ -1,589 +1,425 @@
 package com.seriee.app
 
 import android.app.Application
-import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.seriee.app.R
 import com.seriee.app.data.AniListListClient
 import com.seriee.app.data.AppLanguage
 import com.seriee.app.data.AppThemeMode
 import com.seriee.app.data.AppThemeStyle
-import com.seriee.app.data.ImportError
-import com.seriee.app.data.ImportException
+import com.seriee.app.data.CustomThemeConfig
+import com.seriee.app.data.ImportFetchErrorCode
+import com.seriee.app.data.ImportFetchException
 import com.seriee.app.data.ImportMapper
 import com.seriee.app.data.ImportMode
-import com.seriee.app.data.ImportPhase
-import com.seriee.app.data.ImportSource
-import com.seriee.app.data.ImportUiState
+import com.seriee.app.data.ImportSummary
+import com.seriee.app.data.ImportedEntry
 import com.seriee.app.data.MalXmlParser
 import com.seriee.app.data.MediaItem
+import com.seriee.app.data.MediaType
 import com.seriee.app.data.SerieeRepository
-import com.seriee.app.data.ThemePresetCodec
+import com.seriee.app.data.StreakState
+import com.seriee.app.data.ThemePreset
 import com.seriee.app.data.WatchEvent
 import com.seriee.app.data.WatchHistoryRules
 import com.seriee.app.data.WatchStatus
-import kotlinx.coroutines.CancellationException
+import com.seriee.app.debug.AppLogger
+import com.seriee.app.reminder.ReminderScheduler
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class SerieeViewModel(app: Application) : AndroidViewModel(app) {
-
     private val repo = SerieeRepository(app)
 
     var items by mutableStateOf(repo.loadItems())
         private set
-    private val _themeMode = mutableStateOf(repo.loadThemeMode())
-    val themeMode: AppThemeMode get() = _themeMode.value
-    private val _themeStyle = mutableStateOf(repo.loadThemeStyle())
-    val themeStyle: AppThemeStyle get() = _themeStyle.value
-    private val _customAccent = mutableStateOf(Color(repo.loadCustomAccent()))
-    val customAccent: Color get() = _customAccent.value
-    private val _customBackgroundStart = mutableStateOf(Color(repo.loadCustomBackgroundStart()))
-    val customBackgroundStart: Color get() = _customBackgroundStart.value
-    private val _customBackgroundEnd = mutableStateOf(Color(repo.loadCustomBackgroundEnd()))
-    val customBackgroundEnd: Color get() = _customBackgroundEnd.value
-    private val _customGradient = mutableStateOf(repo.loadCustomGradient())
-    val customGradient: Boolean get() = _customGradient.value
-    private val _reduceTransparency = mutableStateOf(repo.loadReduceTransparency())
-    val reduceTransparency: Boolean get() = _reduceTransparency.value
-    private val _batterySaverAmoled = mutableStateOf(repo.loadBatterySaverAmoled())
-    val batterySaverAmoled: Boolean get() = _batterySaverAmoled.value
-    private val _gridView = mutableStateOf(repo.loadGridView())
-    val gridView: Boolean get() = _gridView.value
-    private val _language = mutableStateOf(repo.loadLanguage())
-    val language: AppLanguage get() = _language.value
-    private val _tmdbKey = mutableStateOf(repo.loadTmdbKey())
-    val tmdbKey: String get() = _tmdbKey.value
-    private val _omdbKey = mutableStateOf(repo.loadOmdbKey())
-    val omdbKey: String get() = _omdbKey.value
-
-    private val _streakDays = mutableStateOf(repo.loadStreakDays())
-    val streakDays: Int get() = _streakDays.value
-    private val _bestStreak = mutableStateOf(repo.loadBestStreak())
-    val bestStreak: Int get() = _bestStreak.value
-    private val _watchDays = mutableStateOf(repo.loadWatchDays())
-    val watchDays: Set<String> get() = _watchDays.value
 
     var history by mutableStateOf(repo.loadHistory())
         private set
 
-    private val _showChangelog = mutableStateOf(false)
-    val showChangelog: Boolean get() = _showChangelog.value
+    var streak by mutableStateOf(repo.loadStreak())
+        private set
 
-    private val aniListClient = AniListListClient()
-    private var importJob: Job? = null
-    private val _importState = mutableStateOf(ImportUiState())
-    val importState: ImportUiState get() = _importState.value
+    var themeMode by mutableStateOf(repo.loadThemeMode())
+        private set
 
-    // Single source of truth: versionCode/versionName in app/build.gradle.kts,
-    // generated into BuildConfig. No hardcoded fallbacks here.
-    val currentVersionCode: Int = BuildConfig.VERSION_CODE
-    val currentVersionName: String = BuildConfig.VERSION_NAME
+    var themeStyle by mutableStateOf(repo.loadThemeStyle())
+        private set
 
-    private fun commit(newItems: List<MediaItem>) {
-        val uniqueItems = newItems.distinctBy { it.id }
-        items = uniqueItems
-        repo.saveItems(uniqueItems)
-    }
+    var customTheme by mutableStateOf(repo.loadCustomTheme())
+        private set
+
+    var reduceTransparency by mutableStateOf(repo.loadReduceTransparency())
+        private set
+
+    var batteryAmoled by mutableStateOf(repo.loadBatteryAmoled())
+        private set
+
+    var gridView by mutableStateOf(repo.loadGridView())
+        private set
+
+    var language by mutableStateOf(repo.loadLanguage())
+        private set
+
+    var tmdbKey by mutableStateOf(repo.loadTmdbKey())
+        private set
+
+    var omdbKey by mutableStateOf(repo.loadOmdbKey())
+        private set
+
+    var showChangelogAuto by mutableStateOf(repo.loadLastSeenVersionCode() < BuildConfig.VERSION_CODE)
+        private set
 
     init {
-        com.seriee.app.reminder.ReminderScheduler.createNotificationChannel(app)
-        // Show changelog once per version upgrade
-        val lastSeen = repo.loadLastSeenVersionCode()
-        if (lastSeen < currentVersionCode) {
-            _showChangelog.value = true
-        }
-        // Refresh alarms for any pending items
-        items.forEach { item ->
-            if (item.reminderEnabled && item.releaseDate != null && item.releaseDate > System.currentTimeMillis()) {
-                com.seriee.app.reminder.ReminderScheduler.scheduleReminder(app, item)
-            }
-        }
+        ReminderScheduler.rescheduleAll(app, items)
     }
 
-    fun incrementEpisode(id: String) {
-        val target = items.find { it.id == id } ?: return
-        val logTarget = incrementTarget(target)
-        val before = target.watchedEpisodes
-        commit(items.map { m ->
-            if (m.id != id) return@map m
-            // Multi-season path
-            if (m.seasons.isNotEmpty()) {
-                val idx = m.seasons.indexOfFirst { it.currentEp < it.totalEp }
-                val newSeasons = if (idx < 0) m.seasons else m.seasons.mapIndexed { i, s ->
-                    if (i == idx) s.copy(currentEp = (s.currentEp + 1).coerceAtMost(s.totalEp)) else s
-                }
-                val watched = newSeasons.sumOf { it.currentEp }
-                val total = newSeasons.sumOf { it.totalEp }
-                val activeSeason = newSeasons.firstOrNull { it.currentEp < it.totalEp } ?: newSeasons.lastOrNull()
-                m.copy(
-                    seasons = newSeasons,
-                    season = activeSeason?.number ?: m.season,
-                    currentEp = watched,
-                    totalEp = total.coerceAtLeast(1),
-                    status = if (watched >= total) WatchStatus.Completed else m.status,
-                    updatedAt = System.currentTimeMillis()
-                )
-            } else if (m.currentEp < m.totalEp) {
-                val next = m.currentEp + 1
-                m.copy(
-                    currentEp = next,
-                    status = if (next >= m.totalEp) WatchStatus.Completed else m.status,
-                    updatedAt = System.currentTimeMillis()
-                )
-            } else m
-        })
-        val after = items.find { it.id == id } ?: return
-        if (after.watchedEpisodes > before) {
-            logTarget?.let { (season, episode) -> logWatch(target, season, episode) }
-            recordWatch()
-        }
+    fun dismissAutoChangelog() {
+        repo.saveLastSeenVersionCode(BuildConfig.VERSION_CODE)
+        showChangelogAuto = false
     }
 
-    fun setCurrentEpisode(id: String, seasonNo: Int, epNo: Int) {
-        val target = items.find { it.id == id } ?: return
-        val before = target.watchedEpisodes
-        commit(items.map { m ->
-            if (m.id != id) return@map m
-            if (m.seasons.isNotEmpty()) {
-                val newSeasons = m.seasons.map { s ->
-                    if (s.number == seasonNo) s.copy(currentEp = epNo.coerceIn(0, s.totalEp)) else s
-                }
-                val watched = newSeasons.sumOf { it.currentEp }
-                val total = newSeasons.sumOf { it.totalEp }
-                m.copy(
-                    seasons = newSeasons,
-                    season = seasonNo,
-                    currentEp = watched,
-                    totalEp = total.coerceAtLeast(1),
-                    updatedAt = System.currentTimeMillis()
-                )
-            } else {
-                m.copy(
-                    currentEp = epNo.coerceIn(0, m.totalEp),
-                    updatedAt = System.currentTimeMillis()
-                )
-            }
-        })
-        val after = items.find { it.id == id } ?: return
-        val delta = after.watchedEpisodes - before
-        if (delta > 0) {
-            val loggedEpisode = if (after.seasons.isNotEmpty()) {
-                after.seasons.firstOrNull { it.number == seasonNo }?.currentEp ?: epNo
-            } else {
-                after.currentEp
-            }
-            logWatch(target, seasonNo, loggedEpisode, delta)
-            recordWatch()
-        }
+    private fun persistItems(next: List<MediaItem>) {
+        items = next
+        repo.saveItems(next)
     }
 
-    /** Season/episode that a + will watch, or null when the item is already complete. */
-    private fun incrementTarget(item: MediaItem): Pair<Int, Int>? {
-        if (item.seasons.isNotEmpty()) {
-            val season = item.seasons.firstOrNull { it.currentEp < it.totalEp } ?: return null
-            return season.number to (season.currentEp + 1)
-        }
-        if (item.currentEp < item.totalEp) return item.season to (item.currentEp + 1)
-        return null
-    }
-
-    private fun logWatch(item: MediaItem, season: Int, episode: Int, count: Int = 1) {
-        if (count <= 0) return
-        val event = WatchEvent(
-            itemId = item.id,
-            title = item.title,
-            type = item.type,
-            season = season,
-            episode = episode,
-            count = count,
-            watchedAt = System.currentTimeMillis()
+    private fun logWatch(item: MediaItem, season: Int, ep: Int, delta: Int) {
+        if (delta <= 0) return
+        val now = System.currentTimeMillis()
+        streak = repo.recordWatchToday()
+        val next = WatchHistoryRules.append(
+            history,
+            WatchEvent(item.id, item.title, item.type, season, ep, delta, now),
+            now
         )
-        history = WatchHistoryRules.trim(history + event)
-        repo.saveHistory(history)
+        history = next
+        repo.saveHistory(next)
+    }
+
+    fun upsertItem(item: MediaItem) {
+        val idx = items.indexOfFirst { it.id == item.id }
+        val next = if (idx >= 0) items.map { if (it.id == item.id) item else it } else listOf(item) + items
+        persistItems(next)
+        ReminderScheduler.schedule(getApplication(), item)
+    }
+
+    fun deleteItem(id: String) {
+        ReminderScheduler.cancel(getApplication(), id)
+        persistItems(items.filterNot { it.id == id })
     }
 
     fun togglePin(id: String) {
-        commit(items.map { if (it.id == id) it.copy(pinned = !it.pinned) else it })
+        persistItems(items.map { if (it.id == id) it.copy(pinned = !it.pinned, updatedAt = System.currentTimeMillis()) else it })
     }
 
-    /**
-     * Daily streak. Watch activity is bucketed by local calendar day:
-     * same day = no change, yesterday = +1, gap = reset to 1.
-     */
-    private fun recordWatch() {
-        val today = java.time.LocalDate.now()
-        val todayStr = today.toString()
-        val last = runCatching { java.time.LocalDate.parse(repo.loadLastWatchDay()) }.getOrNull()
-        val newStreak = when (last) {
-            null -> 1
-            today -> _streakDays.value
-            today.minusDays(1) -> _streakDays.value + 1
-            else -> 1
+    fun incrementEpisode(id: String) {
+        val target = items.firstOrNull { it.id == id } ?: return
+        val now = System.currentTimeMillis()
+        if (target.type == MediaType.Movie) {
+            if (target.currentEp >= 1) return
+            val updated = target.copy(currentEp = 1, totalEp = 1, status = WatchStatus.Completed, updatedAt = now)
+            persistItems(items.map { if (it.id == id) updated else it })
+            logWatch(updated, 1, 1, 1)
+            return
         }
-        val newBest = maxOf(_bestStreak.value, newStreak)
-        val cutoff = today.minusDays(6)
-        val newDays = (_watchDays.value + todayStr)
-            .filter { runCatching { java.time.LocalDate.parse(it) >= cutoff }.getOrDefault(false) }
-            .toSet()
-        _streakDays.value = newStreak
-        _bestStreak.value = newBest
-        _watchDays.value = newDays
-        repo.saveStreak(newStreak, newBest, todayStr, newDays)
+        val seasons = target.effectiveSeasons.toMutableList()
+        var incSeason = seasons.firstOrNull()?.number ?: 1
+        var incEp = 1
+        var bumped = false
+        for (i in seasons.indices) {
+            val sec = seasons[i]
+            if (sec.currentEp < sec.totalEp) {
+                val nextEp = sec.currentEp + 1
+                seasons[i] = sec.copy(currentEp = nextEp)
+                incSeason = sec.number
+                incEp = nextEp
+                bumped = true
+                break
+            }
+        }
+        if (!bumped) return
+        val allDone = seasons.all { it.currentEp >= it.totalEp }
+        val updated = target.copy(
+            seasons = seasons,
+            season = incSeason,
+            currentEp = seasons.sumOf { it.currentEp },
+            totalEp = seasons.sumOf { it.totalEp.coerceAtLeast(1) }.coerceAtLeast(1),
+            status = if (allDone) WatchStatus.Completed else WatchStatus.Watching,
+            updatedAt = now,
+        )
+        persistItems(items.map { if (it.id == id) updated else it })
+        logWatch(updated, incSeason, incEp, 1)
     }
 
-    fun resetStreak() {
-        _streakDays.value = 0
-        _bestStreak.value = 0
-        _watchDays.value = emptySet()
-        repo.saveStreak(0, 0, "", emptySet())
+    fun setSeasonEpisode(id: String, seasonNum: Int, ep: Int) {
+        val target = items.firstOrNull { it.id == id } ?: return
+        val now = System.currentTimeMillis()
+        if (target.type == MediaType.Movie) {
+            val next = if (ep > 0) 1 else 0
+            val delta = next - (if (target.currentEp > 0) 1 else 0)
+            val updated = target.copy(
+                currentEp = next,
+                totalEp = 1,
+                status = when {
+                    next >= 1 -> WatchStatus.Completed
+                    target.status == WatchStatus.Completed -> WatchStatus.Watching
+                    else -> target.status
+                },
+                updatedAt = now,
+            )
+            persistItems(items.map { if (it.id == id) updated else it })
+            if (delta > 0) logWatch(updated, 1, 1, delta)
+            return
+        }
+        val prevSec = target.effectiveSeasons.firstOrNull { it.number == seasonNum }
+        val seasons = target.effectiveSeasons.map { sec ->
+            if (sec.number == seasonNum) sec.copy(currentEp = ep.coerceIn(0, sec.totalEp.coerceAtLeast(1)))
+            else sec
+        }
+        val nextSec = seasons.firstOrNull { it.number == seasonNum }
+        val delta = (nextSec?.currentEp ?: 0) - (prevSec?.currentEp ?: 0)
+        val allDone = seasons.all { it.currentEp >= it.totalEp }
+        val curSum = seasons.sumOf { it.currentEp }
+        val updated = target.copy(
+            seasons = seasons,
+            season = seasonNum,
+            currentEp = curSum,
+            totalEp = seasons.sumOf { it.totalEp.coerceAtLeast(1) }.coerceAtLeast(1),
+            status = when {
+                allDone -> WatchStatus.Completed
+                curSum > 0 && target.status == WatchStatus.PlanToWatch -> WatchStatus.Watching
+                else -> target.status
+            },
+            updatedAt = now,
+        )
+        persistItems(items.map { if (it.id == id) updated else it })
+        if (delta > 0 && nextSec != null) logWatch(updated, seasonNum, nextSec.currentEp, delta)
     }
 
-    /** Clearing history is separate from the streak and never touches progress. */
-    fun clearHistory() {
-        history = emptyList()
-        repo.clearHistory()
+    fun setStatus(id: String, status: WatchStatus) {
+        persistItems(items.map { if (it.id == id) it.copy(status = status, updatedAt = System.currentTimeMillis()) else it })
+    }
+
+    fun setRating(id: String, rating: Int) {
+        persistItems(items.map { if (it.id == id) it.copy(rating = rating.coerceIn(0, 5), updatedAt = System.currentTimeMillis()) else it })
     }
 
     fun toggleReminder(id: String) {
-        commit(items.map { m ->
-            if (m.id == id) {
-                val newStatus = !m.reminderEnabled
-                val updated = m.copy(reminderEnabled = newStatus)
-                if (newStatus && updated.releaseDate != null && updated.releaseDate > System.currentTimeMillis()) {
-                    com.seriee.app.reminder.ReminderScheduler.scheduleReminder(getApplication(), updated)
-                } else {
-                    com.seriee.app.reminder.ReminderScheduler.cancelReminder(getApplication(), id)
-                }
-                updated
-            } else m
-        })
-    }
-
-    fun testReminder(item: MediaItem) {
-        val app = getApplication<Application>()
-        com.seriee.app.reminder.ReminderScheduler.sendImmediateNotification(
-            app,
-            item.title,
-            app.getString(
-                R.string.reminder_test_message,
-                app.getString(item.type.labelRes),
-                item.title
-            ),
-            item.id
-        )
-    }
-
-    fun upsert(item: MediaItem) {
-        val synced = if (item.seasons.isNotEmpty()) {
-            val watched = item.seasons.sumOf { it.currentEp.coerceIn(0, it.totalEp) }
-            val total = item.seasons.sumOf { it.totalEp.coerceAtLeast(1) }
-            val active = item.seasons.firstOrNull { it.currentEp < it.totalEp } ?: item.seasons.lastOrNull()
-            item.copy(season = active?.number ?: item.season, currentEp = watched, totalEp = total.coerceAtLeast(1))
-        } else item
-        val exists = items.any { it.id == synced.id }
-        commit(if (exists) items.map { if (it.id == synced.id) synced else it } else listOf(synced) + items)
-
-        if (synced.reminderEnabled && synced.releaseDate != null && synced.releaseDate > System.currentTimeMillis()) {
-            com.seriee.app.reminder.ReminderScheduler.scheduleReminder(getApplication(), synced)
-        } else {
-            com.seriee.app.reminder.ReminderScheduler.cancelReminder(getApplication(), synced.id)
+        val next = items.map {
+            if (it.id == id) it.copy(reminderEnabled = !it.reminderEnabled, updatedAt = System.currentTimeMillis()) else it
         }
+        persistItems(next)
+        next.firstOrNull { it.id == id }?.let { ReminderScheduler.schedule(getApplication(), it) }
     }
 
-    fun delete(id: String) {
-        com.seriee.app.reminder.ReminderScheduler.cancelReminder(getApplication(), id)
-        items.find { it.id == id }?.poster?.let {
-            com.seriee.app.data.PosterStore.deleteIfLocal(getApplication(), it)
+    fun setReleaseDate(id: String, ms: Long?) {
+        val next = items.map {
+            if (it.id == id) it.copy(releaseDate = ms, reminderEnabled = ms != null, updatedAt = System.currentTimeMillis()) else it
         }
-        commit(items.filterNot { it.id == id })
+        persistItems(next)
+        next.firstOrNull { it.id == id }?.let { ReminderScheduler.schedule(getApplication(), it) }
     }
 
-    fun setTmdbKey(value: String) {
-        _tmdbKey.value = value.trim()
-        repo.saveTmdbKey(value.trim())
+    fun testReminderNow(item: MediaItem) {
+        val ctx = getApplication<Application>()
+        ReminderScheduler.triggerNow(ctx, item)
+        Toast.makeText(
+            ctx,
+            ctx.getString(R.string.reminder_test_message, ctx.getString(item.type.labelRes), item.title),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
-    fun setOmdbKey(value: String) {
-        _omdbKey.value = value.trim()
-        repo.saveOmdbKey(value.trim())
+    fun clearHistory() {
+        repo.clearHistory()
+        history = emptyList()
     }
 
-    fun openChangelog() {
-        _showChangelog.value = true
+    fun resetStreak() {
+        streak = repo.resetStreak()
+        val ctx = getApplication<Application>()
+        Toast.makeText(ctx, ctx.getString(R.string.streak_reset_done), Toast.LENGTH_SHORT).show()
     }
 
-    fun dismissChangelog() {
-        _showChangelog.value = false
-        repo.saveLastSeenVersionCode(currentVersionCode)
+    fun updateThemeMode(mode: AppThemeMode) {
+        themeMode = mode
+        repo.saveThemeMode(mode)
     }
 
-    fun setThemeMode(value: AppThemeMode) {
-        if (_themeMode.value == value) return
-        _themeMode.value = value
-        repo.saveTheme(_themeMode.value, _themeStyle.value)
+    fun updateThemeStyle(style: AppThemeStyle) {
+        themeStyle = style
+        repo.saveThemeStyle(style)
     }
 
-    fun setThemeStyle(value: AppThemeStyle) {
-        if (_themeStyle.value == value) return
-        _themeStyle.value = value
-        repo.saveTheme(_themeMode.value, _themeStyle.value)
+    fun updateCustomAccent(argb: Long) {
+        customTheme = customTheme.copy(accentArgb = argb)
+        repo.saveCustomAccent(argb)
     }
 
-    fun setCustomAccent(value: Color) {
-        _customAccent.value = value
-        repo.saveCustomAccent(value.toArgb())
-        ensureCustomStyle()
+    fun updateCustomBackground(startArgb: Long, endArgb: Long, grad: Boolean) {
+        customTheme = customTheme.copy(bgStartArgb = startArgb, bgEndArgb = endArgb, useGradient = grad)
+        repo.saveCustomBackground(startArgb, endArgb, grad)
     }
 
-    fun setCustomBackground(start: Color, end: Color) {
-        _customBackgroundStart.value = start
-        _customBackgroundEnd.value = end
-        repo.saveCustomBackground(start.toArgb(), end.toArgb())
-        if (!_customGradient.value) setCustomGradient(true) else ensureCustomStyle()
+    fun applyThemePreset(preset: ThemePreset) {
+        updateThemeMode(preset.mode)
+        updateThemeStyle(preset.style)
+        updateCustomAccent(preset.accentArgb)
+        updateCustomBackground(preset.bgStartArgb, preset.bgEndArgb, preset.useGradient)
     }
 
-    fun setCustomGradient(value: Boolean) {
-        _customGradient.value = value
-        repo.saveCustomGradient(value)
-        ensureCustomStyle()
+    fun updateReduceTransparency(v: Boolean) {
+        reduceTransparency = v
+        repo.saveReduceTransparency(v)
     }
 
-    /** Editing any custom colour moves the app onto the Custom style. */
-    private fun ensureCustomStyle() {
-        if (_themeStyle.value != AppThemeStyle.Custom) setThemeStyle(AppThemeStyle.Custom)
+    fun updateBatteryAmoled(v: Boolean) {
+        batteryAmoled = v
+        repo.saveBatteryAmoled(v)
     }
 
-    fun setReduceTransparency(value: Boolean) {
-        _reduceTransparency.value = value
-        repo.saveReduceTransparency(value)
+    fun updateGridView(v: Boolean) {
+        gridView = v
+        repo.saveGridView(v)
     }
 
-    fun setBatterySaverAmoled(value: Boolean) {
-        _batterySaverAmoled.value = value
-        repo.saveBatterySaverAmoled(value)
-    }
-
-    /** Portable text snapshot of the current theme, shared through the clipboard. */
-    fun themeCode(): String = ThemePresetCodec.encode(
-        com.seriee.app.data.ThemePreset(
-            mode = _themeMode.value,
-            style = _themeStyle.value,
-            accent = _customAccent.value.toArgb().toLong() and 0xFFFFFFFFL,
-            backgroundStart = _customBackgroundStart.value.toArgb().toLong() and 0xFFFFFFFFL,
-            backgroundEnd = _customBackgroundEnd.value.toArgb().toLong() and 0xFFFFFFFFL,
-            gradient = _customGradient.value,
-            reduceTransparency = _reduceTransparency.value
-        )
-    )
-
-    /** Applies a pasted theme code. Returns false when the text is not a theme. */
-    fun applyThemeCode(raw: String?): Boolean {
-        val preset = ThemePresetCodec.decode(raw) ?: return false
-        _themeMode.value = preset.mode
-        _themeStyle.value = preset.style
-        _customAccent.value = Color(preset.accent.toInt())
-        _customBackgroundStart.value = Color(preset.backgroundStart.toInt())
-        _customBackgroundEnd.value = Color(preset.backgroundEnd.toInt())
-        _customGradient.value = preset.gradient
-        _reduceTransparency.value = preset.reduceTransparency
-        repo.saveTheme(preset.mode, preset.style)
-        repo.saveCustomAccent(_customAccent.value.toArgb())
-        repo.saveCustomBackground(
-            _customBackgroundStart.value.toArgb(),
-            _customBackgroundEnd.value.toArgb()
-        )
-        repo.saveCustomGradient(preset.gradient)
-        repo.saveReduceTransparency(preset.reduceTransparency)
-        return true
-    }
-
-    fun setGridView(value: Boolean) {
-        _gridView.value = value
-        repo.saveGridView(value)
-    }
-
-    fun setLanguage(value: AppLanguage) {
-        if (_language.value == value) return
-        _language.value = value
-        repo.saveLanguage(value)
-        val locales = if (value.tag.isBlank()) {
-            LocaleListCompat.getEmptyLocaleList()
-        } else {
-            LocaleListCompat.forLanguageTags(value.tag)
-        }
+    fun updateLanguage(lang: AppLanguage) {
+        language = lang
+        repo.saveLanguage(lang)
+        val locales = if (lang.tag.isEmpty()) LocaleListCompat.getEmptyLocaleList()
+        else LocaleListCompat.forLanguageTags(lang.tag)
         AppCompatDelegate.setApplicationLocales(locales)
     }
 
-    // ------------------------------------------------------------- import UX
-
-    fun beginImport() {
-        importJob?.cancel()
-        val current = _importState.value
-        _importState.value = ImportUiState(source = current.source, mode = current.mode)
+    fun saveTmdbKey(k: String) {
+        tmdbKey = k.trim()
+        repo.saveTmdbKey(tmdbKey)
     }
 
-    fun setImportSource(source: ImportSource) {
-        importJob?.cancel()
-        _importState.value = _importState.value.copy(
-            source = source,
-            phase = ImportPhase.Idle,
-            fileName = "",
-            preview = null,
-            result = null,
-            error = null
-        )
+    fun saveOmdbKey(k: String) {
+        omdbKey = k.trim()
+        repo.saveOmdbKey(omdbKey)
     }
 
-    fun setImportMode(mode: ImportMode) {
-        _importState.value = _importState.value.copy(mode = mode)
-    }
-
-    fun fetchAniList(username: String) {
-        importJob?.cancel()
-        _importState.value = _importState.value.copy(
-            phase = ImportPhase.Loading,
-            preview = null,
-            result = null,
-            error = null
-        )
-        importJob = viewModelScope.launch {
-            try {
-                val rows = aniListClient.fetch(username)
-                val mapped = ImportMapper.fromAniList(rows)
-                if (mapped.isEmpty()) throw ImportException(ImportError.ListPrivateOrEmpty)
-                _importState.value = _importState.value.copy(
-                    phase = ImportPhase.Preview,
-                    preview = ImportMapper.preview(mapped, items)
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ImportException) {
-                _importState.value = _importState.value.copy(phase = ImportPhase.Error, error = e.error)
-            } catch (e: Exception) {
-                _importState.value = _importState.value.copy(phase = ImportPhase.Error, error = ImportError.Unknown)
-            }
-        }
-    }
-
-    fun loadMalFile(context: Context, uri: Uri, displayName: String) {
-        importJob?.cancel()
-        _importState.value = _importState.value.copy(
-            phase = ImportPhase.Loading,
-            fileName = displayName,
-            preview = null,
-            result = null,
-            error = null
-        )
-        importJob = viewModelScope.launch {
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: throw ImportException(ImportError.FileInvalid)
-                    ImportMapper.fromMal(MalXmlParser.parseBytes(bytes))
-                }
-                if (result.isEmpty()) throw ImportException(ImportError.NoEntries)
-                _importState.value = _importState.value.copy(
-                    phase = ImportPhase.Preview,
-                    preview = ImportMapper.preview(result, items)
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ImportException) {
-                _importState.value = _importState.value.copy(phase = ImportPhase.Error, error = e.error)
-            } catch (e: Exception) {
-                _importState.value = _importState.value.copy(phase = ImportPhase.Error, error = ImportError.FileInvalid)
-            }
-        }
-    }
-
-    fun applyImport() {
-        val preview = _importState.value.preview ?: return
-        val result = if (_importState.value.mode == ImportMode.Replace) {
-            // Replace drops the old library, so clear its pending alarms first.
-            items.forEach { old ->
-                if (old.reminderEnabled) {
-                    com.seriee.app.reminder.ReminderScheduler.cancelReminder(getApplication(), old.id)
+    fun exportBackupToUri(uri: Uri, onDone: (Result<Int>) -> Unit) {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val json = repo.exportBackupJson(items, history)
+                    ctx.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(json.toByteArray(Charsets.UTF_8))
+                    } ?: error(ctx.getString(R.string.error_open_output))
+                    items.size
                 }
             }
-            val (finalItems, result) = ImportMapper.replace(preview.entries)
-            commit(finalItems)
-            result
-        } else {
-            val (finalItems, result) = ImportMapper.merge(preview.entries, items)
-            commit(finalItems)
-            result
-        }
-        _importState.value = _importState.value.copy(
-            phase = ImportPhase.Done,
-            preview = null,
-            result = result
-        )
-    }
-
-    fun dismissImport() {
-        importJob?.cancel()
-        _importState.value = ImportUiState(source = _importState.value.source, mode = _importState.value.mode)
-    }
-
-    fun exportBackup(context: Context, uri: Uri): Result<Int> {
-        return runCatching {
-            val jsonString = repo.exportBackupJson(items, history)
-            context.contentResolver.openOutputStream(uri)?.use { out ->
-                out.write(jsonString.toByteArray(Charsets.UTF_8))
-                out.flush()
-            } ?: error(getApplication<Application>().getString(R.string.error_open_output))
-            items.size
+            result.onFailure { err ->
+                AppLogger.e("Backup", "Failed to export backup", err)
+            }
+            onDone(result)
         }
     }
 
-    fun importBackup(context: Context, uri: Uri, replace: Boolean): Result<Int> {
-        return runCatching {
-            val raw = context.contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader(Charsets.UTF_8).readText()
-            } ?: error(getApplication<Application>().getString(R.string.error_read_backup))
-            val payload = repo.importBackupJson(raw)
-            val imported = payload.items
-            if (imported.isEmpty()) error(getApplication<Application>().getString(R.string.error_empty_backup))
-
-            val finalItems = if (replace) {
-                imported
-            } else {
-                val importedIds = imported.map { it.id }.toSet()
-                imported + items.filterNot { it.id in importedIds }
-            }
-            commit(finalItems)
-            // Replace restores the file's history (or clears it); merge unions both sides.
-            val restoredHistory = if (replace) {
-                WatchHistoryRules.trim(payload.history ?: emptyList())
-            } else {
-                WatchHistoryRules.trim(history + (payload.history ?: emptyList()))
-            }
-            history = restoredHistory
-            repo.saveHistory(restoredHistory)
-            // Import may have restored streak history (v3 backups).
-            _streakDays.value = repo.loadStreakDays()
-            _bestStreak.value = repo.loadBestStreak()
-            _watchDays.value = repo.loadWatchDays()
-
-            // Reschedule active reminders
-            finalItems.forEach { item ->
-                if (item.reminderEnabled && item.releaseDate != null && item.releaseDate > System.currentTimeMillis()) {
-                    com.seriee.app.reminder.ReminderScheduler.scheduleReminder(getApplication(), item)
+    fun restoreBackupFromUri(uri: Uri, merge: Boolean, onDone: (Result<Int>) -> Unit) {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val parsedResult = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error(ctx.getString(R.string.error_read_backup))
+                    repo.parseBackupJson(text) ?: error(ctx.getString(R.string.error_empty_backup))
                 }
             }
-            imported.size
+            parsedResult.onSuccess { parsed ->
+                if (merge) {
+                    val existingIds = items.map { it.id }.toSet()
+                    val mergedItems = items + parsed.items.filterNot { it.id in existingIds }
+                    val mergedHistory = WatchHistoryRules.merge(history, parsed.history)
+                    persistItems(mergedItems)
+                    history = mergedHistory
+                    repo.saveHistory(mergedHistory)
+                    if (parsed.streak.streakDays > streak.streakDays || parsed.streak.bestStreak > streak.bestStreak) {
+                        val mergedStreak = StreakState(
+                            streakDays = maxOf(streak.streakDays, parsed.streak.streakDays),
+                            bestStreak = maxOf(streak.bestStreak, parsed.streak.bestStreak),
+                            lastWatchDay = parsed.streak.lastWatchDay ?: streak.lastWatchDay,
+                            watchDays = (streak.watchDays + parsed.streak.watchDays).toList().takeLast(7).toSet()
+                        )
+                        streak = mergedStreak
+                        repo.restoreStreak(mergedStreak)
+                    }
+                } else {
+                    persistItems(parsed.items)
+                    val trimmed = WatchHistoryRules.trim(parsed.history)
+                    history = trimmed
+                    repo.saveHistory(trimmed)
+                    streak = parsed.streak
+                    repo.restoreStreak(parsed.streak)
+                }
+                ReminderScheduler.rescheduleAll(ctx, items)
+                onDone(Result.success(parsed.items.size))
+            }.onFailure { err ->
+                AppLogger.e("Restore", "Failed to restore backup", err)
+                onDone(Result.failure(err))
+            }
         }
+    }
+
+    fun fetchAniListEntries(username: String, onResult: (Result<List<ImportedEntry>>) -> Unit) {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val res = runCatching {
+                val rows = AniListListClient.fetch(username)
+                ImportMapper.fromAniList(rows)
+            }.recoverCatching { err ->
+                AppLogger.e("AniListImport", "AniList fetch failed for $username", err)
+                val msg = when ((err as? ImportFetchException)?.code) {
+                    ImportFetchErrorCode.USER_NOT_FOUND -> ctx.getString(R.string.import_error_user_not_found)
+                    ImportFetchErrorCode.PRIVATE_OR_EMPTY -> ctx.getString(R.string.import_error_private_or_empty)
+                    ImportFetchErrorCode.RATE_LIMITED -> ctx.getString(R.string.import_error_rate_limited)
+                    ImportFetchErrorCode.NETWORK -> ctx.getString(R.string.import_error_network)
+                    ImportFetchErrorCode.PARSE -> ctx.getString(R.string.import_error_parse)
+                    else -> ctx.getString(R.string.import_error_unknown)
+                }
+                error(msg)
+            }
+            onResult(res)
+        }
+    }
+
+    fun parseMalUri(uri: Uri, onResult: (Result<List<ImportedEntry>>) -> Unit) {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val res = withContext(Dispatchers.IO) {
+                runCatching {
+                    val entries = ctx.contentResolver.openInputStream(uri)?.use { MalXmlParser.parseStream(it) }
+                        ?: error(ctx.getString(R.string.import_error_file_invalid))
+                    ImportMapper.fromMal(entries)
+                }
+            }
+            res.onFailure { err ->
+                AppLogger.e("MalImport", "MAL XML parse failed", err)
+            }
+            onResult(res)
+        }
+    }
+
+    fun applyImport(entries: List<ImportedEntry>, mode: ImportMode): ImportSummary {
+        val (nextItems, summary) = when (mode) {
+            ImportMode.MERGE -> ImportMapper.merge(items, entries)
+            ImportMode.REPLACE -> ImportMapper.replace(entries)
+        }
+        persistItems(nextItems)
+        ReminderScheduler.rescheduleAll(getApplication(), nextItems)
+        return summary
     }
 }

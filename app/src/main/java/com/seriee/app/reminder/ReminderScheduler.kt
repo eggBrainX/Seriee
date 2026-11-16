@@ -1,245 +1,166 @@
 package com.seriee.app.reminder
 
 import android.app.AlarmManager
-import android.app.NotificationChannel
-import android.app.NotificationManager
+import android.app.DatePickerDialog
 import android.app.PendingIntent
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import com.seriee.app.MainActivity
 import com.seriee.app.R
 import com.seriee.app.data.MediaItem
-import com.seriee.app.ui.findActivity
+import com.seriee.app.debug.AppLogger
 import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 object ReminderScheduler {
-    const val CHANNEL_ID = "seriee_reminders"
-
-    fun createNotificationChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = context.getString(R.string.notification_channel_name)
-            val descriptionText = context.getString(R.string.notification_channel_desc)
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-                description = descriptionText
-                enableVibration(true)
-            }
-            val notificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-
-    fun scheduleReminder(context: Context, item: MediaItem) {
+    fun schedule(context: Context, item: MediaItem) {
+        cancel(context, item.id)
         val release = item.releaseDate ?: return
-        if (release <= System.currentTimeMillis() || !item.reminderEnabled) return
+        if (!item.reminderEnabled || release <= System.currentTimeMillis()) return
 
-        createNotificationChannel(context)
-
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra(ReminderReceiver.EXTRA_ID, item.id)
             putExtra(ReminderReceiver.EXTRA_TITLE, item.title)
-            putExtra(ReminderReceiver.EXTRA_TYPE, item.type.name)
+            putExtra(ReminderReceiver.EXTRA_TYPE, context.getString(item.type.labelRes))
         }
-        val pendingIntent = PendingIntent.getBroadcast(
+        val pi = PendingIntent.getBroadcast(
             context,
             item.id.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, release, pendingIntent)
-                } else {
-                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, release, pendingIntent)
-                }
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, release, pi)
             } else {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, release, pendingIntent)
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, release, pi)
             }
-        } catch (e: SecurityException) {
-            alarmManager.set(AlarmManager.RTC_WAKEUP, release, pendingIntent)
+        }.onFailure { err ->
+            AppLogger.w("Reminder", "Exact alarm fallback for ${item.title}", err)
+            runCatching { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, release, pi) }
+                .onFailure { AppLogger.e("Reminder", "Failed to schedule alarm for ${item.title}", it) }
         }
     }
 
-    fun cancelReminder(context: Context, itemId: String) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+    fun cancel(context: Context, itemId: String) {
+        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ReminderReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
+        val pi = PendingIntent.getBroadcast(
             context,
             itemId.hashCode(),
             intent,
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
-        if (pendingIntent != null) {
-            alarmManager.cancel(pendingIntent)
-            pendingIntent.cancel()
-        }
+        if (pi != null) am.cancel(pi)
     }
 
-    fun sendImmediateNotification(context: Context, title: String, message: String, itemId: String) {
-        createNotificationChannel(context)
-        val tapIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("open_media_id", itemId)
-        }
-        val tapPending = PendingIntent.getActivity(
+    fun rescheduleAll(context: Context, items: List<MediaItem>) {
+        items.forEach { schedule(context, it) }
+    }
+
+    fun triggerNow(context: Context, item: MediaItem) {
+        ReminderReceiver.showNotification(
             context,
-            itemId.hashCode(),
-            tapIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            item.id,
+            context.getString(item.type.labelRes),
+            item.title
         )
+    }
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(context.getString(R.string.reminder_title_prefix, title))
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(tapPending)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .build()
-
-        try {
-            NotificationManagerCompat.from(context).notify(itemId.hashCode(), notification)
-        } catch (e: SecurityException) {
-            // Ignored if permission revoked
+    fun showDateTimePicker(context: Context, initialMs: Long?, onPicked: (Long) -> Unit) {
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = initialMs ?: (System.currentTimeMillis() + 86_400_000L)
         }
+        DatePickerDialog(
+            context,
+            { _, y, m, d ->
+                cal.set(Calendar.YEAR, y)
+                cal.set(Calendar.MONTH, m)
+                cal.set(Calendar.DAY_OF_MONTH, d)
+                TimePickerDialog(
+                    context,
+                    { _, h, min ->
+                        cal.set(Calendar.HOUR_OF_DAY, h)
+                        cal.set(Calendar.MINUTE, min)
+                        cal.set(Calendar.SECOND, 0)
+                        onPicked(cal.timeInMillis)
+                    },
+                    cal.get(Calendar.HOUR_OF_DAY),
+                    cal.get(Calendar.MINUTE),
+                    true
+                ).show()
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
     }
 
-    fun formatReleaseDate(context: Context, ts: Long?): String {
-        if (ts == null || ts <= 0) return context.getString(R.string.date_not_set)
-        val sdf = SimpleDateFormat("EEEE, dd MMM yyyy • HH:mm", Locale.getDefault())
-        return sdf.format(ts)
+    fun formatReleaseDate(context: Context, ms: Long?): String {
+        if (ms == null) return context.getString(R.string.date_not_set)
+        val fmt = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+        return fmt.format(Date(ms))
     }
 
-    fun formatShortDate(context: Context, ts: Long?): String {
-        if (ts == null || ts <= 0) return ""
-        val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-        return sdf.format(ts)
-    }
-
-    fun timeUntilRelease(context: Context, ts: Long?): String {
-        if (ts == null || ts <= 0) return context.getString(R.string.no_schedule)
-        val diff = ts - System.currentTimeMillis()
-        if (diff <= 0) return context.getString(R.string.already_aired)
-        val minutes = diff / (60 * 1000)
-        val hours = minutes / 60
-        val days = hours / 24
-
-        return when {
-            days > 0 -> context.getString(R.string.airs_in_days, days)
-            hours > 0 -> context.getString(R.string.airs_in_hours, hours)
-            minutes > 0 -> context.getString(R.string.airs_in_minutes, minutes)
-            else -> context.getString(R.string.airs_soon)
-        }
-    }
-
-    fun daysUntilRelease(ts: Long?): Int {
-        if (ts == null || ts <= 0) return 0
-        val diff = ts - System.currentTimeMillis()
-        if (diff <= 0) return 0
-        return ((diff + 86400000L - 1) / 86400000L).toInt()
-    }
-
-    fun countdownShortBadge(context: Context, ts: Long?): String {
-        if (ts == null || ts <= 0) return context.getString(R.string.badge_soon)
-        val diff = ts - System.currentTimeMillis()
+    fun countdownShortBadge(context: Context, ms: Long?): String {
+        if (ms == null) return ""
+        val diff = ms - System.currentTimeMillis()
         if (diff <= 0) return context.getString(R.string.badge_today)
-        val days = diff / (86400 * 1000)
+        val days = (diff / 86_400_000L).toInt()
+        if (days >= 1) return context.getString(R.string.badge_d_days, days)
+        val hours = (diff / 3_600_000L).toInt()
+        if (hours >= 1) return context.getString(R.string.badge_hours_left, hours)
+        return context.getString(R.string.badge_soon)
+    }
+
+    fun countdownBadgeText(context: Context, ms: Long?): String {
+        if (ms == null) return context.getString(R.string.no_schedule)
+        val diff = ms - System.currentTimeMillis()
+        if (diff <= 0) return context.getString(R.string.countdown_today)
+        val days = (diff / 86_400_000L).toInt()
         return when {
-            days > 0 -> context.getString(R.string.badge_d_days, days)
+            days > 1 -> context.getString(R.string.countdown_days, days)
+            days == 1 -> context.getString(R.string.countdown_one_day)
             else -> {
-                val hours = (diff / (3600 * 1000)).coerceAtLeast(1)
-                context.getString(R.string.badge_hours_left, hours)
+                val hours = (diff / 3_600_000L).toInt()
+                if (hours >= 1) context.getString(R.string.countdown_hours, hours)
+                else context.getString(R.string.countdown_under_hour)
             }
         }
     }
 
-    fun countdownBadgeText(context: Context, ts: Long?): String {
-        if (ts == null || ts <= 0) return context.getString(R.string.status_coming_soon)
-        val diff = ts - System.currentTimeMillis()
-        if (diff <= 0) return context.getString(R.string.countdown_today)
-        val days = diff / (86400 * 1000)
-        val hours = (diff / (3600 * 1000))
-        return when {
-            days > 1 -> context.getString(R.string.countdown_days, days)
-            days == 1L -> context.getString(R.string.countdown_one_day)
-            hours > 0 -> context.getString(R.string.countdown_hours, hours)
-            else -> context.getString(R.string.countdown_under_hour)
-        }
-    }
-
-    fun countdownDetailedText(context: Context, ts: Long?): String {
-        if (ts == null || ts <= 0) return context.getString(R.string.schedule_not_set)
-        val diff = ts - System.currentTimeMillis()
+    fun countdownDetailedText(context: Context, ms: Long?): String {
+        if (ms == null) return context.getString(R.string.schedule_not_set)
+        val diff = ms - System.currentTimeMillis()
         if (diff <= 0) return context.getString(R.string.released_today)
-        val totalHours = diff / (3600 * 1000)
-        val days = diff / (86400 * 1000)
-        val remainingHours = totalHours % 24
-        val minutes = (diff / (60 * 1000)) % 60
-
+        val totalMin = (diff / 60_000L).toInt()
+        val days = totalMin / (60 * 24)
+        val hours = (totalMin % (60 * 24)) / 60
+        val min = totalMin % 60
         return when {
-            days > 0 -> if (remainingHours > 0) context.getString(R.string.detailed_days_hours, days, remainingHours)
+            days > 0 -> if (hours > 0) context.getString(R.string.detailed_days_hours, days, hours)
             else context.getString(R.string.detailed_days, days)
-            totalHours > 0 -> context.getString(R.string.detailed_hours_minutes, totalHours, minutes)
-            else -> context.getString(R.string.detailed_minutes, minutes)
+            hours > 0 -> context.getString(R.string.detailed_hours_minutes, hours, min)
+            else -> context.getString(R.string.detailed_minutes, maxOf(1, min))
         }
     }
 
-    fun showDateTimePicker(
-        context: Context,
-        initialDate: Long? = null,
-        onDateTimeSelected: (Long) -> Unit
-    ) {
-        val activity = context.findActivity() ?: return
-        if (activity.isFinishing || activity.isDestroyed) return
-
-        val cal = java.util.Calendar.getInstance()
-        if (initialDate != null && initialDate > 0) {
-            cal.timeInMillis = initialDate
-        } else {
-            cal.add(java.util.Calendar.DAY_OF_YEAR, 3)
-            cal.set(java.util.Calendar.HOUR_OF_DAY, 19)
-            cal.set(java.util.Calendar.MINUTE, 0)
-            cal.set(java.util.Calendar.SECOND, 0)
+    fun timeUntilRelease(context: Context, ms: Long?): String {
+        if (ms == null) return context.getString(R.string.no_schedule)
+        val diff = ms - System.currentTimeMillis()
+        if (diff <= 0) return context.getString(R.string.already_aired)
+        val days = (diff / 86_400_000L).toInt()
+        val hours = ((diff % 86_400_000L) / 3_600_000L).toInt()
+        val min = ((diff % 3_600_000L) / 60_000L).toInt()
+        return when {
+            days >= 1 -> context.getString(R.string.airs_in_days, days)
+            hours >= 1 -> context.getString(R.string.airs_in_hours, hours)
+            min >= 1 -> context.getString(R.string.airs_in_minutes, min)
+            else -> context.getString(R.string.airs_soon)
         }
-
-        val datePicker = android.app.DatePickerDialog(
-            activity,
-            { _, year, month, dayOfMonth ->
-                if (activity.isFinishing || activity.isDestroyed) return@DatePickerDialog
-                cal.set(java.util.Calendar.YEAR, year)
-                cal.set(java.util.Calendar.MONTH, month)
-                cal.set(java.util.Calendar.DAY_OF_MONTH, dayOfMonth)
-
-                val timePicker = android.app.TimePickerDialog(
-                    activity,
-                    { _, hourOfDay, minute ->
-                        cal.set(java.util.Calendar.HOUR_OF_DAY, hourOfDay)
-                        cal.set(java.util.Calendar.MINUTE, minute)
-                        cal.set(java.util.Calendar.SECOND, 0)
-                        cal.set(java.util.Calendar.MILLISECOND, 0)
-                        onDateTimeSelected(cal.timeInMillis)
-                    },
-                    cal.get(java.util.Calendar.HOUR_OF_DAY),
-                    cal.get(java.util.Calendar.MINUTE),
-                    true
-                )
-                timePicker.setTitle(activity.getString(R.string.pick_airing_time))
-                runCatching { timePicker.show() }
-            },
-            cal.get(java.util.Calendar.YEAR),
-            cal.get(java.util.Calendar.MONTH),
-            cal.get(java.util.Calendar.DAY_OF_MONTH)
-        )
-        datePicker.setTitle(activity.getString(R.string.pick_release_date_title))
-        runCatching { datePicker.show() }
     }
 }

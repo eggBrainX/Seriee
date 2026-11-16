@@ -1,173 +1,151 @@
 package com.seriee.app.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.json.JSONObject
-import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-/**
- * Reads a public AniList anime list without authentication.
- *
- * `Page.mediaList` is used instead of `MediaListCollection` so large lists can
- * be streamed in pages of 50. No username or token is persisted.
- */
-class AniListListClient(
-    private val endpoint: String = "https://graphql.anilist.co"
-) {
+enum class ImportFetchErrorCode {
+    USER_NOT_FOUND,
+    PRIVATE_OR_EMPTY,
+    RATE_LIMITED,
+    NETWORK,
+    PARSE,
+    UNKNOWN,
+}
 
-    suspend fun fetch(userName: String): List<AniListEntry> = withContext(Dispatchers.IO) {
-        val user = userName.trim()
-        if (user.isBlank()) throw ImportException(ImportError.UserNotFound)
+class ImportFetchException(val code: ImportFetchErrorCode, message: String? = null) :
+    Exception(message ?: code.name)
 
-        val entries = ArrayList<AniListEntry>()
+object AniListListClient {
+    private const val QUERY = """
+        query (${'$'}userName: String, ${'$'}page: Int) {
+          Page(page: ${'$'}page, perPage: 50) {
+            pageInfo { hasNextPage }
+            mediaList(userName: ${'$'}userName, type: ANIME, sort: UPDATED_TIME_DESC) {
+              status
+              progress
+              score(format: POINT_100)
+              media {
+                id format episodes genres description(asHtml: false)
+                title { romaji english native }
+                coverImage { extraLarge large }
+              }
+            }
+          }
+        }
+    """
+
+    suspend fun fetch(username: String): List<AniListListRow> = withContext(Dispatchers.IO) {
+        val clean = username.trim()
+        if (clean.isEmpty()) throw ImportFetchException(ImportFetchErrorCode.USER_NOT_FOUND)
+        val rows = ArrayList<AniListListRow>()
         var page = 1
         var hasNext = true
-        var retried = false
 
         while (hasNext && page <= 40) {
-            val payload = requestBody(user, page)
-            val json = try {
-                post(payload)
-            } catch (e: ImportException) {
-                if (e.error == ImportError.RateLimited && !retried) {
-                    retried = true
-                    try {
-                        Thread.sleep(1200)
-                    } catch (_: InterruptedException) {
-                        throw ImportException(ImportError.Cancelled)
-                    }
-                    post(payload)
-                } else {
-                    throw e
+            var code: Int
+            var body: String
+            fun exec(): Pair<Int, String> {
+                val payload = JSONObject().apply {
+                    put("query", QUERY)
+                    put("variables", JSONObject().apply {
+                        put("userName", clean)
+                        put("page", page)
+                    })
+                }.toString()
+                val conn = (URL("https://graphql.anilist.co").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 15_000
+                    readTimeout = 15_000
+                    setRequestProperty("Content-Type", "application/json")
+                    setRequestProperty("Accept", "application/json")
+                    doOutput = true
                 }
+                conn.outputStream.use { it.write(payload.toByteArray()) }
+                val c = conn.responseCode
+                val text = (if (c in 200..299) conn.inputStream else conn.errorStream)
+                    ?.bufferedReader()?.use { it.readText() } ?: ""
+                return c to text
+            }
+
+            try {
+                val res = exec()
+                code = res.first
+                body = res.second
+                if (code == 429) {
+                    delay(1500)
+                    val retry = exec()
+                    code = retry.first
+                    body = retry.second
+                }
+            } catch (e: ImportFetchException) {
+                throw e
+            } catch (_: Exception) {
+                throw ImportFetchException(ImportFetchErrorCode.NETWORK)
+            }
+
+            if (code == 429) throw ImportFetchException(ImportFetchErrorCode.RATE_LIMITED)
+            if (code == 404) throw ImportFetchException(ImportFetchErrorCode.USER_NOT_FOUND)
+            if (code !in 200..299) throw ImportFetchException(ImportFetchErrorCode.UNKNOWN)
+
+            val json = runCatching { JSONObject(body) }.getOrElse {
+                throw ImportFetchException(ImportFetchErrorCode.PARSE)
+            }
+            val errs = json.optJSONArray("errors")
+            if (errs != null && errs.length() > 0) {
+                val msg = errs.optJSONObject(0)?.optString("message", "")?.lowercase() ?: ""
+                val st = errs.optJSONObject(0)?.optInt("status", 0) ?: 0
+                if (st == 404 || "not found" in msg) throw ImportFetchException(ImportFetchErrorCode.USER_NOT_FOUND)
+                if ("private" in msg) throw ImportFetchException(ImportFetchErrorCode.PRIVATE_OR_EMPTY)
+                throw ImportFetchException(ImportFetchErrorCode.UNKNOWN)
             }
 
             val pageObj = json.optJSONObject("data")?.optJSONObject("Page")
-                ?: throw ImportException(ImportError.Parse)
-            val rows = pageObj.optJSONArray("mediaList") ?: JSONArray()
-            for (i in 0 until rows.length()) {
-                val row = rows.optJSONObject(i) ?: continue
-                val media = row.optJSONObject("media") ?: continue
-                val titleObj = media.optJSONObject("title")
-                val title = str(titleObj, "english")
-                    .ifBlank { str(titleObj, "romaji") }
-                    .ifBlank { str(titleObj, "native") }
-                if (title.isBlank()) continue
-                entries.add(
-                    AniListEntry(
-                        id = media.optLong("id", 0L),
-                        title = title,
-                        format = str(media, "format"),
-                        totalEpisodes = media.optInt("episodes", 0),
-                        progress = row.optInt("progress", 0),
-                        score10 = row.optDouble("score", 0.0),
-                        status = str(row, "status"),
-                        poster = str(media.optJSONObject("coverImage"), "large"),
-                        genres = stringList(media.optJSONArray("genres")),
-                        description = str(media, "description"),
-                        notes = str(row, "notes")
+                ?: throw ImportFetchException(ImportFetchErrorCode.PARSE)
+            hasNext = pageObj.optJSONObject("pageInfo")?.optBoolean("hasNextPage", false) ?: false
+            val listArr = pageObj.optJSONArray("mediaList")
+            if (listArr != null) {
+                for (i in 0 until listArr.length()) {
+                    val item = listArr.optJSONObject(i) ?: continue
+                    val media = item.optJSONObject("media") ?: continue
+                    val tObj = media.optJSONObject("title")
+                    val title = listOf("english", "romaji", "native")
+                        .firstNotNullOfOrNull { k -> tObj?.optString(k)?.takeIf { it.isNotBlank() && it != "null" } }
+                        ?: "Untitled"
+                    val cover = media.optJSONObject("coverImage")
+                    val poster = cover?.optString("extraLarge")?.takeIf { it.isNotBlank() && it != "null" }
+                        ?: cover?.optString("large")?.takeIf { it.isNotBlank() && it != "null" }
+                        ?: ""
+                    val gArr = media.optJSONArray("genres")
+                    val genres = if (gArr != null) {
+                        (0 until gArr.length()).mapNotNull { gArr.optString(it).takeIf { s -> s.isNotBlank() } }
+                    } else emptyList()
+                    rows.add(
+                        AniListListRow(
+                            mediaId = media.optInt("id", 0),
+                            title = title,
+                            format = media.optString("format", "TV"),
+                            episodes = media.optInt("episodes", 0),
+                            status = item.optString("status", "PLANNING"),
+                            progress = item.optInt("progress", 0),
+                            score100 = item.optInt("score", 0),
+                            poster = poster,
+                            genres = genres,
+                            description = media.optString("description", "")
+                                .replace(Regex("<[^>]*>"), " ")
+                                .replace(Regex("\\s+"), " ")
+                                .trim(),
+                        )
                     )
-                )
+                }
             }
-
-            hasNext = pageObj.optJSONObject("pageInfo")?.optBoolean("hasNextPage") ?: false
             page++
         }
 
-        if (entries.isEmpty()) throw ImportException(ImportError.ListPrivateOrEmpty)
-        entries
-    }
-
-    private fun requestBody(userName: String, page: Int): JSONObject {
-        val query = """
-            query (${'$'}userName: String, ${'$'}page: Int) {
-              Page(page: ${'$'}page, perPage: 50) {
-                pageInfo { hasNextPage }
-                mediaList(userName: ${'$'}userName, type: ANIME, sort: [UPDATED_TIME_DESC]) {
-                  status progress repeat notes
-                  score(format: POINT_10)
-                  media {
-                    id episodes format genres description
-                    title { english romaji native }
-                    coverImage { large }
-                  }
-                }
-              }
-            }
-        """.trimIndent()
-        return JSONObject().apply {
-            put("query", query)
-            put("variables", JSONObject().put("userName", userName).put("page", page))
-        }
-    }
-
-    private fun post(body: JSONObject): JSONObject {
-        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15_000
-            readTimeout = 15_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
-        }
-
-        val text = try {
-            connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            when {
-                code == 429 -> throw ImportException(ImportError.RateLimited)
-                code == 404 -> throw ImportException(ImportError.UserNotFound)
-                code !in 200..299 -> throw ImportException(
-                    if (response.contains("private", ignoreCase = true)) {
-                        ImportError.ListPrivateOrEmpty
-                    } else {
-                        ImportError.Network
-                    }
-                )
-            }
-            response
-        } catch (e: ImportException) {
-            throw e
-        } catch (e: IOException) {
-            throw ImportException(ImportError.Network, e)
-        } finally {
-            connection.disconnect()
-        }
-
-        val json = try {
-            JSONObject(text)
-        } catch (e: Exception) {
-            throw ImportException(ImportError.Parse, e)
-        }
-
-        val errors = json.optJSONArray("errors")
-        if (errors != null && errors.length() > 0) {
-            val message = errors.optJSONObject(0)?.optString("message").orEmpty()
-            throw ImportException(
-                when {
-                    message.contains("not found", ignoreCase = true) -> ImportError.UserNotFound
-                    message.contains("private", ignoreCase = true) -> ImportError.ListPrivateOrEmpty
-                    else -> ImportError.Parse
-                }
-            )
-        }
-        return json
-    }
-
-    private fun str(obj: JSONObject?, key: String): String {
-        if (obj == null || obj.isNull(key)) return ""
-        return obj.optString(key, "").trim()
-    }
-
-    private fun stringList(array: JSONArray?): List<String> {
-        if (array == null) return emptyList()
-        return (0 until array.length()).mapNotNull { i ->
-            array.optString(i).trim().takeIf { it.isNotEmpty() }
-        }
+        if (rows.isEmpty()) throw ImportFetchException(ImportFetchErrorCode.PRIVATE_OR_EMPTY)
+        rows
     }
 }
