@@ -92,8 +92,9 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     val currentVersionName: String = BuildConfig.VERSION_NAME
 
     private fun commit(newItems: List<MediaItem>) {
-        items = newItems
-        repo.saveItems(newItems)
+        val uniqueItems = newItems.distinctBy { it.id }
+        items = uniqueItems
+        repo.saveItems(uniqueItems)
     }
 
     init {

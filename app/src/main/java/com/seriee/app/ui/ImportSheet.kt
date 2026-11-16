@@ -2,12 +2,19 @@ package com.seriee.app.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +34,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -48,6 +56,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,34 +100,53 @@ fun ImportSheet(
     }
 
     if (confirmReplace) {
-        AlertDialog(
-            onDismissRequest = { confirmReplace = false },
-            title = { Text(stringResource(R.string.import_replace_confirm_title)) },
-            text = { Text(stringResource(R.string.import_replace_confirm_message, vm.items.size)) },
-            confirmButton = {
-                TextButton(onClick = {
+        if (p.isNeoBrutalist) {
+            NeoBrutalistConfirmDialog(
+                title = stringResource(R.string.import_replace_confirm_title),
+                message = stringResource(R.string.import_replace_confirm_message, vm.items.size),
+                confirmLabel = stringResource(R.string.import_replace_confirm),
+                dismissLabel = stringResource(R.string.cancel),
+                confirmColor = NeoBrutalistColors.CoralRed,
+                onConfirm = {
                     confirmReplace = false
                     vm.applyImport()
-                }) {
-                    Text(stringResource(R.string.import_replace_confirm), color = p.danger)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmReplace = false }) {
-                    Text(stringResource(R.string.cancel), color = p.muted)
-                }
-            },
-            containerColor = p.elevated,
-            titleContentColor = p.text,
-            textContentColor = p.muted
-        )
+                },
+                onDismiss = { confirmReplace = false }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { confirmReplace = false },
+                title = { Text(stringResource(R.string.import_replace_confirm_title)) },
+                text = { Text(stringResource(R.string.import_replace_confirm_message, vm.items.size)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmReplace = false
+                        vm.applyImport()
+                    }) {
+                        Text(stringResource(R.string.import_replace_confirm), color = p.danger)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmReplace = false }) {
+                        Text(stringResource(R.string.cancel), color = p.muted)
+                    }
+                },
+                containerColor = p.elevated,
+                titleContentColor = p.text,
+                textContentColor = p.muted
+            )
+        }
     }
 
     ModalBottomSheet(
         onDismissRequest = { close() },
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(
+            topStart = if (p.isNeoBrutalist) 8.dp else 28.dp,
+            topEnd = if (p.isNeoBrutalist) 8.dp else 28.dp
+        ),
         containerColor = if (p.isGlass) p.surface.copy(alpha = if (p.isLight) 0.90f else 0.84f) else p.surface,
+        tonalElevation = if (p.isNeoBrutalist) 0.dp else BottomSheetDefaults.Elevation,
         scrimColor = Color.Black.copy(alpha = 0.55f),
         dragHandle = { SheetDragHandle() }
     ) {
@@ -132,261 +161,342 @@ fun ImportSheet(
                     .padding(bottom = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-            // Header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(p.accentSoft),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Filled.CloudDownload, null, tint = p.accent, modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.import_title),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = p.text
-                    )
-                    Text(
-                        stringResource(R.string.import_subtitle),
-                        fontSize = 11.sp,
-                        color = p.muted
-                    )
-                }
-                Box(
-                    Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .clickable { close() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Filled.Close, stringResource(R.string.close), tint = p.muted, modifier = Modifier.size(18.dp))
-                }
-            }
-
-            SegmentedTabs(
-                labels = listOf(
-                    stringResource(R.string.import_source_anilist),
-                    stringResource(R.string.import_source_mal)
-                ),
-                selected = if (state.source == ImportSource.AniList) 0 else 1,
-                onSelect = {
-                    localErrorRes = null
-                    vm.setImportSource(
-                        if (it == 0) ImportSource.AniList else ImportSource.MyAnimeList
-                    )
-                }
-            )
-
-            // Merge / replace
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RadioCard(
-                    title = stringResource(R.string.import_mode_merge),
-                    subtitle = stringResource(R.string.import_mode_merge_desc),
-                    selected = state.mode == ImportMode.Merge,
-                    onClick = { vm.setImportMode(ImportMode.Merge) }
-                )
-                RadioCard(
-                    title = stringResource(R.string.import_mode_replace),
-                    subtitle = stringResource(R.string.import_mode_replace_desc),
-                    selected = state.mode == ImportMode.Replace,
-                    onClick = { vm.setImportMode(ImportMode.Replace) }
-                )
-            }
-
-            HorizontalDivider(color = p.border)
-
-            when (state.phase) {
-                ImportPhase.Done -> ResultBlock(vm, onViewLibrary, { close() })
-
-                else -> {
-                    if (state.source == ImportSource.AniList) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                stringResource(R.string.import_anilist_username),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = p.muted
-                            )
-                            SField(
-                                value = username,
-                                onChange = {
-                                    username = it
-                                    localErrorRes = null
-                                },
-                                placeholder = stringResource(R.string.import_anilist_hint)
-                            )
-                            Text(
-                                stringResource(R.string.import_anilist_privacy),
-                                fontSize = 10.sp,
-                                color = p.muted,
-                                lineHeight = 14.sp
+                // Header
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(if (p.isNeoBrutalist) 6.dp else 12.dp))
+                            .background(if (p.isNeoBrutalist) NeoBrutalistColors.Yellow else p.accentSoft)
+                            .then(
+                                if (p.isNeoBrutalist) {
+                                    Modifier.border(2.dp, p.border, RoundedCornerShape(6.dp))
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Filled.CloudDownload,
+                            null,
+                            tint = if (p.isNeoBrutalist) NeoBrutalistColors.Black else p.accent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.import_title),
+                            fontSize = 18.sp,
+                            fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
+                            color = p.text
+                        )
+                        Text(
+                            stringResource(R.string.import_subtitle),
+                            fontSize = 11.sp,
+                            color = p.muted
+                        )
+                    }
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            onClick = { close() },
+                            role = Role.Button,
+                            backgroundColor = NeoBrutalistColors.OffWhite,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.dp,
+                            shadowOffset = 2.dp,
+                            cornerRadius = 6.dp,
+                            modifier = Modifier.size(38.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Close,
+                                stringResource(R.string.close),
+                                tint = NeoBrutalistColors.Black,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            SecondaryButton(
-                                text = stringResource(R.string.import_mal_pick),
-                                onClick = { filePicker.launch(arrayOf("*/*")) }
-                            )
-                            if (state.fileName.isNotBlank()) {
+                        Box(
+                            Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable { close() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Close, stringResource(R.string.close), tint = p.muted, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+
+                SegmentedTabs(
+                    labels = listOf(
+                        stringResource(R.string.import_source_anilist),
+                        stringResource(R.string.import_source_mal)
+                    ),
+                    selected = if (state.source == ImportSource.AniList) 0 else 1,
+                    onSelect = {
+                        localErrorRes = null
+                        vm.setImportSource(
+                            if (it == 0) ImportSource.AniList else ImportSource.MyAnimeList
+                        )
+                    }
+                )
+
+                // Merge / replace
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RadioCard(
+                        title = stringResource(R.string.import_mode_merge),
+                        subtitle = stringResource(R.string.import_mode_merge_desc),
+                        selected = state.mode == ImportMode.Merge,
+                        onClick = { vm.setImportMode(ImportMode.Merge) }
+                    )
+                    RadioCard(
+                        title = stringResource(R.string.import_mode_replace),
+                        subtitle = stringResource(R.string.import_mode_replace_desc),
+                        selected = state.mode == ImportMode.Replace,
+                        onClick = { vm.setImportMode(ImportMode.Replace) }
+                    )
+                }
+
+                HorizontalDivider(
+                    thickness = if (p.isNeoBrutalist) 2.dp else 1.dp,
+                    color = p.border
+                )
+
+                when (state.phase) {
+                    ImportPhase.Done -> ResultBlock(vm, onViewLibrary, { close() })
+
+                    else -> {
+                        if (state.source == ImportSource.AniList) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    stringResource(R.string.import_mal_selected, state.fileName),
+                                    stringResource(R.string.import_anilist_username),
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = p.success
+                                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                    fontWeight = FontWeight.Bold,
+                                    color = p.muted
                                 )
-                            }
-                            Row(verticalAlignment = Alignment.Top) {
-                                Icon(Icons.Filled.Info, null, tint = p.muted, modifier = Modifier.size(12.dp))
-                                Spacer(Modifier.width(5.dp))
+                                SField(
+                                    value = username,
+                                    onChange = {
+                                        username = it
+                                        localErrorRes = null
+                                    },
+                                    placeholder = stringResource(R.string.import_anilist_hint)
+                                )
                                 Text(
-                                    stringResource(R.string.import_mal_help),
+                                    stringResource(R.string.import_anilist_privacy),
                                     fontSize = 10.sp,
                                     color = p.muted,
                                     lineHeight = 14.sp
                                 )
                             }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                SecondaryButton(
+                                    text = stringResource(R.string.import_mal_pick),
+                                    onClick = { filePicker.launch(arrayOf("*/*")) }
+                                )
+                                if (state.fileName.isNotBlank()) {
+                                    Text(
+                                        stringResource(R.string.import_mal_selected, state.fileName),
+                                        fontSize = 11.sp,
+                                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                        fontWeight = FontWeight.Bold,
+                                        color = p.success
+                                    )
+                                }
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Icon(Icons.Filled.Info, null, tint = p.muted, modifier = Modifier.size(12.dp))
+                                    Spacer(Modifier.width(5.dp))
+                                    Text(
+                                        stringResource(R.string.import_mal_help),
+                                        fontSize = 10.sp,
+                                        color = p.muted,
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
                         }
-                    }
 
-                    if (state.phase == ImportPhase.Loading) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LinearProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(3.dp)
-                                    .clip(RoundedCornerShape(50)),
-                                color = p.primary,
-                                trackColor = p.chip
-                            )
-                            Text(
-                                stringResource(R.string.import_loading),
-                                fontSize = 11.sp,
-                                color = p.muted
-                            )
+                        AnimatedVisibility(
+                            visible = state.phase == ImportPhase.Loading,
+                            enter = fadeIn(tween(SerieeMotion.quick, easing = SerieeMotion.EaseOutExpo)) +
+                                expandVertically(tween(SerieeMotion.standard, easing = SerieeMotion.EaseOutExpo)),
+                            exit = fadeOut(tween(SerieeMotion.quick)) +
+                                shrinkVertically(tween(SerieeMotion.quick))
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (p.isNeoBrutalist) {
+                                    NeoBrutalistIndeterminateProgressBar(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        fillColor = p.primary,
+                                        trackColor = p.chip
+                                    )
+                                } else {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(50)),
+                                        color = p.primary,
+                                        trackColor = p.chip
+                                    )
+                                }
+                                Text(
+                                    stringResource(R.string.import_loading),
+                                    fontSize = 11.sp,
+                                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                                    color = p.muted
+                                )
+                            }
                         }
-                    }
 
-                    val localError = localErrorRes
-                    if (localError != null) {
-                        Text(stringResource(localError), fontSize = 11.sp, color = p.danger)
-                    }
-                    state.error?.let { error ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(p.danger)
-                            )
-                            Spacer(Modifier.width(6.dp))
+                        val localError = localErrorRes
+                        if (localError != null) {
                             Text(
-                                stringResource(error.messageRes),
+                                stringResource(localError),
                                 fontSize = 11.sp,
+                                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                                 color = p.danger
                             )
                         }
-                    }
-
-                    val preview = state.preview
-                    if (preview != null) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .liquidGlass(
-                                    shape = SerieeShape.field,
-                                    tint = p.card,
-                                    blurRadius = 14.dp,
-                                    refractionHeight = 8.dp,
-                                    refractionAmount = 14.dp
+                        state.error?.let { error ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    Modifier
+                                        .size(6.dp)
+                                        .clip(if (p.isNeoBrutalist) RoundedCornerShape(2.dp) else CircleShape)
+                                        .background(p.danger)
                                 )
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                stringResource(R.string.import_preview_title),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = p.text
-                            )
-                            Text(
-                                stringResource(
-                                    R.string.import_preview_counts,
-                                    preview.total,
-                                    preview.seriesCount,
-                                    preview.movieCount
-                                ),
-                                fontSize = 11.sp,
-                                color = p.muted
-                            )
-                            Text(
-                                stringResource(
-                                    R.string.import_preview_breakdown,
-                                    preview.newCount,
-                                    preview.updatedCount,
-                                    preview.unchangedCount
-                                ),
-                                fontSize = 11.sp,
-                                color = p.success
-                            )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    stringResource(error.messageRes),
+                                    fontSize = 11.sp,
+                                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                                    color = p.danger
+                                )
+                            }
                         }
 
-                        if (state.mode == ImportMode.Replace) {
-                            SecondaryButton(
-                                text = stringResource(R.string.cancel),
-                                onClick = { vm.setImportSource(state.source) }
-                            )
-                        }
-                        PrimaryButton(
-                            text = stringResource(R.string.import_import_button, preview.total),
-                            gradient = true,
-                            onClick = {
-                                if (state.mode == ImportMode.Replace) confirmReplace = true
-                                else vm.applyImport()
+                        val preview = state.preview
+                        if (preview != null) {
+                            val previewModifier = if (p.isNeoBrutalist) {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .neoBrutalist(
+                                        backgroundColor = NeoBrutalistColors.SkyBlue,
+                                        borderColor = p.border,
+                                        shadowColor = NeoBrutalistColors.Black,
+                                        borderWidth = 2.dp,
+                                        shadowOffset = 4.dp,
+                                        cornerRadius = 8.dp
+                                    )
+                                    .padding(12.dp)
+                            } else {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .liquidGlass(
+                                        shape = SerieeShape.field,
+                                        tint = p.card,
+                                        blurRadius = 12.dp,
+                                        refractionHeight = 8.dp,
+                                        refractionAmount = 14.dp,
+                                        chromaticAberration = false
+                                    )
+                                    .padding(12.dp)
                             }
-                        )
-                    } else {
-                        val action = {
-                            when (state.source) {
-                                ImportSource.AniList -> {
-                                    if (username.isBlank()) {
-                                        localErrorRes = R.string.import_username_required
-                                    } else {
+                            Column(
+                                previewModifier,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    stringResource(R.string.import_preview_title),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (p.isNeoBrutalist) NeoBrutalistColors.Black else p.text
+                                )
+                                Text(
+                                    stringResource(
+                                        R.string.import_preview_counts,
+                                        preview.total,
+                                        preview.seriesCount,
+                                        preview.movieCount
+                                    ),
+                                    fontSize = 11.sp,
+                                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (p.isNeoBrutalist) NeoBrutalistColors.Black else p.muted
+                                )
+                                Text(
+                                    stringResource(
+                                        R.string.import_preview_breakdown,
+                                        preview.newCount,
+                                        preview.updatedCount,
+                                        preview.unchangedCount
+                                    ),
+                                    fontSize = 11.sp,
+                                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (p.isNeoBrutalist) NeoBrutalistColors.Black else p.success
+                                )
+                            }
+
+                            if (state.mode == ImportMode.Replace) {
+                                SecondaryButton(
+                                    text = stringResource(R.string.cancel),
+                                    onClick = { vm.setImportSource(state.source) }
+                                )
+                            }
+                            PrimaryButton(
+                                text = stringResource(R.string.import_import_button, preview.total),
+                                gradient = true,
+                                onClick = {
+                                    if (state.mode == ImportMode.Replace) confirmReplace = true
+                                    else vm.applyImport()
+                                }
+                            )
+                        } else {
+                            val action = {
+                                when (state.source) {
+                                    ImportSource.AniList -> {
+                                        if (username.isBlank()) {
+                                            localErrorRes = R.string.import_username_required
+                                        } else {
+                                            localErrorRes = null
+                                            vm.fetchAniList(username)
+                                        }
+                                    }
+                                    ImportSource.MyAnimeList -> {
                                         localErrorRes = null
-                                        vm.fetchAniList(username)
+                                        filePicker.launch(arrayOf("*/*"))
                                     }
                                 }
-                                ImportSource.MyAnimeList -> {
-                                    localErrorRes = null
-                                    filePicker.launch(arrayOf("*/*"))
-                                }
+                                Unit
                             }
-                            Unit
-                        }
-                        PrimaryButton(
-                            text = if (state.source == ImportSource.AniList) {
-                                stringResource(R.string.import_fetch)
-                            } else {
-                                stringResource(R.string.import_mal_pick)
-                            },
-                            enabled = state.phase != ImportPhase.Loading,
-                            onClick = action
-                        )
-                        if (state.phase == ImportPhase.Loading) {
-                            SecondaryButton(
-                                text = stringResource(R.string.cancel),
-                                onClick = { close() }
+                            PrimaryButton(
+                                text = if (state.source == ImportSource.AniList) {
+                                    stringResource(R.string.import_fetch)
+                                } else {
+                                    stringResource(R.string.import_mal_pick)
+                                },
+                                enabled = state.phase != ImportPhase.Loading,
+                                onClick = action
                             )
+                            if (state.phase == ImportPhase.Loading) {
+                                SecondaryButton(
+                                    text = stringResource(R.string.cancel),
+                                    onClick = { close() }
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
         }
     }
 }
@@ -399,40 +509,86 @@ private fun ResultBlock(
 ) {
     val p = LocalPalette.current
     val result = vm.importState.result ?: return
-    Column(
+    val resultModifier = if (p.isNeoBrutalist) {
+        Modifier
+            .fillMaxWidth()
+            .neoBrutalist(
+                backgroundColor = p.card,
+                borderColor = p.border,
+                shadowColor = NeoBrutalistColors.Black,
+                borderWidth = 2.5.dp,
+                shadowOffset = 4.dp,
+                cornerRadius = 8.dp
+            )
+            .padding(16.dp)
+    } else {
         Modifier
             .fillMaxWidth()
             .liquidGlass(
                 shape = SerieeShape.card,
                 tint = p.card,
-                blurRadius = 14.dp,
+                blurRadius = 12.dp,
                 refractionHeight = 8.dp,
-                refractionAmount = 14.dp
+                refractionAmount = 14.dp,
+                chromaticAberration = false
             )
-            .padding(16.dp),
+            .padding(16.dp)
+    }
+    Column(
+        resultModifier,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
                     .size(28.dp)
-                    .clip(CircleShape)
-                    .background(p.success.copy(alpha = 0.16f)),
+                    .clip(if (p.isNeoBrutalist) RoundedCornerShape(6.dp) else CircleShape)
+                    .background(if (p.isNeoBrutalist) NeoBrutalistColors.Mint else p.success.copy(alpha = 0.16f))
+                    .then(
+                        if (p.isNeoBrutalist) {
+                            Modifier.border(2.dp, p.border, RoundedCornerShape(6.dp))
+                        } else {
+                            Modifier
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Check, null, tint = p.success, modifier = Modifier.size(16.dp))
+                Icon(
+                    Icons.Filled.Check,
+                    null,
+                    tint = if (p.isNeoBrutalist) NeoBrutalistColors.Black else p.success,
+                    modifier = Modifier.size(16.dp)
+                )
             }
             Spacer(Modifier.width(8.dp))
             Text(
                 stringResource(R.string.import_result_title),
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,
                 color = p.text
             )
         }
-        Text(stringResource(R.string.import_result_added, result.added), fontSize = 12.sp, color = p.text)
-        Text(stringResource(R.string.import_result_updated, result.updated), fontSize = 12.sp, color = p.text)
-        Text(stringResource(R.string.import_result_skipped, result.skipped), fontSize = 12.sp, color = p.muted)
+        Text(
+            stringResource(R.string.import_result_added, result.added),
+            fontSize = 12.sp,
+            fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+            fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+            color = p.text
+        )
+        Text(
+            stringResource(R.string.import_result_updated, result.updated),
+            fontSize = 12.sp,
+            fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+            fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+            color = p.text
+        )
+        Text(
+            stringResource(R.string.import_result_skipped, result.skipped),
+            fontSize = 12.sp,
+            fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+            fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+            color = p.muted
+        )
     }
     PrimaryButton(
         text = stringResource(R.string.import_view_library),

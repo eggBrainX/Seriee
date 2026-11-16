@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,6 +43,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,6 +60,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -72,6 +78,7 @@ import com.seriee.app.data.SerieeRepository
 import com.seriee.app.data.WatchStatus
 import com.seriee.app.data.parseSeasonNumberFromText
 import com.seriee.app.reminder.ReminderScheduler
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -256,9 +263,9 @@ fun MediaFormDialog(
                         val children = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(uri, android.provider.DocumentsContract.getTreeDocumentId(uri))
                         context.contentResolver.query(children, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
                             while (cursor.moveToNext()) {
-                                val docId = cursor.getString(0)
-                                val mime = cursor.getString(2)
-                                if (mime != null && mime.startsWith("video/")) {
+                                val docId = if (!cursor.isNull(0)) cursor.getString(0) else null
+                                val mime = if (!cursor.isNull(2)) cursor.getString(2) else null
+                                if (!docId.isNullOrBlank() && mime != null && mime.startsWith("video/")) {
                                     out.add(android.provider.DocumentsContract.buildDocumentUriUsingTree(uri, docId))
                                 }
                             }
@@ -396,8 +403,12 @@ fun MediaFormDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(
+            topStart = if (p.isNeoBrutalist) 8.dp else 28.dp,
+            topEnd = if (p.isNeoBrutalist) 8.dp else 28.dp
+        ),
         containerColor = if (p.isGlass) p.surface.copy(alpha = if (p.isLight) 0.90f else 0.84f) else p.surface,
+        tonalElevation = if (p.isNeoBrutalist) 0.dp else BottomSheetDefaults.Elevation,
         scrimColor = Color.Black.copy(alpha = 0.55f),
         dragHandle = { SheetDragHandle() }
     ) {
@@ -416,87 +427,196 @@ fun MediaFormDialog(
                     Text(
                         if (initial == null) stringResource(R.string.add_to_seriee) else stringResource(R.string.edit_media),
                         fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
                         color = p.text,
                         modifier = Modifier.weight(1f)
                     )
-                    Box(
-                        Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(50))
-                            .clickable(onClick = onDismiss),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = p.muted)
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            onClick = onDismiss,
+                            role = Role.Button,
+                            backgroundColor = NeoBrutalistColors.OffWhite,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.dp,
+                            shadowOffset = 2.dp,
+                            cornerRadius = 6.dp,
+                            modifier = Modifier.size(38.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = NeoBrutalistColors.Black)
+                        }
+                    } else {
+                        Box(
+                            Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(50))
+                                .clickable(onClick = onDismiss),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = p.muted)
+                        }
                     }
                 }
 
                 // Fetch metadata
-                Column(
-                    modifier = Modifier
+                val fetchCardModifier = if (p.isNeoBrutalist) {
+                    Modifier
+                        .fillMaxWidth()
+                        .neoBrutalist(
+                            backgroundColor = p.card,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.5.dp,
+                            shadowOffset = 4.dp,
+                            cornerRadius = 8.dp
+                        )
+                        .padding(14.dp)
+                } else {
+                    Modifier
                         .fillMaxWidth()
                         .liquidGlass(
                             shape = RoundedCornerShape(20.dp),
                             tint = p.card,
-                            blurRadius = 14.dp,
+                            blurRadius = 12.dp,
                             refractionHeight = 8.dp,
-                            refractionAmount = 14.dp
+                            refractionAmount = 14.dp,
+                            chromaticAberration = false
                         )
-                        .padding(14.dp),
+                        .padding(14.dp)
+                }
+                Column(
+                    modifier = fetchCardModifier,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FieldLabel(stringResource(R.string.fetch_metadata_title))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         SField(fetchQuery, { fetchQuery = it }, placeholder = stringResource(R.string.fetch_search_hint), modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(p.primary)
-                                .clickable(enabled = !fetchLoading) { doFetch() }
-                                .padding(horizontal = 14.dp, vertical = 12.dp)
-                        ) {
-                            if (fetchLoading) CircularProgressIndicator(color = p.onAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
-                            else Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.fetch_search_button), tint = p.onAccent, modifier = Modifier.size(16.dp))
+                        if (p.isNeoBrutalist) {
+                            NeoBrutalistBox(
+                                onClick = { doFetch() },
+                                enabled = !fetchLoading,
+                                role = Role.Button,
+                                backgroundColor = NeoBrutalistColors.Yellow,
+                                borderColor = p.border,
+                                shadowColor = NeoBrutalistColors.Black,
+                                borderWidth = 2.5.dp,
+                                shadowOffset = 3.dp,
+                                cornerRadius = 8.dp,
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 13.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (fetchLoading) {
+                                    CircularProgressIndicator(color = NeoBrutalistColors.Black, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                } else {
+                                    Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.fetch_search_button), tint = NeoBrutalistColors.Black, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(p.primary)
+                                    .clickable(enabled = !fetchLoading) { doFetch() }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                            ) {
+                                if (fetchLoading) CircularProgressIndicator(color = p.onAccent, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                else Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.fetch_search_button), tint = p.onAccent, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                     if (fetchLoading) {
-                        Text(stringResource(R.string.fetch_loading), fontSize = 11.sp, color = p.muted)
+                        Text(
+                            stringResource(R.string.fetch_loading),
+                            fontSize = 11.sp,
+                            fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                            color = p.muted
+                        )
                     }
-                    fetchError?.let { Text(it, color = p.danger, fontSize = 12.sp) }
+                    fetchError?.let {
+                        Text(it, color = p.danger, fontSize = 12.sp, fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal)
+                    }
                     if (hasSearched && !fetchLoading && fetchError == null && fetchResults.isEmpty()) {
                         Text(stringResource(R.string.fetch_no_results), fontSize = 12.sp, color = p.muted)
                     }
                     fetchResults.forEach { r ->
                         val resultSeason = r.seasonNumbers.firstOrNull()?.takeIf { it > 0 }
                             ?: parseSeasonNumberFromText(r.title)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(p.chip)
-                                .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                                .clickable { applyFetch(r) }
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Poster(r.posterUrl, Modifier.size(width = 44.dp, height = 58.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(r.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = p.text, maxLines = 1)
-                                val seasonLabel = if (r.type == MediaType.Series && resultSeason != null && resultSeason > 1)
-                                    " · " + stringResource(R.string.season_format, resultSeason) else ""
-                                // Show the source's real air date so it can be verified before applying.
-                                val airLabel = r.releaseAt?.takeIf { it > System.currentTimeMillis() }
-                                    ?.let { " · " + ReminderScheduler.formatShortDate(context, it) } ?: ""
-                                Text(("${r.source} ${r.year}".trim() + seasonLabel + airLabel), fontSize = 11.sp, color = p.muted)
+                        val seasonLabel = if (r.type == MediaType.Series && resultSeason != null && resultSeason > 1)
+                            " · " + stringResource(R.string.season_format, resultSeason) else ""
+                        val airLabel = r.releaseAt?.takeIf { it > System.currentTimeMillis() }
+                            ?.let { " · " + ReminderScheduler.formatShortDate(context, it) } ?: ""
+
+                        if (p.isNeoBrutalist) {
+                            NeoBrutalistBox(
+                                onClick = { applyFetch(r) },
+                                role = Role.Button,
+                                backgroundColor = p.chip,
+                                borderColor = p.border,
+                                shadowColor = NeoBrutalistColors.Black,
+                                borderWidth = 2.dp,
+                                shadowOffset = 3.dp,
+                                cornerRadius = 8.dp,
+                                contentPadding = PaddingValues(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Poster(r.posterUrl, Modifier.size(width = 44.dp, height = 58.dp))
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(r.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = p.text, maxLines = 1)
+                                        Text(
+                                            ("${r.source} ${r.year}".trim() + seasonLabel + airLabel),
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = p.muted
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(NeoBrutalistColors.SkyBlue)
+                                            .border(1.5.dp, p.border, RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            r.source,
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = NeoBrutalistColors.Black
+                                        )
+                                    }
+                                }
                             }
-                            Box(
+                        } else {
+                            Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(p.primary.copy(alpha = 0.2f))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) { Text(r.source, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = p.primary) }
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(p.chip)
+                                    .border(1.dp, p.border, RoundedCornerShape(12.dp))
+                                    .clickable { applyFetch(r) }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Poster(r.posterUrl, Modifier.size(width = 44.dp, height = 58.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(r.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = p.text, maxLines = 1)
+                                    Text(("${r.source} ${r.year}".trim() + seasonLabel + airLabel), fontSize = 11.sp, color = p.muted)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(p.primary.copy(alpha = 0.2f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) { Text(r.source, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = p.primary) }
+                            }
                         }
                     }
                     // stream candidates from last fetch are applied directly; user can edit streamUrl below
@@ -506,10 +626,6 @@ fun MediaFormDialog(
                     FieldLabel(stringResource(R.string.title_label))
                     SField(title, {
                         title = it
-                        // Manual entry (no fetch result): keep a single untouched season card
-                        // in sync with "Season N" in the title — e.g. typing
-                        // "Re:ZERO -Starting Life…- Season 4" switches Season 1 → Season 4
-                        // so Pick Folder targets the right season. Never moves picked files.
                         val detected = parseSeasonNumberFromText(it)
                         if (detected != null && type == MediaType.Series && seasonsDraft.size == 1) {
                             val only = seasonsDraft.first()
@@ -523,24 +639,57 @@ fun MediaFormDialog(
                 // Description
                 Column {
                     FieldLabel(stringResource(R.string.description_label))
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        placeholder = { Text("", fontSize = 14.sp) },
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = p.text,
-                            unfocusedTextColor = p.text,
-                            focusedContainerColor = p.bg,
-                            unfocusedContainerColor = p.bg,
-                            cursorColor = p.primary,
-                            focusedBorderColor = p.primary,
-                            unfocusedBorderColor = p.border
+                    if (p.isNeoBrutalist) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .neoBrutalist(
+                                    backgroundColor = p.surface,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 2.5.dp,
+                                    shadowOffset = 4.dp,
+                                    cornerRadius = 8.dp
+                                )
+                        ) {
+                            TextField(
+                                value = description,
+                                onValueChange = { description = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                                placeholder = { Text("", fontSize = 14.sp) },
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                                colors = TextFieldDefaults.colors(
+                                    focusedTextColor = p.text,
+                                    unfocusedTextColor = p.text,
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    cursorColor = p.text,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
+                                )
+                            )
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = description,
+                            onValueChange = { description = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                            placeholder = { Text("", fontSize = 14.sp) },
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = p.text,
+                                unfocusedTextColor = p.text,
+                                focusedContainerColor = p.bg,
+                                unfocusedContainerColor = p.bg,
+                                cursorColor = p.primary,
+                                focusedBorderColor = p.primary,
+                                unfocusedBorderColor = p.border
+                            )
                         )
-                    )
+                    }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -559,11 +708,9 @@ fun MediaFormDialog(
                             status = it
                             if (it == WatchStatus.ComingSoon) {
                                 reminderEnabled = true
-                                // Never invent a release date: if the metadata had no
-                                // air time, ask the user instead of showing a fake
-                                // "+3 days" date that disagrees with the source.
-                                if (releaseDate == null || releaseDate!! <= System.currentTimeMillis()) {
-                                    ReminderScheduler.showDateTimePicker(context, releaseDate) { selected ->
+                                val currentRelease = releaseDate
+                                if (currentRelease == null || currentRelease <= System.currentTimeMillis()) {
+                                    ReminderScheduler.showDateTimePicker(context, currentRelease) { selected ->
                                         releaseDate = selected
                                         reminderEnabled = true
                                     }
@@ -574,17 +721,33 @@ fun MediaFormDialog(
                     )
                 }
 
-                Column(
-                    modifier = Modifier
+                val ratingCardModifier = if (p.isNeoBrutalist) {
+                    Modifier
+                        .fillMaxWidth()
+                        .neoBrutalist(
+                            backgroundColor = p.card,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.5.dp,
+                            shadowOffset = 4.dp,
+                            cornerRadius = 8.dp
+                        )
+                        .padding(12.dp)
+                } else {
+                    Modifier
                         .fillMaxWidth()
                         .liquidGlass(
                             shape = RoundedCornerShape(18.dp),
                             tint = p.card,
-                            blurRadius = 14.dp,
+                            blurRadius = 12.dp,
                             refractionHeight = 8.dp,
-                            refractionAmount = 14.dp
+                            refractionAmount = 14.dp,
+                            chromaticAberration = false
                         )
-                        .padding(12.dp),
+                        .padding(12.dp)
+                }
+                Column(
+                    modifier = ratingCardModifier,
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     FieldLabel(stringResource(R.string.rating_label))
@@ -595,8 +758,20 @@ fun MediaFormDialog(
 
                 val showReminderSection = status == WatchStatus.ComingSoon || status == WatchStatus.PlanToWatch || releaseDate != null
                 if (showReminderSection) {
-                    Column(
-                        modifier = Modifier
+                    val reminderCardModifier = if (p.isNeoBrutalist) {
+                        Modifier
+                            .fillMaxWidth()
+                            .neoBrutalist(
+                                backgroundColor = if (status == WatchStatus.ComingSoon && p.isLight) NeoBrutalistColors.Cream else p.card,
+                                borderColor = p.border,
+                                shadowColor = NeoBrutalistColors.Black,
+                                borderWidth = 2.5.dp,
+                                shadowOffset = 4.dp,
+                                cornerRadius = 8.dp
+                            )
+                            .padding(14.dp)
+                    } else {
+                        Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .background(
@@ -609,7 +784,10 @@ fun MediaFormDialog(
                                 if (status == WatchStatus.ComingSoon) p.reminder.copy(alpha = 0.35f) else p.border,
                                 RoundedCornerShape(16.dp)
                             )
-                            .padding(14.dp),
+                            .padding(14.dp)
+                    }
+                    Column(
+                        modifier = reminderCardModifier,
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
@@ -621,12 +799,21 @@ fun MediaFormDialog(
                                 Icon(
                                     imageVector = if (reminderEnabled) Icons.Filled.NotificationsActive else Icons.Filled.Alarm,
                                     contentDescription = null,
-                                    tint = if (reminderEnabled) p.reminder else p.muted,
+                                    tint = when {
+                                        p.isNeoBrutalist -> p.text
+                                        reminderEnabled -> p.reminder
+                                        else -> p.muted
+                                    },
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Column {
-                                    Text(stringResource(R.string.release_reminder_title), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = p.text)
+                                    Text(
+                                        stringResource(R.string.release_reminder_title),
+                                        fontSize = 13.sp,
+                                        fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
+                                        color = p.text
+                                    )
                                     Text(
                                         if (reminderEnabled) stringResource(R.string.reminder_on_desc) else stringResource(R.string.reminder_off_desc),
                                         fontSize = 11.sp, color = p.muted
@@ -637,30 +824,40 @@ fun MediaFormDialog(
                                 checked = reminderEnabled,
                                 onCheckedChange = {
                                     reminderEnabled = it
-                                    if (it && (releaseDate == null || releaseDate!! <= System.currentTimeMillis())) {
-                                        ReminderScheduler.showDateTimePicker(context, releaseDate) { selected ->
+                                    val currentRelease = releaseDate
+                                    if (it && (currentRelease == null || currentRelease <= System.currentTimeMillis())) {
+                                        ReminderScheduler.showDateTimePicker(context, currentRelease) { selected ->
                                             releaseDate = selected
                                             reminderEnabled = true
                                         }
                                     }
                                 },
-                                colors = SwitchDefaults.colors(checkedThumbColor = contrastOn(p.reminder), checkedTrackColor = p.reminder)
+                                colors = if (p.isNeoBrutalist) {
+                                    SwitchDefaults.colors(
+                                        checkedThumbColor = NeoBrutalistColors.Black,
+                                        checkedTrackColor = NeoBrutalistColors.Mint,
+                                        checkedBorderColor = p.border,
+                                        uncheckedThumbColor = p.text,
+                                        uncheckedTrackColor = p.chip,
+                                        uncheckedBorderColor = p.border
+                                    )
+                                } else {
+                                    SwitchDefaults.colors(checkedThumbColor = contrastOn(p.reminder), checkedTrackColor = p.reminder)
+                                }
                             )
                         }
                         if (reminderEnabled || status == WatchStatus.ComingSoon) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(stringResource(R.string.schedule_release_date), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.muted)
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(p.reminder.copy(alpha = 0.15f))
-                                        .border(
-                                            1.dp,
-                                            p.reminder.copy(alpha = 0.4f),
-                                            RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable {
+                                Text(
+                                    stringResource(R.string.schedule_release_date),
+                                    fontSize = 11.sp,
+                                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = p.muted
+                                )
+                                if (p.isNeoBrutalist) {
+                                    NeoBrutalistBox(
+                                        onClick = {
                                             ReminderScheduler.showDateTimePicker(
                                                 context,
                                                 releaseDate
@@ -668,14 +865,58 @@ fun MediaFormDialog(
                                                 releaseDate = selected
                                                 reminderEnabled = true
                                             }
+                                        },
+                                        role = Role.Button,
+                                        backgroundColor = NeoBrutalistColors.Yellow,
+                                        borderColor = p.border,
+                                        shadowColor = NeoBrutalistColors.Black,
+                                        borderWidth = 2.dp,
+                                        shadowOffset = 3.dp,
+                                        cornerRadius = 8.dp,
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = NeoBrutalistColors.Black, modifier = Modifier.size(18.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                stringResource(R.string.pick_release_date),
+                                                fontSize = 13.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = NeoBrutalistColors.Black
+                                            )
                                         }
-                                        .padding(horizontal = 14.dp, vertical = 11.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = p.reminder, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.pick_release_date), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = p.reminder)
+                                    }
+                                } else {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(p.reminder.copy(alpha = 0.15f))
+                                            .border(
+                                                1.dp,
+                                                p.reminder.copy(alpha = 0.4f),
+                                                RoundedCornerShape(12.dp)
+                                            )
+                                            .clickable {
+                                                ReminderScheduler.showDateTimePicker(
+                                                    context,
+                                                    releaseDate
+                                                ) { selected ->
+                                                    releaseDate = selected
+                                                    reminderEnabled = true
+                                                }
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = p.reminder, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.pick_release_date), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = p.reminder)
+                                    }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text(stringResource(R.string.preset), fontSize = 11.sp, color = p.muted)
@@ -686,34 +927,87 @@ fun MediaFormDialog(
                                     PresetChip(stringResource(R.string.preset_1_month)) { releaseDate = now + 30 * 86400000L }
                                 }
                                 if (releaseDate != null) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(p.chip)
-                                            .border(1.dp, p.border, RoundedCornerShape(10.dp))
-                                            .clickable {
+                                    if (p.isNeoBrutalist) {
+                                        NeoBrutalistBox(
+                                            onClick = {
                                                 ReminderScheduler.showDateTimePicker(
                                                     context,
                                                     releaseDate
                                                 ) { selected -> releaseDate = selected }
-                                            }
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Filled.EditCalendar, contentDescription = stringResource(R.string.change_date), tint = p.reminder, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(8.dp))
-                                        Column(Modifier.weight(1f)) {
-                                            Text(ReminderScheduler.formatReleaseDate(context, releaseDate), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text)
-                                            Text(stringResource(R.string.tap_to_change_release), fontSize = 10.sp, color = p.muted)
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(p.reminder.copy(alpha = 0.2f))
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            },
+                                            role = Role.Button,
+                                            backgroundColor = p.chip,
+                                            borderColor = p.border,
+                                            shadowColor = NeoBrutalistColors.Black,
+                                            borderWidth = 2.dp,
+                                            shadowOffset = 3.dp,
+                                            cornerRadius = 8.dp,
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Text(ReminderScheduler.timeUntilRelease(context, releaseDate), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = p.reminder)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Filled.EditCalendar, contentDescription = stringResource(R.string.change_date), tint = p.text, modifier = Modifier.size(16.dp))
+                                                Spacer(Modifier.width(8.dp))
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(
+                                                        ReminderScheduler.formatReleaseDate(context, releaseDate),
+                                                        fontSize = 12.sp,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = p.text
+                                                    )
+                                                    Text(stringResource(R.string.tap_to_change_release), fontSize = 10.sp, color = p.muted)
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(NeoBrutalistColors.Yellow)
+                                                        .border(1.5.dp, p.border, RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                ) {
+                                                    Text(
+                                                        ReminderScheduler.timeUntilRelease(context, releaseDate),
+                                                        fontSize = 10.sp,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = NeoBrutalistColors.Black
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(p.chip)
+                                                .border(1.dp, p.border, RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    ReminderScheduler.showDateTimePicker(
+                                                        context,
+                                                        releaseDate
+                                                    ) { selected -> releaseDate = selected }
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Filled.EditCalendar, contentDescription = stringResource(R.string.change_date), tint = p.reminder, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Column(Modifier.weight(1f)) {
+                                                Text(ReminderScheduler.formatReleaseDate(context, releaseDate), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text)
+                                                Text(stringResource(R.string.tap_to_change_release), fontSize = 10.sp, color = p.muted)
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(p.reminder.copy(alpha = 0.2f))
+                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            ) {
+                                                Text(ReminderScheduler.timeUntilRelease(context, releaseDate), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = p.reminder)
+                                            }
                                         }
                                     }
                                 }
@@ -737,15 +1031,37 @@ fun MediaFormDialog(
                                 Poster(poster, Modifier.size(width = 56.dp, height = 72.dp))
                                 Spacer(Modifier.width(10.dp))
                             }
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(p.chip)
-                                    .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                                    .clickable { posterPicker.launch(arrayOf("image/*")) }
-                                    .padding(horizontal = 12.dp, vertical = 12.dp)
-                            ) {
-                                Text(stringResource(R.string.pick_files), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text)
+                            if (p.isNeoBrutalist) {
+                                NeoBrutalistBox(
+                                    onClick = { posterPicker.launch(arrayOf("image/*")) },
+                                    role = Role.Button,
+                                    backgroundColor = NeoBrutalistColors.SkyBlue,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 2.dp,
+                                    shadowOffset = 3.dp,
+                                    cornerRadius = 8.dp,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
+                                ) {
+                                    Text(
+                                        stringResource(R.string.pick_files),
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = NeoBrutalistColors.Black
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(p.chip)
+                                        .border(1.dp, p.border, RoundedCornerShape(12.dp))
+                                        .clickable { posterPicker.launch(arrayOf("image/*")) }
+                                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                                ) {
+                                    Text(stringResource(R.string.pick_files), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text)
+                                }
                             }
                         }
                     }
@@ -757,15 +1073,15 @@ fun MediaFormDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 stringResource(R.string.seasons),
-                                fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.muted,
+                                fontSize = 12.sp,
+                                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.SemiBold,
+                                color = p.muted,
                                 modifier = Modifier.weight(1f)
                             )
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(p.chip)
-                                    .border(1.dp, p.border, RoundedCornerShape(8.dp))
-                                    .clickable {
+                            if (p.isNeoBrutalist) {
+                                NeoBrutalistBox(
+                                    onClick = {
                                         val nextNum =
                                             (seasonsDraft.maxOfOrNull { it.number } ?: 0) + 1
                                         seasonsDraft = (seasonsDraft + SeasonDraft(
@@ -773,43 +1089,121 @@ fun MediaFormDialog(
                                             "12",
                                             "0"
                                         )).sortedBy { it.number }.toMutableList()
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) { Text(stringResource(R.string.add_season), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.text) }
+                                    },
+                                    role = Role.Button,
+                                    backgroundColor = NeoBrutalistColors.Mint,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 2.dp,
+                                    shadowOffset = 2.dp,
+                                    cornerRadius = 6.dp,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        stringResource(R.string.add_season),
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = NeoBrutalistColors.Black
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(p.chip)
+                                        .border(1.dp, p.border, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            val nextNum =
+                                                (seasonsDraft.maxOfOrNull { it.number } ?: 0) + 1
+                                            seasonsDraft = (seasonsDraft + SeasonDraft(
+                                                nextNum,
+                                                "12",
+                                                "0"
+                                            )).sortedBy { it.number }.toMutableList()
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) { Text(stringResource(R.string.add_season), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.text) }
+                            }
                         }
 
                         seasonsDraft.forEachIndexed { sIdx, draft ->
-                            Column(
-                                modifier = Modifier
+                            val seasonCardModifier = if (p.isNeoBrutalist) {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .neoBrutalist(
+                                        backgroundColor = p.card,
+                                        borderColor = p.border,
+                                        shadowColor = NeoBrutalistColors.Black,
+                                        borderWidth = 2.5.dp,
+                                        shadowOffset = 4.dp,
+                                        cornerRadius = 8.dp
+                                    )
+                                    .padding(12.dp)
+                            } else {
+                                Modifier
                                     .fillMaxWidth()
                                     .liquidGlass(
                                         shape = RoundedCornerShape(18.dp),
                                         tint = p.card,
-                                        blurRadius = 14.dp,
+                                        blurRadius = 12.dp,
                                         refractionHeight = 8.dp,
-                                        refractionAmount = 14.dp
+                                        refractionAmount = 14.dp,
+                                        chromaticAberration = false
                                     )
-                                    .padding(12.dp),
+                                    .padding(12.dp)
+                            }
+                            Column(
+                                modifier = seasonCardModifier,
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         stringResource(R.string.season_number_label, draft.number),
-                                        fontSize = 13.sp, fontWeight = FontWeight.Bold, color = p.text,
+                                        fontSize = 13.sp,
+                                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = p.text,
                                         modifier = Modifier.weight(1f)
                                     )
                                     if (seasonsDraft.size > 1) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(p.danger.copy(alpha = 0.15f))
-                                                .clickable {
+                                        if (p.isNeoBrutalist) {
+                                            NeoBrutalistBox(
+                                                onClick = {
                                                     seasonsDraft =
                                                         seasonsDraft.filter { it.number != draft.number }
                                                             .toMutableList()
-                                                }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) { Text(stringResource(R.string.remove_season, draft.number), fontSize = 10.sp, color = p.danger) }
+                                                },
+                                                role = Role.Button,
+                                                backgroundColor = NeoBrutalistColors.CoralRed,
+                                                borderColor = p.border,
+                                                shadowColor = NeoBrutalistColors.Black,
+                                                borderWidth = 1.5.dp,
+                                                shadowOffset = 2.dp,
+                                                cornerRadius = 6.dp,
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    stringResource(R.string.remove_season, draft.number),
+                                                    fontSize = 10.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = NeoBrutalistColors.Black
+                                                )
+                                            }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(p.danger.copy(alpha = 0.15f))
+                                                    .clickable {
+                                                        seasonsDraft =
+                                                            seasonsDraft.filter { it.number != draft.number }
+                                                                .toMutableList()
+                                                    }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) { Text(stringResource(R.string.remove_season, draft.number), fontSize = 10.sp, color = p.danger) }
+                                        }
                                     }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -827,32 +1221,83 @@ fun MediaFormDialog(
                                     }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(p.chip)
-                                            .border(1.dp, p.border, RoundedCornerShape(10.dp))
-                                            .clickable {
+                                    if (p.isNeoBrutalist) {
+                                        NeoBrutalistBox(
+                                            onClick = {
                                                 folderPickerTarget.intValue = sIdx
                                                 folderPicker.launch(null)
-                                            }
-                                            .padding(vertical = 10.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) { Text(stringResource(R.string.pick_folder), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.text) }
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(p.chip)
-                                            .border(1.dp, p.border, RoundedCornerShape(10.dp))
-                                            .clickable {
+                                            },
+                                            role = Role.Button,
+                                            backgroundColor = NeoBrutalistColors.SkyBlue,
+                                            borderColor = p.border,
+                                            shadowColor = NeoBrutalistColors.Black,
+                                            borderWidth = 2.dp,
+                                            shadowOffset = 3.dp,
+                                            cornerRadius = 8.dp,
+                                            contentPadding = PaddingValues(vertical = 10.dp, horizontal = 8.dp),
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                stringResource(R.string.pick_folder),
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = NeoBrutalistColors.Black
+                                            )
+                                        }
+                                        NeoBrutalistBox(
+                                            onClick = {
                                                 multiPickerTarget.intValue = sIdx
                                                 multiPicker.launch(arrayOf("video/*"))
-                                            }
-                                            .padding(vertical = 10.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) { Text(stringResource(R.string.pick_files), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.text) }
+                                            },
+                                            role = Role.Button,
+                                            backgroundColor = NeoBrutalistColors.Mint,
+                                            borderColor = p.border,
+                                            shadowColor = NeoBrutalistColors.Black,
+                                            borderWidth = 2.dp,
+                                            shadowOffset = 3.dp,
+                                            cornerRadius = 8.dp,
+                                            contentPadding = PaddingValues(vertical = 10.dp, horizontal = 8.dp),
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                stringResource(R.string.pick_files),
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = NeoBrutalistColors.Black
+                                            )
+                                        }
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(p.chip)
+                                                .border(1.dp, p.border, RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    folderPickerTarget.intValue = sIdx
+                                                    folderPicker.launch(null)
+                                                }
+                                                .padding(vertical = 10.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) { Text(stringResource(R.string.pick_folder), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.text) }
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(p.chip)
+                                                .border(1.dp, p.border, RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    multiPickerTarget.intValue = sIdx
+                                                    multiPicker.launch(arrayOf("video/*"))
+                                                }
+                                                .padding(vertical = 10.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) { Text(stringResource(R.string.pick_files), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = p.text) }
+                                    }
                                 }
                                 // Episode list — paged for long shows (e.g. 1000+ eps), direct for small ones.
                                 val total = (draft.totalEpStr.toIntOrNull() ?: 1).coerceAtLeast(1)
@@ -872,31 +1317,60 @@ fun MediaFormDialog(
                                 ) {
                                     Text(
                                         stringResource(R.string.episode_picked_summary, pickedCount, total),
-                                        fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text
+                                        fontSize = 11.sp,
+                                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                        fontWeight = FontWeight.Bold,
+                                        color = p.text
                                     )
                                     if (draft.episodes.isNotEmpty() && missingCount in 1..(total - 1)) {
                                         val chipSelected = showMissingOnly
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(100.dp))
-                                                .background(if (chipSelected) p.primary else p.chip)
-                                                .border(
-                                                    1.dp,
-                                                    if (chipSelected) p.primary else p.border,
-                                                    RoundedCornerShape(100.dp)
-                                                )
-                                                .clickable {
+                                        if (p.isNeoBrutalist) {
+                                            NeoBrutalistBox(
+                                                onClick = {
                                                     showMissingOnlyBySeason[draft.number] =
                                                         !chipSelected
                                                     episodePageBySeason[draft.number] = 0
-                                                }
-                                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                                        ) {
-                                            Text(
-                                                stringResource(R.string.episode_missing_only),
-                                                fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
-                                                color = if (chipSelected) p.onAccent else p.muted
-                                            )
+                                                },
+                                                role = Role.Button,
+                                                backgroundColor = if (chipSelected) NeoBrutalistColors.Yellow else p.chip,
+                                                borderColor = p.border,
+                                                shadowColor = NeoBrutalistColors.Black,
+                                                borderWidth = 1.5.dp,
+                                                shadowOffset = 2.dp,
+                                                cornerRadius = 6.dp,
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    stringResource(R.string.episode_missing_only),
+                                                    fontSize = 10.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = if (chipSelected) NeoBrutalistColors.Black else p.text
+                                                )
+                                            }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(100.dp))
+                                                    .background(if (chipSelected) p.primary else p.chip)
+                                                    .border(
+                                                        1.dp,
+                                                        if (chipSelected) p.primary else p.border,
+                                                        RoundedCornerShape(100.dp)
+                                                    )
+                                                    .clickable {
+                                                        showMissingOnlyBySeason[draft.number] =
+                                                            !chipSelected
+                                                        episodePageBySeason[draft.number] = 0
+                                                    }
+                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    stringResource(R.string.episode_missing_only),
+                                                    fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                                                    color = if (chipSelected) p.onAccent else p.muted
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -964,11 +1438,16 @@ fun MediaFormDialog(
                                                     R.string.episode_page_range,
                                                     pageEps.first(), pageEps.last(), visibleTotal
                                                 ),
-                                                fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text
+                                                fontSize = 11.sp,
+                                                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                                fontWeight = FontWeight.Bold,
+                                                color = p.text
                                             )
                                             Text(
                                                 stringResource(R.string.episode_page_label, safePage + 1, pageCount),
-                                                fontSize = 9.sp, color = p.muted
+                                                fontSize = 9.sp,
+                                                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                                color = p.muted
                                             )
                                         }
                                         EpisodePagerButton(
@@ -987,18 +1466,42 @@ fun MediaFormDialog(
                                             keyboardType = KeyboardType.Number,
                                             modifier = Modifier.weight(1f)
                                         )
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(p.primary)
-                                                .clickable(
-                                                    enabled = gotoText.isNotBlank(),
-                                                    onClick = goToPage
+                                        if (p.isNeoBrutalist) {
+                                            NeoBrutalistBox(
+                                                onClick = goToPage,
+                                                enabled = gotoText.isNotBlank(),
+                                                role = Role.Button,
+                                                backgroundColor = if (gotoText.isNotBlank()) NeoBrutalistColors.Yellow else p.chip,
+                                                borderColor = p.border,
+                                                shadowColor = NeoBrutalistColors.Black,
+                                                borderWidth = 2.dp,
+                                                shadowOffset = 3.dp,
+                                                cornerRadius = 8.dp,
+                                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    stringResource(R.string.episode_go),
+                                                    fontSize = 11.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = NeoBrutalistColors.Black
                                                 )
-                                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(stringResource(R.string.episode_go), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.onAccent)
+                                            }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(p.primary)
+                                                    .clickable(
+                                                        enabled = gotoText.isNotBlank(),
+                                                        onClick = goToPage
+                                                    )
+                                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(stringResource(R.string.episode_go), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.onAccent)
+                                            }
                                         }
                                     }
                                 }
@@ -1041,119 +1544,192 @@ fun MediaFormDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             SField(videoPath, { videoPath = it }, placeholder = stringResource(R.string.video_name_placeholder), modifier = Modifier.weight(1f))
                             Spacer(Modifier.width(8.dp))
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(p.chip)
-                                    .border(1.dp, p.border, RoundedCornerShape(12.dp))
-                                    .clickable {
+                            if (p.isNeoBrutalist) {
+                                NeoBrutalistBox(
+                                    onClick = {
                                         manualTarget = null; picker.launch(arrayOf("video/*"))
+                                    },
+                                    role = Role.Button,
+                                    backgroundColor = NeoBrutalistColors.SkyBlue,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 2.dp,
+                                    shadowOffset = 3.dp,
+                                    cornerRadius = 8.dp,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Filled.FolderOpen, null, tint = NeoBrutalistColors.Black, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            stringResource(R.string.pick_file),
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = NeoBrutalistColors.Black
+                                        )
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Filled.FolderOpen, null, tint = p.primary, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource(R.string.pick_file), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text)
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(p.chip)
+                                        .border(1.dp, p.border, RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            manualTarget = null; picker.launch(arrayOf("video/*"))
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Filled.FolderOpen, null, tint = p.primary, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource(R.string.pick_file), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.text)
+                                }
                             }
                         }
                     }
                 }
 
-                error?.let { Text(it, color = p.danger, fontSize = 12.sp) }
+                error?.let { Text(it, color = p.danger, fontSize = 12.sp, fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal) }
+
+                val performSave = {
+                    error = null
+                    if (title.isBlank()) {
+                        error = context.getString(R.string.title_required)
+                    } else if (existing.any { other ->
+                            other.id != initial?.id && isDuplicateOf(other)
+                        }) {
+                        error = context.getString(R.string.duplicate_media)
+                    } else {
+                        val base = initial ?: MediaItem(
+                            id = UUID.randomUUID().toString(),
+                            title = "",
+                            type = type,
+                            status = status,
+                            poster = ""
+                        )
+                        val builtSeasons: List<Season> = if (type == MediaType.Series) {
+                            seasonsDraft.sortedBy { it.number }.map { d ->
+                                val tot =
+                                    (d.totalEpStr.toIntOrNull() ?: 1).coerceAtLeast(1)
+                                val cur =
+                                    (d.currentEpStr.toIntOrNull() ?: 0).coerceIn(0, tot)
+                                Season(
+                                    number = d.number,
+                                    currentEp = cur,
+                                    totalEp = tot,
+                                    episodes = d.episodes.values.sortedBy { it.number })
+                            }
+                        } else emptyList()
+                        val legacyTotal =
+                            if (type == MediaType.Movie) 1 else builtSeasons.sumOf { it.totalEp }
+                                .coerceAtLeast(1)
+                        val legacyCurrent =
+                            if (type == MediaType.Movie) (initial?.currentEp
+                                ?: 1) else builtSeasons.sumOf { it.currentEp }
+                                .coerceAtLeast(0)
+                        val firstFileUri =
+                            builtSeasons.flatMap { it.episodes }.firstOrNull()?.uri
+                                ?: videoUri
+                        val firstFilePath = builtSeasons.flatMap { it.episodes }
+                            .firstOrNull()?.displayName ?: videoPath
+                        onSave(
+                            base.copy(
+                                title = title.trim(),
+                                type = type,
+                                status = status,
+                                poster = poster.trim(),
+                                description = description.trim(),
+                                source = source,
+                                sourceId = sourceId,
+                                season = builtSeasons.firstOrNull()?.number
+                                    ?: base.season,
+                                currentEp = legacyCurrent,
+                                totalEp = legacyTotal,
+                                seasons = builtSeasons,
+                                streamUrl = streamUrl.trim(),
+                                videoPath = firstFilePath.trim(),
+                                videoUri = firstFileUri,
+                                releaseDate = if (status == WatchStatus.ComingSoon || reminderEnabled) releaseDate else null,
+                                reminderEnabled = reminderEnabled && (releaseDate != null),
+                                tags = tags,
+                                rating = rating,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                }
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {
-                    Box(
-                        Modifier
-                            .liquidGlass(
-                                shape = CircleShape,
-                                tint = p.chip,
-                                blurRadius = 12.dp,
-                                refractionHeight = 8.dp,
-                                refractionAmount = 14.dp
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            onClick = onDismiss,
+                            role = Role.Button,
+                            backgroundColor = NeoBrutalistColors.OffWhite,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.dp,
+                            shadowOffset = 3.dp,
+                            cornerRadius = 8.dp,
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                stringResource(R.string.cancel),
+                                color = NeoBrutalistColors.Black,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
                             )
-                            .clickable(onClick = onDismiss)
-                            .padding(horizontal = 20.dp, vertical = 12.dp)
-                    ) { Text(stringResource(R.string.cancel), color = p.text.copy(alpha = 0.8f), fontSize = 14.sp) }
+                        }
+                        NeoBrutalistBox(
+                            onClick = performSave,
+                            role = Role.Button,
+                            backgroundColor = NeoBrutalistColors.Yellow,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.5.dp,
+                            shadowOffset = 4.dp,
+                            cornerRadius = 8.dp,
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                stringResource(R.string.save),
+                                color = NeoBrutalistColors.Black,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    } else {
+                        Box(
+                            Modifier
+                                .liquidGlass(
+                                    shape = CircleShape,
+                                    tint = p.chip,
+                                    blurRadius = 12.dp,
+                                    refractionHeight = 8.dp,
+                                    refractionAmount = 14.dp,
+                                    chromaticAberration = false
+                                )
+                                .clickable(onClick = onDismiss)
+                                .padding(horizontal = 20.dp, vertical = 12.dp)
+                        ) { Text(stringResource(R.string.cancel), color = p.text.copy(alpha = 0.8f), fontSize = 14.sp) }
 
-                    Box(
-                        Modifier
-                            .liquidGlass(
-                                shape = CircleShape,
-                                tint = p.primary.copy(alpha = if (p.isGlass) 0.82f else 1f),
-                                blurRadius = 14.dp,
-                                refractionHeight = 8.dp,
-                                refractionAmount = 16.dp
-                            )
-                            .clickable {
-                                error = null
-                                if (title.isBlank()) {
-                                    error = context.getString(R.string.title_required)
-                                } else if (existing.any { other ->
-                                        other.id != initial?.id && isDuplicateOf(other)
-                                    }) {
-                                    error = context.getString(R.string.duplicate_media)
-                                } else {
-                                    val base = initial ?: MediaItem(
-                                        id = System.currentTimeMillis().toString(),
-                                        title = "",
-                                        type = type,
-                                        status = status,
-                                        poster = ""
-                                    )
-                                    val builtSeasons: List<Season> = if (type == MediaType.Series) {
-                                        seasonsDraft.sortedBy { it.number }.map { d ->
-                                            val tot =
-                                                (d.totalEpStr.toIntOrNull() ?: 1).coerceAtLeast(1)
-                                            val cur =
-                                                (d.currentEpStr.toIntOrNull() ?: 0).coerceIn(0, tot)
-                                            Season(
-                                                number = d.number,
-                                                currentEp = cur,
-                                                totalEp = tot,
-                                                episodes = d.episodes.values.sortedBy { it.number })
-                                        }
-                                    } else emptyList()
-                                    val legacyTotal =
-                                        if (type == MediaType.Movie) 1 else builtSeasons.sumOf { it.totalEp }
-                                            .coerceAtLeast(1)
-                                    val legacyCurrent =
-                                        if (type == MediaType.Movie) (initial?.currentEp
-                                            ?: 1) else builtSeasons.sumOf { it.currentEp }
-                                            .coerceAtLeast(0)
-                                    val firstFileUri =
-                                        builtSeasons.flatMap { it.episodes }.firstOrNull()?.uri
-                                            ?: videoUri
-                                    val firstFilePath = builtSeasons.flatMap { it.episodes }
-                                        .firstOrNull()?.displayName ?: videoPath
-                                    onSave(
-                                        base.copy(
-                                            title = title.trim(),
-                                            type = type,
-                                            status = status,
-                                            poster = poster.trim(),
-                                            description = description.trim(),
-                                            source = source,
-                                            sourceId = sourceId,
-                                            season = builtSeasons.firstOrNull()?.number
-                                                ?: base.season,
-                                            currentEp = legacyCurrent,
-                                            totalEp = legacyTotal,
-                                            seasons = builtSeasons,
-                                            streamUrl = streamUrl.trim(),
-                                            videoPath = firstFilePath.trim(),
-                                            videoUri = firstFileUri,
-                                            releaseDate = if (status == WatchStatus.ComingSoon || reminderEnabled) releaseDate else null,
-                                            reminderEnabled = reminderEnabled && (releaseDate != null),
-                                            tags = tags,
-                                            rating = rating,
-                                            updatedAt = System.currentTimeMillis()
-                                        )
-                                    )
-                                }
-                            }
-                            .padding(horizontal = 24.dp, vertical = 12.dp)
-                    ) { Text(stringResource(R.string.save), color = p.onAccent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                        Box(
+                            Modifier
+                                .liquidGlass(
+                                    shape = CircleShape,
+                                    tint = p.primary.copy(alpha = if (p.isGlass) 0.82f else 1f),
+                                    blurRadius = 12.dp,
+                                    refractionHeight = 8.dp,
+                                    refractionAmount = 16.dp,
+                                    chromaticAberration = false
+                                )
+                                .clickable(onClick = performSave)
+                                .padding(horizontal = 24.dp, vertical = 12.dp)
+                        ) { Text(stringResource(R.string.save), color = p.onAccent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                    }
                 }
             }
         }
@@ -1163,33 +1739,79 @@ fun MediaFormDialog(
 @Composable
 private fun PresetChip(label: String, onClick: () -> Unit) {
     val p = LocalPalette.current
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(p.chip)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) { Text(label, fontSize = 11.sp, color = p.text) }
+    if (p.isNeoBrutalist) {
+        NeoBrutalistBox(
+            onClick = onClick,
+            role = Role.Button,
+            backgroundColor = p.chip,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 1.5.dp,
+            shadowOffset = 2.dp,
+            cornerRadius = 6.dp,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                color = p.text
+            )
+        }
+    } else {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(p.chip)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) { Text(label, fontSize = 11.sp, color = p.text) }
+    }
 }
 
 @Composable
 private fun EpisodePagerButton(label: String, enabled: Boolean, onClick: () -> Unit) {
     val p = LocalPalette.current
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (enabled) p.chip else p.chip.copy(alpha = 0.5f))
-            .border(1.dp, p.border, RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            label,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (enabled) p.text else p.muted
-        )
+    if (p.isNeoBrutalist) {
+        NeoBrutalistBox(
+            onClick = onClick,
+            enabled = enabled,
+            role = Role.Button,
+            backgroundColor = if (enabled) NeoBrutalistColors.OffWhite else p.chip,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 2.dp,
+            shadowOffset = if (enabled) 2.dp else 0.dp,
+            cornerRadius = 6.dp,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                color = if (enabled) NeoBrutalistColors.Black else p.muted
+            )
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (enabled) p.chip else p.chip.copy(alpha = 0.5f))
+                .border(1.dp, p.border, RoundedCornerShape(8.dp))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (enabled) p.text else p.muted
+            )
+        }
     }
 }
 
@@ -1199,51 +1821,115 @@ private fun EpisodeAssignRow(ep: Int, file: EpisodeFile?, onPick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(if (p.isNeoBrutalist) 6.dp else 8.dp))
             .background(p.chip)
+            .then(
+                if (p.isNeoBrutalist) {
+                    Modifier.border(1.5.dp, p.border, RoundedCornerShape(6.dp))
+                } else {
+                    Modifier
+                }
+            )
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("E$ep", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text, modifier = Modifier.width(48.dp))
+        Text(
+            "E$ep",
+            fontSize = 11.sp,
+            fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+            fontWeight = FontWeight.ExtraBold,
+            color = p.text,
+            modifier = Modifier.width(48.dp)
+        )
         Text(
             file?.displayName ?: stringResource(R.string.episode_missing),
-            fontSize = 11.sp, color = if (file != null) p.success else p.muted,
-            maxLines = 1, modifier = Modifier.weight(1f)
+            fontSize = 11.sp,
+            fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+            color = if (file != null) p.success else p.muted,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
         )
         if (file != null) {
             Text(
                 stringResource(R.string.episode_picked_ok),
-                fontSize = 9.sp, color = p.success,
+                fontSize = 9.sp,
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                color = p.success,
                 modifier = Modifier.padding(end = 6.dp)
             )
         }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(
-                    if (file != null) p.success.copy(alpha = 0.15f) else p.primary.copy(
-                        alpha = 0.15f
-                    )
+        if (p.isNeoBrutalist) {
+            NeoBrutalistBox(
+                onClick = onPick,
+                role = Role.Button,
+                backgroundColor = if (file != null) NeoBrutalistColors.Mint else NeoBrutalistColors.Yellow,
+                borderColor = p.border,
+                shadowColor = NeoBrutalistColors.Black,
+                borderWidth = 1.5.dp,
+                shadowOffset = 2.dp,
+                cornerRadius = 6.dp,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    if (file != null) "✓" else "+",
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = NeoBrutalistColors.Black
                 )
-                .clickable(onClick = onPick)
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        ) { Text(if (file != null) "✓" else "+", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (file != null) p.success else p.primary) }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        if (file != null) p.success.copy(alpha = 0.15f) else p.primary.copy(
+                            alpha = 0.15f
+                        )
+                    )
+                    .clickable(onClick = onPick)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) { Text(if (file != null) "✓" else "+", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (file != null) p.success else p.primary) }
+        }
     }
 }
 
 @Composable
 private fun PosterSourceChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val p = LocalPalette.current
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(100.dp))
-            .background(if (selected) p.primary else p.chip)
-            .border(
-                1.dp,
-                if (selected) p.primary else p.border,
-                RoundedCornerShape(100.dp)
+    if (p.isNeoBrutalist) {
+        NeoBrutalistBox(
+            onClick = onClick,
+            role = Role.Tab,
+            backgroundColor = if (selected) NeoBrutalistColors.Yellow else p.chip,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 2.dp,
+            shadowOffset = if (selected) 2.dp else 1.dp,
+            cornerRadius = 6.dp,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (selected) NeoBrutalistColors.Black else p.text
             )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) { Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (selected) p.onAccent else p.muted) }
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(100.dp))
+                .background(if (selected) p.primary else p.chip)
+                .border(
+                    1.dp,
+                    if (selected) p.primary else p.border,
+                    RoundedCornerShape(100.dp)
+                )
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) { Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (selected) p.onAccent else p.muted) }
+    }
 }

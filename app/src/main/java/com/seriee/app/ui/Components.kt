@@ -1,12 +1,19 @@
 package com.seriee.app.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,13 +52,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -63,6 +72,8 @@ import com.seriee.app.R
 fun Poster(url: String, modifier: Modifier, shape: Shape = RoundedCornerShape(12.dp)) {
     val p = LocalPalette.current
     val context = androidx.compose.ui.platform.LocalContext.current
+    val effectiveShape = if (p.isNeoBrutalist) RoundedCornerShape(8.dp) else shape
+    val borderMod = if (p.isNeoBrutalist) Modifier.border(2.dp, p.border, effectiveShape) else Modifier
     if (url.isNotBlank()) {
         val model: Any? = remember(url) {
             when {
@@ -83,20 +94,22 @@ fun Poster(url: String, modifier: Modifier, shape: Shape = RoundedCornerShape(12
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = modifier
-                .clip(shape)
+                .clip(effectiveShape)
                 .background(p.chip)
+                .then(borderMod)
         )
     } else {
         Box(
             modifier = modifier
-                .clip(shape)
-                .background(p.chip),
+                .clip(effectiveShape)
+                .background(p.chip)
+                .then(borderMod),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Filled.Movie,
                 contentDescription = null,
-                tint = p.muted.copy(alpha = 0.5f),
+                tint = if (p.isNeoBrutalist) p.text else p.muted.copy(alpha = 0.5f),
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -106,38 +119,84 @@ fun Poster(url: String, modifier: Modifier, shape: Shape = RoundedCornerShape(12
 @Composable
 fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        NeoBrutalistBox(
+            onClick = onClick,
+            role = Role.Tab,
+            backgroundColor = if (selected) NeoBrutalistColors.Yellow else p.surface,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 2.dp,
+            shadowOffset = 3.dp,
+            cornerRadius = 6.dp,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+        ) {
+            Text(
+                text = label,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (selected) NeoBrutalistColors.Black else p.text
+            )
+        }
+        return
+    }
     val shape = CircleShape
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = SerieeMotion.SnappySpring,
+        label = "chipScale"
+    )
+    val bgColor by animateColorAsState(
+        targetValue = when {
+            selected -> p.primary.copy(alpha = if (p.isGlass) 0.86f else 1f)
+            p.isGlass && p.isLight -> Color.White.copy(alpha = 0.56f)
+            p.isGlass -> Color.White.copy(alpha = 0.12f)
+            else -> p.chip
+        },
+        animationSpec = tween(SerieeMotion.quick, easing = SerieeMotion.StandardEasing),
+        label = "chipBg"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) p.onAccent else p.text.copy(alpha = 0.84f),
+        animationSpec = tween(SerieeMotion.quick, easing = SerieeMotion.StandardEasing),
+        label = "chipText"
+    )
+    val borderColor = when {
+        selected && p.isGlass -> Color.White.copy(alpha = 0.55f)
+        p.isGlass && p.isLight -> Color.White.copy(alpha = 0.72f)
+        p.isGlass -> Color.White.copy(alpha = 0.22f)
+        selected -> Color.Transparent
+        else -> p.border
+    }
     Box(
         modifier = Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
+            .background(bgColor)
             .then(
-                if (selected) {
-                    Modifier
-                        .clip(shape)
-                        .background(p.primary.copy(alpha = if (p.isGlass) 0.84f else 1f))
-                        .then(
-                            if (p.isGlass) Modifier.border(0.75.dp, Color.White.copy(alpha = 0.55f), shape)
-                            else Modifier
-                        )
-                } else {
-                    Modifier.liquidGlass(
-                        shape = shape,
-                        tint = if (p.isGlass) {
-                            if (p.isLight) Color.White.copy(alpha = 0.44f) else Color.White.copy(alpha = 0.10f)
-                        } else p.chip,
-                        blurRadius = 12.dp,
-                        refractionHeight = 8.dp,
-                        refractionAmount = 14.dp
-                    )
-                }
+                if (borderColor != Color.Transparent) {
+                    Modifier.border(if (p.isGlass) 0.75.dp else 1.dp, borderColor, shape)
+                } else Modifier
             )
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick
+            )
             .padding(horizontal = 13.dp, vertical = 7.dp)
     ) {
         Text(
             text = label,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            color = if (selected) p.onAccent else p.text.copy(alpha = 0.82f)
+            color = textColor
         )
     }
 }
@@ -146,10 +205,11 @@ fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 fun FieldLabel(text: String) {
     val p = LocalPalette.current
     Text(
-        text = text,
+        text = if (p.isNeoBrutalist) text.uppercase() else text,
+        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
         fontSize = 12.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = p.muted,
+        fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.SemiBold,
+        color = if (p.isNeoBrutalist) p.text else p.muted,
         modifier = Modifier.padding(bottom = 4.dp)
     )
 }
@@ -167,6 +227,64 @@ fun SField(
     filled: Boolean = false
 ) {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        val neoShape = RoundedCornerShape(8.dp)
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .neoBrutalist(
+                    backgroundColor = p.surface,
+                    borderColor = p.border,
+                    shadowColor = NeoBrutalistColors.Black,
+                    borderWidth = 2.5.dp,
+                    shadowOffset = 4.dp,
+                    cornerRadius = 8.dp
+                )
+        ) {
+            TextField(
+                value = value,
+                onValueChange = onChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = {
+                    Text(
+                        placeholder,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = p.muted
+                    )
+                },
+                leadingIcon = leading,
+                trailingIcon = trailing,
+                visualTransformation = visualTransformation,
+                textStyle = TextStyle(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = p.text
+                ),
+                shape = neoShape,
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                colors = TextFieldDefaults.colors(
+                    focusedTextColor = p.text,
+                    unfocusedTextColor = p.text,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    cursorColor = p.text,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    focusedPlaceholderColor = p.muted,
+                    unfocusedPlaceholderColor = p.muted,
+                    focusedLeadingIconColor = p.text,
+                    unfocusedLeadingIconColor = p.text,
+                    focusedTrailingIconColor = p.text,
+                    unfocusedTrailingIconColor = p.text
+                )
+            )
+        }
+        return
+    }
     if (filled) {
         val pillShape = CircleShape
         Box(
@@ -177,9 +295,10 @@ fun SField(
                     tint = if (p.isGlass) {
                         if (p.isLight) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.10f)
                     } else p.chip,
-                    blurRadius = 16.dp,
+                    blurRadius = 12.dp,
                     refractionHeight = 10.dp,
-                    refractionAmount = 18.dp
+                    refractionAmount = 16.dp,
+                    chromaticAberration = false
                 )
         ) {
             TextField(
@@ -220,9 +339,10 @@ fun SField(
         Modifier.liquidGlass(
             shape = fieldShape,
             tint = if (p.isLight) Color.White.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f),
-            blurRadius = 12.dp,
+            blurRadius = 10.dp,
             refractionHeight = 8.dp,
             refractionAmount = 12.dp,
+            chromaticAberration = false,
             withBorder = false
         )
     } else Modifier
@@ -264,43 +384,79 @@ fun <T> DropdownField(
 ) {
     val p = LocalPalette.current
     var expanded by remember { mutableStateOf(false) }
-    val fieldShape = RoundedCornerShape(16.dp)
+    val fieldShape = if (p.isNeoBrutalist) RoundedCornerShape(8.dp) else RoundedCornerShape(16.dp)
     Column(modifier) {
         if (label.isNotEmpty()) FieldLabel(label)
         Box {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .liquidGlass(
-                        shape = fieldShape,
-                        tint = if (p.isGlass) {
-                            if (p.isLight) Color.White.copy(alpha = 0.48f) else Color.White.copy(alpha = 0.10f)
-                        } else p.bg,
-                        blurRadius = 14.dp,
-                        refractionHeight = 8.dp,
-                        refractionAmount = 14.dp
+            if (p.isNeoBrutalist) {
+                NeoBrutalistBox(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { expanded = true },
+                    role = Role.DropdownList,
+                    backgroundColor = p.surface,
+                    borderColor = p.border,
+                    shadowColor = NeoBrutalistColors.Black,
+                    borderWidth = 2.5.dp,
+                    shadowOffset = 4.dp,
+                    cornerRadius = 8.dp,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = valueLabel,
+                            color = p.text,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = p.text)
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .liquidGlass(
+                            shape = fieldShape,
+                            tint = if (p.isGlass) {
+                                if (p.isLight) Color.White.copy(alpha = 0.48f) else Color.White.copy(alpha = 0.10f)
+                            } else p.bg,
+                            blurRadius = 10.dp,
+                            refractionHeight = 8.dp,
+                            refractionAmount = 12.dp,
+                            chromaticAberration = false
+                        )
+                        .clickable { expanded = true }
+                        .padding(horizontal = 14.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = valueLabel,
+                        color = p.text,
+                        fontSize = 14.sp,
+                        modifier = Modifier.weight(1f)
                     )
-                    .clickable { expanded = true }
-                    .padding(horizontal = 14.dp, vertical = 13.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = valueLabel,
-                    color = p.text,
-                    fontSize = 14.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = p.muted)
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = p.muted)
+                }
             }
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                shape = RoundedCornerShape(20.dp),
-                containerColor = if (p.isGlass) p.elevated else p.surface
+                shape = if (p.isNeoBrutalist) RoundedCornerShape(8.dp) else RoundedCornerShape(20.dp),
+                containerColor = if (p.isNeoBrutalist) p.surface else if (p.isGlass) p.elevated else p.surface,
+                tonalElevation = 0.dp,
+                shadowElevation = if (p.isNeoBrutalist) 0.dp else 8.dp,
+                border = if (p.isNeoBrutalist) BorderStroke(2.5.dp, p.border) else null
             ) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(option.second, color = p.text) },
+                        text = {
+                            Text(
+                                option.second,
+                                color = p.text,
+                                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
                         onClick = {
                             onSelect(option.first)
                             expanded = false
@@ -332,7 +488,7 @@ fun StarRatingBar(
         1 -> stringResource(R.string.rating_poor)
         else -> stringResource(R.string.rating_none)
     }
-    val labelColor = if (rating > 0) starColor else p.muted
+    val labelColor = if (p.isNeoBrutalist) p.text else if (rating > 0) starColor else p.muted
 
     Column(modifier = modifier) {
         Row(
@@ -342,15 +498,25 @@ fun StarRatingBar(
             for (i in 1..maxStars) {
                 val isFilled = i <= rating
                 val icon = if (isFilled) Icons.Filled.Star else Icons.Filled.StarBorder
-                val tint = if (isFilled) starColor else p.muted.copy(alpha = 0.45f)
+                val tint = if (isFilled) {
+                    if (p.isNeoBrutalist) NeoBrutalistColors.Black else starColor
+                } else {
+                    p.muted.copy(alpha = 0.45f)
+                }
 
                 Box(
                     modifier = Modifier
                         .size(starSize + 8.dp)
-                        .clip(CircleShape)
+                        .clip(if (p.isNeoBrutalist) RoundedCornerShape(6.dp) else CircleShape)
+                        .then(
+                            if (p.isNeoBrutalist && isFilled) {
+                                Modifier
+                                    .background(NeoBrutalistColors.Yellow)
+                                    .border(1.5.dp, p.border, RoundedCornerShape(6.dp))
+                            } else Modifier
+                        )
                         .clickable(enabled = onRatingChange != null) {
                             if (onRatingChange != null) {
-                                // Toggle off if clicking the currently selected star
                                 val newRating = if (rating == i) 0 else i
                                 onRatingChange(newRating)
                             }
@@ -369,8 +535,9 @@ fun StarRatingBar(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = labelText,
+                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.SemiBold,
                     color = labelColor,
                     maxLines = 1
                 )
@@ -380,8 +547,9 @@ fun StarRatingBar(
             Spacer(Modifier.height(4.dp))
             Text(
                 text = labelText,
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.SemiBold,
                 color = labelColor,
                 maxLines = 1
             )
@@ -396,6 +564,34 @@ fun StarRatingBadge(
 ) {
     if (rating <= 0) return
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        val shape = RoundedCornerShape(6.dp)
+        Box(
+            modifier = modifier
+                .clip(shape)
+                .background(NeoBrutalistColors.Yellow)
+                .border(1.5.dp, NeoBrutalistColors.Black, shape)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.Star,
+                    contentDescription = null,
+                    tint = NeoBrutalistColors.Black,
+                    modifier = Modifier.size(11.dp)
+                )
+                Spacer(Modifier.width(2.dp))
+                Text(
+                    text = "$rating.0",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = NeoBrutalistColors.Black
+                )
+            }
+        }
+        return
+    }
     Box(
         modifier = modifier
             .clip(CircleShape)
@@ -431,6 +627,26 @@ fun GenreTagBadge(
     color: Color? = null
 ) {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        val shape = RoundedCornerShape(6.dp)
+        val fill = color ?: NeoBrutalistColors.SkyBlue
+        Box(
+            modifier = modifier
+                .clip(shape)
+                .background(fill)
+                .border(1.5.dp, NeoBrutalistColors.Black, shape)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = tag,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = NeoBrutalistColors.Black
+            )
+        }
+        return
+    }
     val accent = color ?: p.primary
     Box(
         modifier = modifier
@@ -476,60 +692,126 @@ fun TagInputField(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FieldLabel(stringResource(R.string.genre_tag_label))
 
-        // Tag Input Text Field with Add Button
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = { newVal ->
-                    if (newVal.endsWith(",") || newVal.endsWith("\n")) {
-                        addTag(newVal)
-                    } else {
-                        input = newVal
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                placeholder = { Text(stringResource(R.string.genre_placeholder), fontSize = 13.sp) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Filled.LocalOffer,
-                        contentDescription = null,
-                        tint = p.muted,
-                        modifier = Modifier.size(16.dp)
+            val fieldShape = if (p.isNeoBrutalist) RoundedCornerShape(8.dp) else RoundedCornerShape(12.dp)
+            val containerModifier = if (p.isNeoBrutalist) {
+                Modifier
+                    .weight(1f)
+                    .neoBrutalist(
+                        backgroundColor = p.surface,
+                        borderColor = p.border,
+                        shadowColor = NeoBrutalistColors.Black,
+                        borderWidth = 2.5.dp,
+                        shadowOffset = 4.dp,
+                        cornerRadius = 8.dp
                     )
-                },
-                trailingIcon = if (input.isNotBlank()) {
-                    {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(p.primary)
-                                .clickable { addTag(input) }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Text(stringResource(R.string.add), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.onAccent)
+            } else Modifier.weight(1f)
+
+            if (p.isNeoBrutalist) {
+                Box(modifier = containerModifier) {
+                    TextField(
+                        value = input,
+                        onValueChange = { newVal ->
+                            if (newVal.endsWith(",") || newVal.endsWith("\n")) addTag(newVal)
+                            else input = newVal
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.genre_placeholder), fontSize = 13.sp, color = p.muted) },
+                        leadingIcon = {
+                            Icon(Icons.Filled.LocalOffer, contentDescription = null, tint = p.text, modifier = Modifier.size(16.dp))
+                        },
+                        trailingIcon = if (input.isNotBlank()) {
+                            {
+                                NeoBrutalistBox(
+                                    onClick = { addTag(input) },
+                                    backgroundColor = NeoBrutalistColors.Mint,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 2.dp,
+                                    shadowOffset = 2.dp,
+                                    cornerRadius = 6.dp,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
+                                    modifier = Modifier.padding(end = 6.dp)
+                                ) {
+                                    Text(
+                                        stringResource(R.string.add),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = NeoBrutalistColors.Black
+                                    )
+                                }
+                            }
+                        } else null,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { addTag(input) }),
+                        textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold, color = p.text),
+                        shape = fieldShape,
+                        colors = TextFieldDefaults.colors(
+                            focusedTextColor = p.text,
+                            unfocusedTextColor = p.text,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            cursorColor = p.text,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        )
+                    )
+                }
+            } else {
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { newVal ->
+                        if (newVal.endsWith(",") || newVal.endsWith("\n")) {
+                            addTag(newVal)
+                        } else {
+                            input = newVal
                         }
-                    }
-                } else null,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { addTag(input) }),
-                textStyle = TextStyle(fontSize = 13.sp),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = p.text,
-                    unfocusedTextColor = p.text,
-                    focusedContainerColor = p.bg,
-                    unfocusedContainerColor = p.bg,
-                    cursorColor = p.primary,
-                    focusedBorderColor = p.primary,
-                    unfocusedBorderColor = p.border,
-                    focusedPlaceholderColor = p.muted,
-                    unfocusedPlaceholderColor = p.muted
+                    },
+                    modifier = containerModifier,
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.genre_placeholder), fontSize = 13.sp) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.LocalOffer,
+                            contentDescription = null,
+                            tint = p.muted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    trailingIcon = if (input.isNotBlank()) {
+                        {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(p.primary)
+                                    .clickable { addTag(input) }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(stringResource(R.string.add), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.onAccent)
+                            }
+                        }
+                    } else null,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { addTag(input) }),
+                    textStyle = TextStyle(fontSize = 13.sp),
+                    shape = fieldShape,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = p.text,
+                        unfocusedTextColor = p.text,
+                        focusedContainerColor = p.bg,
+                        unfocusedContainerColor = p.bg,
+                        cursorColor = p.primary,
+                        focusedBorderColor = p.primary,
+                        unfocusedBorderColor = p.border,
+                        focusedPlaceholderColor = p.muted,
+                        unfocusedPlaceholderColor = p.muted
+                    )
                 )
-            )
+            }
         }
 
-        // Active tags chips (removable)
         if (tags.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -539,37 +821,72 @@ fun TagInputField(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 tags.forEach { tag ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(p.primary.copy(alpha = 0.2f))
-                            .border(1.dp, p.primary.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                            .clickable { onTagsChanged(tags - tag) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                tag,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = p.primary
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = stringResource(R.string.remove_tag, tag),
-                                tint = p.primary,
-                                modifier = Modifier.size(12.dp)
-                            )
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            onClick = { onTagsChanged(tags - tag) },
+                            backgroundColor = NeoBrutalistColors.Pink,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.dp,
+                            shadowOffset = 2.dp,
+                            cornerRadius = 6.dp,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    tag,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeoBrutalistColors.Black
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = stringResource(R.string.remove_tag, tag),
+                                    tint = NeoBrutalistColors.Black,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(p.primary.copy(alpha = 0.2f))
+                                .border(1.dp, p.primary.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .clickable { onTagsChanged(tags - tag) }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    tag,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = p.primary
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = stringResource(R.string.remove_tag, tag),
+                                    tint = p.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Popular Genre Suggestions
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.popular_genres), fontSize = 10.sp, color = p.muted)
+            Text(
+                stringResource(R.string.popular_genres),
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                fontSize = 10.sp,
+                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                color = p.muted
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -578,35 +895,73 @@ fun TagInputField(
             ) {
                 popularGenres.forEach { genre ->
                     val isSelected = tags.any { it.equals(genre, ignoreCase = true) }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isSelected) p.primary else p.chip)
-                            .clickable {
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            onClick = {
                                 if (isSelected) {
                                     onTagsChanged(tags.filterNot { it.equals(genre, ignoreCase = true) })
                                 } else {
                                     onTagsChanged(tags + genre)
                                 }
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (!isSelected) {
-                                Icon(
-                                    Icons.Filled.Add,
-                                    contentDescription = null,
-                                    tint = p.muted,
-                                    modifier = Modifier.size(10.dp)
+                            },
+                            backgroundColor = if (isSelected) NeoBrutalistColors.Yellow else p.surface,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.dp,
+                            shadowOffset = 2.dp,
+                            cornerRadius = 6.dp,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (!isSelected) {
+                                    Icon(
+                                        Icons.Filled.Add,
+                                        contentDescription = null,
+                                        tint = p.text,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                }
+                                Text(
+                                    genre,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    color = if (isSelected) NeoBrutalistColors.Black else p.text,
+                                    fontWeight = FontWeight.Bold
                                 )
-                                Spacer(Modifier.width(2.dp))
                             }
-                            Text(
-                                genre,
-                                fontSize = 11.sp,
-                                color = if (isSelected) p.onAccent else p.muted,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSelected) p.primary else p.chip)
+                                .clickable {
+                                    if (isSelected) {
+                                        onTagsChanged(tags.filterNot { it.equals(genre, ignoreCase = true) })
+                                    } else {
+                                        onTagsChanged(tags + genre)
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (!isSelected) {
+                                    Icon(
+                                        Icons.Filled.Add,
+                                        contentDescription = null,
+                                        tint = p.muted,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                }
+                                Text(
+                                    genre,
+                                    fontSize = 11.sp,
+                                    color = if (isSelected) p.onAccent else p.muted,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
                         }
                     }
                 }
@@ -614,4 +969,3 @@ fun TagInputField(
         }
     }
 }
-

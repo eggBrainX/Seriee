@@ -1,19 +1,29 @@
 package com.seriee.app.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,44 +44,35 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kyant.backdrop.backdrops.LayerBackdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
-import com.kyant.backdrop.highlight.Highlight
-import com.kyant.backdrop.shadow.Shadow
 import com.seriee.app.data.WatchStatus
-
-/** Backdrop capturing the ambient wallpaper/gradient behind in-page glass cards. */
-val LocalLiquidBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
-
-/** Backdrop capturing both background and scrolling content behind floating chrome. */
-val LocalChromeBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
 object SerieeType {
     val display = androidx.compose.ui.text.TextStyle(
@@ -112,15 +113,42 @@ object SerieeSpace {
 }
 
 object SerieeMotion {
-    const val quick = 180
+    const val quick = 160
     const val standard = 240
     const val emphasized = 320
+
+    val EaseOutExpo = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+    val StandardEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+    val EmphasizedDecel = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+
+    val SnappySpring = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = 520f
+    )
+    val SmoothSpring = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = 380f
+    )
+    val SleekSpring = spring<Float>(
+        dampingRatio = 0.88f,
+        stiffness = 420f
+    )
 }
 
 /** Status colours shared by cards, badges and the detail sheet. */
 @Composable
 fun statusColor(status: WatchStatus): Color {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        return when (status) {
+            WatchStatus.Watching -> NeoBrutalistColors.SkyBlue
+            WatchStatus.Completed -> NeoBrutalistColors.Mint
+            WatchStatus.PlanToWatch -> NeoBrutalistColors.OffWhite
+            WatchStatus.ComingSoon -> NeoBrutalistColors.Yellow
+            WatchStatus.OnHold -> NeoBrutalistColors.Pink
+            WatchStatus.Dropped -> NeoBrutalistColors.CoralRed
+        }
+    }
     return when (status) {
         WatchStatus.Watching -> p.primary
         WatchStatus.Completed -> p.success
@@ -148,22 +176,18 @@ private fun SeriePalette.specularColors(): List<Color> {
  */
 fun Modifier.themedBorder(p: SeriePalette, shape: Shape, width: Dp = 1.dp): Modifier =
     border(
-        width = width,
+        width = if (p.isNeoBrutalist) 2.5.dp else width,
         brush = if (p.isGlass) Brush.linearGradient(p.specularColors()) else SolidColor(p.border),
         shape = shape
     )
 
 /**
- * Apple Liquid Glass surface powered by `io.github.kyant0:backdrop`.
- *
- * Samples [backdrop] through vibrancy + Gaussian blur + optical SDF lens
- * refraction and RGB chromatic dispersion when [palette.isGlass] is active,
- * falling back cleanly to solid themed surfaces when [reduceTransparency] or
- * an opaque style is chosen.
+ * Pure Compose translucent glass surface for Frost/Liquid/Custom styles, or crisp
+ * Neo-Brutalist offset-shadow surface when [SeriePalette.isNeoBrutalist] is active.
  */
+@Suppress("UNUSED_PARAMETER")
 fun Modifier.liquidGlass(
     shape: Shape,
-    backdrop: LayerBackdrop? = null,
     tint: Color? = null,
     blurRadius: Dp = 18.dp,
     refractionHeight: Dp = 12.dp,
@@ -174,87 +198,82 @@ fun Modifier.liquidGlass(
     withBorder: Boolean = true
 ): Modifier = composed {
     val p = LocalPalette.current
-    val activeBackdrop = backdrop ?: LocalLiquidBackdrop.current
+    if (p.isNeoBrutalist) {
+        val bgColor = (tint ?: p.card).let {
+            if (it.alpha < 0.99f) it.copy(alpha = 1f) else it
+        }
+        return@composed this.neoBrutalist(
+            backgroundColor = bgColor,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = if (withBorder) 2.5.dp else 0.dp,
+            shadowOffset = 4.dp,
+            cornerRadius = 8.dp
+        )
+    }
+
     val resolvedTint = tint ?: if (p.isGlass) {
-        if (p.isLight) Color.White.copy(alpha = 0.46f)
-        else Color(0xFF0E1729).copy(alpha = 0.48f)
+        if (p.isLight) Color.White.copy(alpha = 0.56f)
+        else Color(0xFF0E1729).copy(alpha = 0.62f)
     } else {
         p.card
     }
+    val surface = if (p.isGlass) resolvedTint.compositeOver(p.bg.copy(alpha = 0.35f)) else resolvedTint
 
-    if (p.isGlass && activeBackdrop != null) {
-        this
-            .drawBackdrop(
-                backdrop = activeBackdrop,
-                shape = { shape },
-                effects = {
-                    vibrancy()
-                    if (blurRadius > 0.dp) {
-                        blur(blurRadius.toPx())
+    this
+        .then(
+            if (elevated && p.isGlass) Modifier.shadow(8.dp, shape, clip = false) else Modifier
+        )
+        .clip(shape)
+        .background(surface)
+        .then(
+            if (p.isGlass && withHighlight) {
+                Modifier.drawWithCache {
+                    val sheen = Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = if (p.isLight) 0.34f else 0.14f),
+                        0.45f to Color.White.copy(alpha = if (p.isLight) 0.06f else 0.02f),
+                        1f to Color.Transparent
+                    )
+                    onDrawBehind {
+                        drawRect(sheen)
                     }
-                    if (p.isLiquidGlass && refractionAmount > 0.dp) {
-                        lens(
-                            refractionHeight = refractionHeight.toPx(),
-                            refractionAmount = refractionAmount.toPx(),
-                            chromaticAberration = chromaticAberration
-                        )
-                    }
-                },
-                highlight = if (withHighlight) {
-                    { Highlight.Default }
-                } else null,
-                shadow = if (elevated) {
-                    { Shadow.Default }
-                } else null,
-                onDrawSurface = {
-                    drawRect(resolvedTint)
                 }
-            )
-            .then(
-                if (withBorder) Modifier.themedBorder(p, shape, width = 0.75.dp) else Modifier
-            )
-    } else {
-        // No live backdrop (API < 31) or an opaque / reduced-transparency style:
-        // composite the tint over the page background so the fallback keeps a
-        // readable contrast instead of washing out over the gradient, and
-        // restore the elevation that the blur effect would have provided.
-        val fallbackTint = tint ?: p.card
-        val surface = if (p.isGlass) fallbackTint.compositeOver(p.bg) else fallbackTint
-        this
-            .then(
-                if (elevated && p.isGlass) Modifier.shadow(6.dp, shape, clip = false) else Modifier
-            )
-            .clip(shape)
-            .background(surface)
-            .then(
-                if (withBorder) {
-                    // The white specular edge is invisible on pale backgrounds;
-                    // use the palette border when the glass is unavailable.
-                    if (p.isGlass) Modifier.border(1.dp, p.border, shape)
-                    else Modifier.themedBorder(p, shape)
-                } else {
-                    Modifier
-                }
-            )
-    }
+            } else {
+                Modifier
+            }
+        )
+        .then(
+            if (withBorder) {
+                Modifier.themedBorder(p, shape, width = if (p.isGlass) 0.85.dp else 1.dp)
+            } else {
+                Modifier
+            }
+        )
 }
 
-/** Translucent floating chrome (nav bar, top bar) with strong Liquid Glass optics. */
+/** Translucent floating chrome (nav bar, top bar) or Neo-Brutalist solid chrome. */
 fun Modifier.glassChrome(
     p: SeriePalette,
-    shape: Shape,
-    backdrop: LayerBackdrop? = null
+    shape: Shape
 ): Modifier = composed {
-    val chromeBackdrop = backdrop ?: LocalChromeBackdrop.current ?: LocalLiquidBackdrop.current
+    if (p.isNeoBrutalist) {
+        return@composed this.neoBrutalist(
+            backgroundColor = p.surface,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 2.5.dp,
+            shadowOffset = 4.dp,
+            cornerRadius = 8.dp
+        )
+    }
     val surfaceTint = if (p.isGlass) {
-        if (p.isLight) Color.White.copy(alpha = 0.42f)
-        else Color(0xFF0B1324).copy(alpha = 0.48f)
+        if (p.isLight) Color.White.copy(alpha = 0.68f)
+        else Color(0xFF0B1324).copy(alpha = 0.72f)
     } else {
         p.surface
     }
     liquidGlass(
         shape = shape,
-        backdrop = chromeBackdrop,
         tint = surfaceTint,
         blurRadius = 12.dp,
         refractionHeight = 18.dp,
@@ -267,9 +286,9 @@ fun Modifier.glassChrome(
 }
 
 /**
- * Provides an ambient glass [LayerBackdrop] inside standalone Android windows
- * such as [ModalBottomSheet] and [Dialog], so inner cards, fields, and buttons
- * still exhibit Liquid Glass refraction and dispersion.
+ * Provides an ambient glass background inside standalone Android windows
+ * such as [androidx.compose.material3.ModalBottomSheet] and [androidx.compose.ui.window.Dialog],
+ * or a crisp solid surface for Neo-Brutalism.
  */
 @Composable
 fun LiquidSheetHost(
@@ -277,64 +296,141 @@ fun LiquidSheetHost(
     content: @Composable () -> Unit
 ) {
     val p = LocalPalette.current
-    val sheetBackdrop = rememberLayerBackdrop()
-    Box(modifier = modifier.fillMaxWidth()) {
+    if (p.isNeoBrutalist) {
         Box(
-            modifier = Modifier
-                .matchParentSize()
-                .layerBackdrop(sheetBackdrop)
-                .drawBehind {
-                    drawRect(if (p.isGlass) p.surface.copy(alpha = if (p.isLight) 0.90f else 0.84f) else p.surface)
-                    if (p.isGlass) {
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    p.primary.copy(alpha = if (p.isLight) 0.16f else 0.22f),
-                                    Color.Transparent
-                                ),
-                                center = Offset(size.width * 0.15f, size.height * 0.12f),
-                                radius = size.maxDimension * 0.65f
+            modifier = modifier
+                .fillMaxWidth()
+                .background(p.surface)
+        ) {
+            content()
+        }
+        return
+    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .drawBehind {
+                drawRect(if (p.isGlass) p.surface.copy(alpha = if (p.isLight) 0.92f else 0.88f) else p.surface)
+                if (p.isGlass) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                p.primary.copy(alpha = if (p.isLight) 0.16f else 0.22f),
+                                Color.Transparent
                             ),
                             center = Offset(size.width * 0.15f, size.height * 0.12f),
                             radius = size.maxDimension * 0.65f
-                        )
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    p.accent.copy(alpha = if (p.isLight) 0.14f else 0.18f),
-                                    Color.Transparent
-                                ),
-                                center = Offset(size.width * 0.88f, size.height * 0.72f),
-                                radius = size.maxDimension * 0.6f
+                        ),
+                        center = Offset(size.width * 0.15f, size.height * 0.12f),
+                        radius = size.maxDimension * 0.65f
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                p.accent.copy(alpha = if (p.isLight) 0.14f else 0.18f),
+                                Color.Transparent
                             ),
                             center = Offset(size.width * 0.88f, size.height * 0.72f),
                             radius = size.maxDimension * 0.6f
-                        )
-                    }
+                        ),
+                        center = Offset(size.width * 0.88f, size.height * 0.72f),
+                        radius = size.maxDimension * 0.6f
+                    )
                 }
-        )
-        CompositionLocalProvider(LocalLiquidBackdrop provides sheetBackdrop) {
-            content()
-        }
+            }
+    ) {
+        content()
     }
 }
 
 /**
- * Full-screen backdrop. Liquid styles drift their aurora gradient and luminous
- * color orbs slowly so refracting glass cards catch shifting highlights.
+ * Full-screen backdrop.
+ *
+ * The cached base gradient + luminous orbs live on [modifier] (the captured
+ * [LayerBackdrop]) so glass cards never re-blur every idle frame. When
+ * [SeriePalette.animatedGradient] is active, a lightweight GPU-translated glow
+ * layer drifts smoothly above it without invalidating the backdrop cache.
  */
 @Composable
 fun SerieeBackground(p: SeriePalette, modifier: Modifier = Modifier) {
     val gradient = p.gradient
-    Box(modifier = modifier.fillMaxSize().background(p.bg)) {
-        if (gradient == null) return@Box
-        if (p.animatedGradient) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(p.bg)
+                .then(
+                    if (gradient != null && !p.isNeoBrutalist) {
+                        Modifier.drawWithCache {
+                            val linear = Brush.linearGradient(colors = gradient)
+                            val orbA = if (p.isGlass) {
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        p.primary.copy(alpha = if (p.isLight) 0.28f else 0.32f),
+                                        Color.Transparent
+                                    ),
+                                    center = Offset(size.width * 0.22f, size.height * 0.16f),
+                                    radius = size.width * 0.65f
+                                )
+                            } else null
+                            val orbB = if (p.isGlass) {
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        p.accent.copy(alpha = if (p.isLight) 0.22f else 0.24f),
+                                        Color.Transparent
+                                    ),
+                                    center = Offset(size.width * 0.82f, size.height * 0.50f),
+                                    radius = size.width * 0.60f
+                                )
+                            } else null
+                            val orbC = if (p.isGlass) {
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        (gradient.lastOrNull() ?: p.accent).copy(
+                                            alpha = if (p.isLight) 0.26f else 0.30f
+                                        ),
+                                        Color.Transparent
+                                    ),
+                                    center = Offset(size.width * 0.38f, size.height * 0.86f),
+                                    radius = size.width * 0.70f
+                                )
+                            } else null
+                            onDrawBehind {
+                                drawRect(linear)
+                                orbA?.let {
+                                    drawCircle(
+                                        brush = it,
+                                        center = Offset(size.width * 0.22f, size.height * 0.16f),
+                                        radius = size.width * 0.65f
+                                    )
+                                }
+                                orbB?.let {
+                                    drawCircle(
+                                        brush = it,
+                                        center = Offset(size.width * 0.82f, size.height * 0.50f),
+                                        radius = size.width * 0.60f
+                                    )
+                                }
+                                orbC?.let {
+                                    drawCircle(
+                                        brush = it,
+                                        center = Offset(size.width * 0.38f, size.height * 0.86f),
+                                        radius = size.width * 0.70f
+                                    )
+                                }
+                            }
+                        }
+                    } else Modifier
+                )
+        )
+
+        if (gradient != null && !p.isNeoBrutalist && p.animatedGradient && p.isGlass) {
             val transition = rememberInfiniteTransition(label = "liquidBackground")
             val drift by transition.animateFloat(
-                initialValue = 0f,
+                initialValue = -1f,
                 targetValue = 1f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 16_000, easing = LinearEasing),
+                    animation = tween(durationMillis = 14_000, easing = LinearEasing),
                     repeatMode = RepeatMode.Reverse
                 ),
                 label = "liquidDrift"
@@ -342,70 +438,43 @@ fun SerieeBackground(p: SeriePalette, modifier: Modifier = Modifier) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .drawBehind {
-                        drawRect(
-                            brush = Brush.linearGradient(
-                                colors = gradient,
-                                start = Offset(size.width * 0.25f * drift, 0f),
-                                end = Offset(size.width * (1f - 0.25f * drift), size.height)
-                            )
+                    .graphicsLayer {
+                        translationX = size.width * 0.08f * drift
+                        translationY = size.height * 0.04f * drift
+                    }
+                    .drawWithCache {
+                        val glowA = Brush.radialGradient(
+                            colors = listOf(
+                                p.primary.copy(alpha = if (p.isLight) 0.14f else 0.16f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.30f, size.height * 0.22f),
+                            radius = size.width * 0.55f
                         )
-                        if (p.isGlass) {
-                            val orbA = Offset(
-                                x = size.width * (0.18f + 0.22f * drift),
-                                y = size.height * (0.14f + 0.08f * drift)
-                            )
-                            val orbB = Offset(
-                                x = size.width * (0.85f - 0.25f * drift),
-                                y = size.height * (0.52f - 0.10f * drift)
-                            )
-                            val orbC = Offset(
-                                x = size.width * (0.30f + 0.35f * drift),
-                                y = size.height * 0.86f
+                        val glowB = Brush.radialGradient(
+                            colors = listOf(
+                                (gradient.lastOrNull() ?: p.accent).copy(
+                                    alpha = if (p.isLight) 0.12f else 0.15f
+                                ),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.72f, size.height * 0.76f),
+                            radius = size.width * 0.58f
+                        )
+                        onDrawBehind {
+                            drawCircle(
+                                brush = glowA,
+                                center = Offset(size.width * 0.30f, size.height * 0.22f),
+                                radius = size.width * 0.55f
                             )
                             drawCircle(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        p.primary.copy(alpha = if (p.isLight) 0.30f else 0.34f),
-                                        Color.Transparent
-                                    ),
-                                    center = orbA,
-                                    radius = size.width * 0.65f
-                                ),
-                                center = orbA,
-                                radius = size.width * 0.65f
-                            )
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        p.accent.copy(alpha = if (p.isLight) 0.24f else 0.26f),
-                                        Color.Transparent
-                                    ),
-                                    center = orbB,
-                                    radius = size.width * 0.60f
-                                ),
-                                center = orbB,
-                                radius = size.width * 0.60f
-                            )
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        (gradient.lastOrNull() ?: p.accent).copy(
-                                            alpha = if (p.isLight) 0.28f else 0.32f
-                                        ),
-                                        Color.Transparent
-                                    ),
-                                    center = orbC,
-                                    radius = size.width * 0.70f
-                                ),
-                                center = orbC,
-                                radius = size.width * 0.70f
+                                brush = glowB,
+                                center = Offset(size.width * 0.72f, size.height * 0.76f),
+                                radius = size.width * 0.58f
                             )
                         }
                     }
             )
-        } else {
-            Box(Modifier.fillMaxSize().background(Brush.linearGradient(gradient)))
         }
     }
 }
@@ -424,16 +493,24 @@ fun SerieeSurface(
         else -> p.card
     }
     Box(
-        modifier = if (level > 0 && p.isGlass) {
-            modifier.liquidGlass(
+        modifier = when {
+            p.isNeoBrutalist && level > 0 -> modifier.neoBrutalist(
+                backgroundColor = bg,
+                borderColor = p.border,
+                shadowColor = NeoBrutalistColors.Black,
+                borderWidth = 2.5.dp,
+                shadowOffset = 4.dp,
+                cornerRadius = 8.dp
+            )
+            level > 0 && p.isGlass -> modifier.liquidGlass(
                 shape = shape,
                 tint = bg,
-                blurRadius = 16.dp,
+                blurRadius = 12.dp,
                 refractionHeight = 10.dp,
-                refractionAmount = 18.dp
+                refractionAmount = 16.dp,
+                chromaticAberration = false
             )
-        } else {
-            modifier
+            else -> modifier
                 .clip(shape)
                 .background(bg)
                 .then(if (level > 0) Modifier.themedBorder(p, shape) else Modifier)
@@ -455,9 +532,20 @@ fun SectionHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.text)
+            Text(
+                title,
+                fontSize = 15.sp,
+                fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
+                color = p.text
+            )
             if (subtitle != null) {
-                Text(subtitle, fontSize = 11.sp, color = p.muted)
+                Text(
+                    subtitle,
+                    fontSize = 11.sp,
+                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                    color = p.muted
+                )
             }
         }
         trailing?.invoke()
@@ -470,26 +558,62 @@ fun IconPillButton(
     contentDescription: String?,
     onClick: () -> Unit,
     tint: Color? = null,
-    backdrop: LayerBackdrop? = null,
     modifier: Modifier = Modifier
 ) {
     val p = LocalPalette.current
-    val effectiveBackdrop = backdrop ?: LocalLiquidBackdrop.current
+    if (p.isNeoBrutalist) {
+        NeoBrutalistBox(
+            modifier = modifier.size(44.dp),
+            onClick = onClick,
+            role = Role.Button,
+            backgroundColor = NeoBrutalistColors.OffWhite,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 2.dp,
+            shadowOffset = 3.dp,
+            cornerRadius = 8.dp,
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = contentDescription,
+                tint = tint ?: p.text,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        return
+    }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.90f else 1f,
+        animationSpec = SerieeMotion.SnappySpring,
+        label = "iconPillScale"
+    )
     Box(
         modifier = modifier
             .size(40.dp)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .liquidGlass(
                 shape = CircleShape,
-                backdrop = effectiveBackdrop,
                 tint = if (p.isGlass) {
                     if (p.isLight) Color.White.copy(alpha = 0.52f)
                     else Color.White.copy(alpha = 0.14f)
                 } else p.chip,
-                blurRadius = 14.dp,
+                blurRadius = 12.dp,
                 refractionHeight = 8.dp,
-                refractionAmount = 16.dp
+                refractionAmount = 14.dp,
+                chromaticAberration = false
             )
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(icon, contentDescription = contentDescription, tint = tint ?: p.text.copy(alpha = 0.85f), modifier = Modifier.size(18.dp))
@@ -514,19 +638,21 @@ fun SettingRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = tint ?: p.muted, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = tint ?: p.text, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))
         Text(
             title,
             fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Medium,
             color = p.text,
             modifier = Modifier.weight(1f)
         )
         if (value != null) {
             Text(
                 value,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                 color = p.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -534,7 +660,7 @@ fun SettingRow(
             Spacer(Modifier.width(4.dp))
         }
         if (showChevron) {
-            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = p.muted, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = if (p.isNeoBrutalist) p.text else p.muted, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -548,27 +674,67 @@ fun RadioCard(
     modifier: Modifier = Modifier
 ) {
     val p = LocalPalette.current
-    val tint = if (selected) {
-        p.primary.copy(alpha = if (p.isGlass) 0.22f else 0.12f)
-    } else if (p.isGlass) {
-        if (p.isLight) Color.White.copy(alpha = 0.44f) else Color.White.copy(alpha = 0.08f)
-    } else {
-        p.chip
+    if (p.isNeoBrutalist) {
+        NeoBrutalistBox(
+            modifier = modifier.fillMaxWidth(),
+            onClick = onClick,
+            role = Role.RadioButton,
+            backgroundColor = if (selected) NeoBrutalistColors.Yellow else p.surface,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 2.5.dp,
+            shadowOffset = 3.dp,
+            cornerRadius = 8.dp,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (selected) Icons.Filled.RadioButtonChecked else Icons.Filled.RadioButtonUnchecked,
+                    contentDescription = null,
+                    tint = NeoBrutalistColors.Black,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        title,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (selected) NeoBrutalistColors.Black else p.text
+                    )
+                    Text(
+                        subtitle,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (selected) NeoBrutalistColors.Black.copy(alpha = 0.8f) else p.muted,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+        }
+        return
     }
+    val tintColor by animateColorAsState(
+        targetValue = if (selected) {
+            p.primary.copy(alpha = if (p.isGlass) 0.22f else 0.12f)
+        } else if (p.isGlass) {
+            if (p.isLight) Color.White.copy(alpha = 0.44f) else Color.White.copy(alpha = 0.08f)
+        } else {
+            p.chip
+        },
+        animationSpec = tween(SerieeMotion.quick, easing = SerieeMotion.StandardEasing),
+        label = "radioTint"
+    )
+    val cardShape = SerieeShape.field
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .liquidGlass(
-                shape = SerieeShape.field,
-                tint = tint,
-                blurRadius = 14.dp,
-                refractionHeight = 8.dp,
-                refractionAmount = 14.dp,
-                withBorder = !selected
-            )
-            .then(
-                if (selected) Modifier.border(1.dp, p.primary.copy(alpha = 0.65f), SerieeShape.field)
-                else Modifier
+            .clip(cardShape)
+            .background(tintColor)
+            .border(
+                width = if (selected) 1.dp else if (p.isGlass) 0.75.dp else 1.dp,
+                color = if (selected) p.primary.copy(alpha = 0.65f) else p.border,
+                shape = cardShape
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -596,50 +762,122 @@ fun SegmentedTabs(
     modifier: Modifier = Modifier
 ) {
     val p = LocalPalette.current
-    Row(
-        modifier = modifier
+    if (labels.isEmpty()) return
+    val animatedIndex by animateFloatAsState(
+        targetValue = selected.coerceIn(0, labels.lastIndex).toFloat(),
+        animationSpec = SerieeMotion.SleekSpring,
+        label = "segmentedTabIndex"
+    )
+
+    if (p.isNeoBrutalist) {
+        val neoContainerModifier = modifier
             .fillMaxWidth()
-            .liquidGlass(
-                shape = SerieeShape.pill,
-                tint = if (p.isGlass) {
-                    if (p.isLight) Color.White.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.10f)
-                } else p.chip,
-                blurRadius = 14.dp,
-                refractionHeight = 8.dp,
-                refractionAmount = 14.dp
+            .neoBrutalist(
+                backgroundColor = p.chip,
+                borderColor = p.border,
+                shadowColor = NeoBrutalistColors.Black,
+                borderWidth = 2.5.dp,
+                shadowOffset = 3.dp,
+                cornerRadius = 8.dp
             )
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        labels.forEachIndexed { index, label ->
-            val active = index == selected
+            .padding(4.dp)
+        BoxWithConstraints(modifier = neoContainerModifier) {
+            val tabWidth = (maxWidth / labels.size).coerceAtLeast(0.dp)
+            val pillShape = RoundedCornerShape(6.dp)
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .clip(SerieeShape.pill)
-                    .background(
-                        if (active) {
-                            Brush.horizontalGradient(listOf(p.primary, p.accent))
-                        } else {
-                            SolidColor(Color.Transparent)
-                        }
-                    )
-                    .then(
-                        if (active && p.isGlass) {
-                            Modifier.border(0.75.dp, Color.White.copy(alpha = 0.45f), SerieeShape.pill)
-                        } else Modifier
-                    )
-                    .selectable(selected = active, role = Role.Tab) { onSelect(index) }
-                    .padding(vertical = 9.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    label,
-                    fontSize = 12.sp,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                    color = if (active) p.onAccent else p.muted,
-                    maxLines = 1
+                    .width(tabWidth)
+                    .height(34.dp)
+                    .graphicsLayer {
+                        translationX = tabWidth.toPx() * animatedIndex
+                    }
+                    .clip(pillShape)
+                    .background(NeoBrutalistColors.Yellow)
+                    .border(2.dp, NeoBrutalistColors.Black, pillShape)
+            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                labels.forEachIndexed { index, label ->
+                    val active = index == selected
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp)
+                            .clip(pillShape)
+                            .selectable(selected = active, role = Role.Tab) { onSelect(index) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (active) NeoBrutalistColors.Black else p.text,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    val containerTint = if (p.isGlass) {
+        if (p.isLight) Color.White.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.10f)
+    } else p.chip
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(SerieeShape.pill)
+            .background(containerTint)
+            .themedBorder(p, SerieeShape.pill, width = if (p.isGlass) 0.75.dp else 1.dp)
+            .padding(4.dp)
+    ) {
+        val tabWidth = (maxWidth / labels.size).coerceAtLeast(0.dp)
+        Box(
+            modifier = Modifier
+                .width(tabWidth)
+                .height(36.dp)
+                .graphicsLayer {
+                    translationX = tabWidth.toPx() * animatedIndex
+                }
+                .clip(SerieeShape.pill)
+                .background(Brush.horizontalGradient(listOf(p.primary, p.accent)))
+                .then(
+                    if (p.isGlass) {
+                        Modifier.border(0.75.dp, Color.White.copy(alpha = 0.45f), SerieeShape.pill)
+                    } else Modifier
                 )
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            labels.forEachIndexed { index, label ->
+                val active = index == selected
+                val textColor by animateColorAsState(
+                    targetValue = if (active) p.onAccent else p.muted,
+                    animationSpec = tween(SerieeMotion.quick, easing = SerieeMotion.StandardEasing),
+                    label = "segText_$index"
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .clip(SerieeShape.pill)
+                        .selectable(
+                            selected = active,
+                            role = Role.Tab,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onSelect(index) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        label,
+                        fontSize = 12.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        color = textColor,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
@@ -654,6 +892,42 @@ fun PrimaryButton(
     gradient: Boolean = false
 ) {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        NeoBrutalistBox(
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+            onClick = onClick,
+            enabled = enabled,
+            role = Role.Button,
+            backgroundColor = if (enabled) NeoBrutalistColors.Yellow else p.chip,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 2.5.dp,
+            shadowOffset = 4.dp,
+            cornerRadius = 8.dp,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (enabled) NeoBrutalistColors.Black else p.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        return
+    }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.97f else 1f,
+        animationSpec = SerieeMotion.SnappySpring,
+        label = "primaryBtnScale"
+    )
     val tintColor = if (enabled) {
         p.primary.copy(alpha = if (p.isGlass) 0.78f else 1f)
     } else {
@@ -663,12 +937,17 @@ fun PrimaryButton(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .liquidGlass(
                 shape = SerieeShape.pill,
                 tint = tintColor,
-                blurRadius = 14.dp,
+                blurRadius = 12.dp,
                 refractionHeight = 10.dp,
-                refractionAmount = 18.dp,
+                refractionAmount = 16.dp,
+                chromaticAberration = false,
                 elevated = enabled && p.isGlass,
                 withBorder = true
             )
@@ -684,7 +963,13 @@ fun PrimaryButton(
                     )
                 } else Modifier
             )
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(horizontal = 16.dp, vertical = 13.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -706,20 +991,63 @@ fun SecondaryButton(
     modifier: Modifier = Modifier
 ) {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        NeoBrutalistBox(
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+            onClick = onClick,
+            role = Role.Button,
+            backgroundColor = p.surface,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            borderWidth = 2.5.dp,
+            shadowOffset = 4.dp,
+            cornerRadius = 8.dp,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = p.text
+            )
+        }
+        return
+    }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = SerieeMotion.SnappySpring,
+        label = "secondaryBtnScale"
+    )
     Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .liquidGlass(
                 shape = SerieeShape.pill,
                 tint = if (p.isGlass) {
                     if (p.isLight) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.12f)
                 } else p.chip,
-                blurRadius = 14.dp,
+                blurRadius = 12.dp,
                 refractionHeight = 10.dp,
-                refractionAmount = 18.dp
+                refractionAmount = 16.dp,
+                chromaticAberration = false
             )
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(horizontal = 16.dp, vertical = 13.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -744,6 +1072,50 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        if (p.isNeoBrutalist) {
+            Box(
+                modifier = Modifier
+                    .size(68.dp)
+                    .neoBrutalist(
+                        backgroundColor = NeoBrutalistColors.SkyBlue,
+                        borderColor = p.border,
+                        shadowColor = NeoBrutalistColors.Black,
+                        borderWidth = 2.5.dp,
+                        shadowOffset = 4.dp,
+                        cornerRadius = 8.dp
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = NeoBrutalistColors.Black, modifier = Modifier.size(28.dp))
+            }
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = p.text, textAlign = TextAlign.Center)
+            Text(hint, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = p.muted, textAlign = TextAlign.Center, lineHeight = 17.sp)
+            if (ctaLabel != null && onCta != null) {
+                Spacer(Modifier.height(4.dp))
+                NeoBrutalistBox(
+                    modifier = Modifier.heightIn(min = 48.dp),
+                    onClick = onCta,
+                    role = Role.Button,
+                    backgroundColor = NeoBrutalistColors.Yellow,
+                    borderColor = p.border,
+                    shadowColor = NeoBrutalistColors.Black,
+                    borderWidth = 2.5.dp,
+                    shadowOffset = 4.dp,
+                    cornerRadius = 8.dp,
+                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        ctaLabel,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = NeoBrutalistColors.Black
+                    )
+                }
+            }
+            return
+        }
         Box(
             modifier = Modifier
                 .size(64.dp)
@@ -792,10 +1164,16 @@ fun SheetDragHandle() {
     val p = LocalPalette.current
     Box(
         Modifier
-            .padding(top = 10.dp, bottom = 6.dp)
-            .size(width = 40.dp, height = 5.dp)
-            .clip(RoundedCornerShape(50))
-            .background(if (p.isGlass) Color.White.copy(alpha = if (p.isLight) 0.7f else 0.35f) else p.border)
+            .padding(top = 12.dp, bottom = 6.dp)
+            .size(width = if (p.isNeoBrutalist) 48.dp else 40.dp, height = if (p.isNeoBrutalist) 6.dp else 5.dp)
+            .clip(RoundedCornerShape(if (p.isNeoBrutalist) 2.dp else 50.dp))
+            .background(
+                when {
+                    p.isNeoBrutalist -> p.border
+                    p.isGlass -> Color.White.copy(alpha = if (p.isLight) 0.7f else 0.35f)
+                    else -> p.border
+                }
+            )
     )
 }
 
@@ -804,32 +1182,80 @@ fun GradientProgressBar(
     fraction: Float,
     modifier: Modifier = Modifier,
     colors: List<Color>? = null,
-    track: Color? = null
+    track: Color? = null,
+    height: Dp? = null
 ) {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        NeoBrutalistProgressBar(
+            fraction = fraction,
+            modifier = modifier,
+            fillColor = colors?.firstOrNull() ?: p.success,
+            trackColor = track ?: p.chip,
+            borderColor = p.border,
+            shadowColor = NeoBrutalistColors.Black,
+            height = height ?: 13.dp
+        )
+        return
+    }
+    val clamped = fraction.coerceIn(0f, 1f)
+    val animatedFraction by animateFloatAsState(
+        targetValue = clamped,
+        animationSpec = SerieeMotion.SmoothSpring,
+        label = "progressFill"
+    )
     val resolvedTrack = track ?: if (p.isGlass) {
         if (p.isLight) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.14f)
     } else p.chip
-    val brush = Brush.horizontalGradient(colors ?: listOf(p.primary, p.accent))
+    val fillColors = colors ?: listOf(p.primary, p.accent)
+    val pillShape = RoundedCornerShape(50)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(50))
+            .height(height ?: 6.dp)
+            .clip(pillShape)
             .background(resolvedTrack)
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .height(6.dp)
-                .clip(RoundedCornerShape(50))
-                .background(brush)
-        )
-    }
+            .drawBehind {
+                if (animatedFraction > 0f) {
+                    val fillW = (size.width * animatedFraction).coerceAtLeast(size.height.coerceAtMost(size.width))
+                    drawRoundRect(
+                        brush = Brush.horizontalGradient(fillColors),
+                        size = Size(fillW, size.height),
+                        cornerRadius = CornerRadius(size.height / 2f, size.height / 2f)
+                    )
+                }
+            }
+    )
 }
 
 @Composable
 fun StatusBadge(status: WatchStatus, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val color = statusColor(status)
+    if (p.isNeoBrutalist) {
+        val shape = RoundedCornerShape(6.dp)
+        Box(
+            modifier = modifier
+                .clip(shape)
+                .background(color)
+                .border(2.dp, NeoBrutalistColors.Black, shape)
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (status == WatchStatus.Completed) {
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = NeoBrutalistColors.Black, modifier = Modifier.size(11.dp))
+                    Spacer(Modifier.width(3.dp))
+                }
+                Text(
+                    stringResource(status.labelRes).uppercase(),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = NeoBrutalistColors.Black
+                )
+            }
+        }
+        return
+    }
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(50))

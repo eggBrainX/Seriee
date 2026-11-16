@@ -39,7 +39,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -49,6 +51,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,6 +107,7 @@ fun InsightsScreen(
                 Text(
                     stringResource(R.string.insights_subtitle),
                     fontSize = 12.sp,
+                    fontWeight = if (p.isNeoBrutalist) FontWeight.SemiBold else FontWeight.Normal,
                     color = p.muted
                 )
             }
@@ -150,7 +154,9 @@ fun InsightsScreen(
             item(key = "insights-footer") {
                 Text(
                     stringResource(R.string.insights_watch_time_note),
+                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                     fontSize = 11.sp,
+                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                     color = p.muted,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -162,27 +168,42 @@ fun InsightsScreen(
     }
 
     if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            containerColor = p.elevated,
-            titleContentColor = p.text,
-            textContentColor = p.muted,
-            title = { Text(stringResource(R.string.insights_clear_history_title)) },
-            text = { Text(stringResource(R.string.insights_clear_history_message)) },
-            confirmButton = {
-                TextButton(onClick = {
+        if (p.isNeoBrutalist) {
+            NeoBrutalistConfirmDialog(
+                title = stringResource(R.string.insights_clear_history_title),
+                message = stringResource(R.string.insights_clear_history_message),
+                confirmLabel = stringResource(R.string.insights_clear_history_confirm),
+                dismissLabel = stringResource(R.string.cancel),
+                confirmColor = NeoBrutalistColors.CoralRed,
+                onConfirm = {
                     confirmClear = false
                     onClearHistory()
-                }) {
-                    Text(stringResource(R.string.insights_clear_history_confirm), color = p.danger)
+                },
+                onDismiss = { confirmClear = false }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { confirmClear = false },
+                containerColor = p.elevated,
+                titleContentColor = p.text,
+                textContentColor = p.muted,
+                title = { Text(stringResource(R.string.insights_clear_history_title)) },
+                text = { Text(stringResource(R.string.insights_clear_history_message)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmClear = false
+                        onClearHistory()
+                    }) {
+                        Text(stringResource(R.string.insights_clear_history_confirm), color = p.danger)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmClear = false }) {
+                        Text(stringResource(R.string.cancel), color = p.muted)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClear = false }) {
-                    Text(stringResource(R.string.cancel), color = p.muted)
-                }
-            }
-        )
+            )
+        }
     }
 }
 
@@ -212,13 +233,16 @@ private fun HeroCard(insights: Insights) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
                 "${insights.watchedEpisodes}",
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                 fontSize = 42.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = p.text
             )
             Text(
-                stringResource(R.string.insights_stat_episodes),
+                stringResource(R.string.insights_stat_episodes).let { if (p.isNeoBrutalist) it.uppercase() else it },
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                 fontSize = 12.sp,
+                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                 color = p.muted
             )
 
@@ -226,11 +250,13 @@ private fun HeroCard(insights: Insights) {
                 MiniStat(
                     label = stringResource(R.string.insights_stat_hours),
                     value = stringResource(R.string.insights_hours_value, hoursLabel),
+                    neoFill = NeoBrutalistColors.SkyBlue,
                     modifier = Modifier.weight(1f)
                 )
                 MiniStat(
                     label = stringResource(R.string.insights_stat_completion),
                     value = "${insights.completionRate}%",
+                    neoFill = NeoBrutalistColors.Pink,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -240,22 +266,67 @@ private fun HeroCard(insights: Insights) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(completedLabel, fontSize = 11.sp, color = p.muted)
-                Text("${insights.completionRate}%", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text)
+                Text(
+                    completedLabel,
+                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                    fontSize = 11.sp,
+                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                    color = p.muted
+                )
+                Text(
+                    "${insights.completionRate}%",
+                    fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = p.text
+                )
             }
             GradientProgressBar(
                 fraction = insights.completionRate / 100f,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(7.dp)
+                modifier = Modifier.fillMaxWidth(),
+                colors = if (p.isNeoBrutalist) listOf(p.primary) else null,
+                height = if (p.isNeoBrutalist) 14.dp else 7.dp
             )
         }
     }
 }
 
 @Composable
-private fun MiniStat(label: String, value: String, modifier: Modifier = Modifier) {
+private fun MiniStat(
+    label: String,
+    value: String,
+    neoFill: Color = NeoBrutalistColors.SkyBlue,
+    modifier: Modifier = Modifier
+) {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        val shape = RoundedCornerShape(6.dp)
+        Column(
+            modifier
+                .clip(shape)
+                .background(neoFill)
+                .border(2.dp, NeoBrutalistColors.Black, shape)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Text(
+                label.uppercase(),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = NeoBrutalistColors.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                value,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = NeoBrutalistColors.Black
+            )
+        }
+        return
+    }
     Column(
         modifier
             .clip(RoundedCornerShape(12.dp))
@@ -269,8 +340,7 @@ private fun MiniStat(label: String, value: String, modifier: Modifier = Modifier
 
 @Composable
 private fun QuickTiles(insights: Insights) {
-    val p = LocalPalette.current
-    val locale = LocalConfiguration.current.locales[0]
+    val locale = LocalConfiguration.current.primaryLocale()
     val seriesDescription = pluralStringResource(
         R.plurals.insights_title_count,
         insights.totalSeries,
@@ -338,10 +408,19 @@ private fun Tile(
                 .padding(horizontal = 10.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(value, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = p.text, maxLines = 1)
             Text(
-                label,
+                value,
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = p.text,
+                maxLines = 1
+            )
+            Text(
+                label.let { if (p.isNeoBrutalist) it.uppercase() else it },
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                 fontSize = 10.sp,
+                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                 color = p.muted,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -360,22 +439,65 @@ private fun StatusCard(insights: Insights) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHeader(stringResource(R.string.insights_status_title))
 
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(p.chip)
-            ) {
-                if (total > 0) {
-                    insights.statusCounts.forEach { (status, count) ->
-                        if (count > 0) {
+            val barShape = RoundedCornerShape(if (p.isNeoBrutalist) 6.dp else 50.dp)
+            if (p.isNeoBrutalist) {
+                val activeSegments = insights.statusCounts.entries.filter { it.value > 0 }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(end = 2.dp, bottom = 2.dp)
+                        .height(16.dp)
+                        .drawBehind {
+                            val shadowPx = 2.dp.toPx()
+                            val radiusPx = 6.dp.toPx()
+                            drawRoundRect(
+                                color = NeoBrutalistColors.Black,
+                                topLeft = Offset(shadowPx, shadowPx),
+                                size = size,
+                                cornerRadius = CornerRadius(radiusPx, radiusPx)
+                            )
+                        }
+                        .clip(barShape)
+                        .background(p.chip)
+                        .border(2.5.dp, p.border, barShape)
+                ) {
+                    if (total > 0) {
+                        activeSegments.forEachIndexed { idx, (status, count) ->
                             Box(
                                 Modifier
                                     .weight(count.toFloat())
                                     .fillMaxHeight()
                                     .background(statusColor(status))
                             )
+                            if (idx < activeSegments.lastIndex) {
+                                Box(
+                                    Modifier
+                                        .width(2.dp)
+                                        .fillMaxHeight()
+                                        .background(p.border)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(barShape)
+                        .background(p.chip)
+                ) {
+                    if (total > 0) {
+                        insights.statusCounts.forEach { (status, count) ->
+                            if (count > 0) {
+                                Box(
+                                    Modifier
+                                        .weight(count.toFloat())
+                                        .fillMaxHeight()
+                                        .background(statusColor(status))
+                                )
+                            }
                         }
                     }
                 }
@@ -395,22 +517,41 @@ private fun StatusCard(insights: Insights) {
                         .semantics(mergeDescendants = true) { contentDescription = rowDescription },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val dotShape = if (p.isNeoBrutalist) RoundedCornerShape(3.dp) else CircleShape
                     Box(
                         Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
+                            .size(if (p.isNeoBrutalist) 11.dp else 8.dp)
+                            .clip(dotShape)
                             .background(statusColor(status).copy(alpha = if (count == 0) 0.35f else 1f))
+                            .then(
+                                if (p.isNeoBrutalist) Modifier.border(1.5.dp, NeoBrutalistColors.Black, dotShape)
+                                else Modifier
+                            )
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         stringResource(status.labelRes),
                         fontSize = 12.sp,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                         color = p.text,
                         modifier = Modifier.weight(1f)
                     )
-                    Text("$count", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = p.text)
+                    Text(
+                        "$count",
+                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = p.text
+                    )
                     Spacer(Modifier.width(10.dp))
-                    Text("$percent%", fontSize = 11.sp, color = p.muted, modifier = Modifier.width(36.dp))
+                    Text(
+                        "$percent%",
+                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                        fontSize = 11.sp,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                        color = p.muted,
+                        modifier = Modifier.width(36.dp)
+                    )
                 }
             }
         }
@@ -438,36 +579,29 @@ private fun RatingsCard(insights: Insights) {
                     Icon(
                         Icons.Filled.Star,
                         contentDescription = null,
-                        tint = p.star,
+                        tint = if (p.isNeoBrutalist) p.text else p.star,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
                         "$rating",
+                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.ExtraBold,
                         color = p.text,
                         modifier = Modifier.padding(horizontal = 6.dp)
                     )
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(p.chip)
-                    ) {
-                        if (fraction > 0f) {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth(fraction)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(50))
-                                    .background(Brush.horizontalGradient(listOf(p.primary, p.accent)))
-                            )
-                        }
-                    }
+                    GradientProgressBar(
+                        fraction = fraction,
+                        modifier = Modifier.weight(1f),
+                        colors = if (p.isNeoBrutalist) listOf(p.star) else listOf(p.primary, p.accent),
+                        track = p.chip,
+                        height = if (p.isNeoBrutalist) 12.dp else 6.dp
+                    )
                     Text(
                         "$count",
+                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                         fontSize = 11.sp,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                         color = p.muted,
                         textAlign = TextAlign.End,
                         modifier = Modifier.width(32.dp)
@@ -478,6 +612,7 @@ private fun RatingsCard(insights: Insights) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TagsCard(insights: Insights) {
     val p = LocalPalette.current
@@ -489,24 +624,51 @@ private fun TagsCard(insights: Insights) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                insights.topTags.forEach { (tag, count) ->
-                    Box(
-                        Modifier
-                            .liquidGlass(
-                                shape = CircleShape,
-                                tint = p.chip,
-                                blurRadius = 12.dp,
-                                refractionHeight = 8.dp,
-                                refractionAmount = 14.dp
+                insights.topTags.forEachIndexed { idx, (tag, count) ->
+                    if (p.isNeoBrutalist) {
+                        val chipFill = when (idx % 3) {
+                            0 -> NeoBrutalistColors.SkyBlue
+                            1 -> NeoBrutalistColors.Yellow
+                            else -> NeoBrutalistColors.Pink
+                        }
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(chipFill)
+                                .border(2.dp, NeoBrutalistColors.Black, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                stringResource(R.string.insights_tag_chip, tag, count),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = NeoBrutalistColors.Black
                             )
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            stringResource(R.string.insights_tag_chip, tag, count),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = p.text
-                        )
+                        }
+                    } else {
+                        Box(
+                            Modifier
+                                .clip(CircleShape)
+                                .background(
+                                    if (p.isGlass) {
+                                        if (p.isLight) Color.White.copy(alpha = 0.56f) else Color.White.copy(alpha = 0.12f)
+                                    } else p.chip
+                                )
+                                .border(
+                                    width = if (p.isGlass) 0.75.dp else 1.dp,
+                                    color = if (p.isGlass) Color.White.copy(alpha = if (p.isLight) 0.7f else 0.22f) else p.border,
+                                    shape = CircleShape
+                                )
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                stringResource(R.string.insights_tag_chip, tag, count),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = p.text
+                            )
+                        }
                     }
                 }
             }
@@ -518,7 +680,7 @@ private fun TagsCard(insights: Insights) {
 private fun ActivityCard(insights: Insights) {
     val p = LocalPalette.current
     val configuration = LocalConfiguration.current
-    val locale = configuration.locales[0]
+    val locale = configuration.primaryLocale()
     val today = remember { LocalDate.now() }
     val gridStart = remember(today) {
         val thisMonday = today.minusDays((today.dayOfWeek.value - 1).toLong())
@@ -558,7 +720,9 @@ private fun ActivityCard(insights: Insights) {
                                 if (previous == null || previous.month != monday.month) {
                                     Text(
                                         monday.month.getDisplayName(TextStyle.SHORT, locale),
+                                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                                         fontSize = 7.sp,
+                                        fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                                         color = p.muted,
                                         maxLines = 1,
                                         overflow = TextOverflow.Clip
@@ -580,7 +744,9 @@ private fun ActivityCard(insights: Insights) {
                                     Text(
                                         gridStart.plusDays(day.toLong()).dayOfWeek
                                             .getDisplayName(TextStyle.NARROW, locale),
+                                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                                         fontSize = 8.sp,
+                                        fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                                         color = p.muted
                                     )
                                 }
@@ -610,7 +776,13 @@ private fun ActivityCard(insights: Insights) {
                 }
             }
 
-            Text(activityTotal, fontSize = 11.sp, color = p.muted)
+            Text(
+                activityTotal,
+                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                fontSize = 11.sp,
+                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                color = p.muted
+            )
             Text(
                 stringResource(R.string.insights_activity_note),
                 fontSize = 10.sp,
@@ -628,6 +800,28 @@ private fun HeatCell(
     description: String
 ) {
     val p = LocalPalette.current
+    if (p.isNeoBrutalist) {
+        val fill = when {
+            count <= 0 -> p.chip
+            count == 1 -> NeoBrutalistColors.SkyBlue
+            count <= 3 -> NeoBrutalistColors.Mint
+            else -> NeoBrutalistColors.Yellow
+        }
+        val shape = RoundedCornerShape(3.dp)
+        Box(
+            Modifier
+                .size(size)
+                .clip(shape)
+                .background(fill)
+                .border(
+                    width = if (isToday) 2.dp else 1.dp,
+                    color = p.border,
+                    shape = shape
+                )
+                .semantics { contentDescription = description }
+        )
+        return
+    }
     val alpha = when {
         count <= 0 -> 0f
         count == 1 -> 0.24f
@@ -667,21 +861,45 @@ private fun RecentActivityCard(
                 } else null,
                 trailing = if (recentCount > 0) {
                     {
-                        Box(
-                            Modifier
-                                .heightIn(min = 48.dp)
-                                .clip(SerieeShape.pill)
-                                .background(if (p.isGlass) p.chip.copy(alpha = 0.55f) else p.chip)
-                                .clickable(role = Role.Button, onClick = onClear)
-                                .padding(horizontal = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                stringResource(R.string.insights_clear_history),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = p.danger
-                            )
+                        if (p.isNeoBrutalist) {
+                            NeoBrutalistBox(
+                                onClick = onClear,
+                                role = Role.Button,
+                                backgroundColor = NeoBrutalistColors.CoralRed,
+                                borderColor = p.border,
+                                shadowColor = NeoBrutalistColors.Black,
+                                borderWidth = 2.dp,
+                                shadowOffset = 2.dp,
+                                cornerRadius = 6.dp,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                modifier = Modifier.heightIn(min = 44.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    stringResource(R.string.insights_clear_history),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeoBrutalistColors.Black
+                                )
+                            }
+                        } else {
+                            Box(
+                                Modifier
+                                    .heightIn(min = 48.dp)
+                                    .clip(SerieeShape.pill)
+                                    .background(if (p.isGlass) p.chip.copy(alpha = 0.55f) else p.chip)
+                                    .clickable(role = Role.Button, onClick = onClear)
+                                    .padding(horizontal = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    stringResource(R.string.insights_clear_history),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = p.danger
+                                )
+                            }
                         }
                     }
                 } else null
@@ -714,38 +932,91 @@ private fun RecentActivityCard(
                             event.episode
                         )
                     }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 56.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (p.isGlass) p.chip.copy(alpha = 0.45f) else Color.Transparent)
-                            .then(
-                                if (item != null) {
-                                    Modifier.clickable(role = Role.Button) { onOpen(item) }
-                                } else Modifier
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 56.dp)
+                                .semantics(mergeDescendants = true) {},
+                            onClick = if (item != null) ({ onOpen(item) }) else null,
+                            role = if (item != null) Role.Button else null,
+                            backgroundColor = p.chip,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.dp,
+                            shadowOffset = 3.dp,
+                            cornerRadius = 6.dp,
+                            contentPadding = PaddingValues(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Poster(
+                                    url = item?.poster ?: "",
+                                    modifier = Modifier.size(width = 40.dp, height = 54.dp),
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        item?.title ?: event.title,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = p.text,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        meta,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = p.text
+                                    )
+                                    Text(
+                                        relative,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        color = p.muted
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 56.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (p.isGlass) p.chip.copy(alpha = 0.45f) else Color.Transparent)
+                                .then(
+                                    if (item != null) {
+                                        Modifier.clickable(role = Role.Button) { onOpen(item) }
+                                    } else Modifier
+                                )
+                                .padding(8.dp)
+                                .semantics(mergeDescendants = true) {},
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Poster(
+                                url = item?.poster ?: "",
+                                modifier = Modifier.size(width = 40.dp, height = 54.dp),
+                                shape = RoundedCornerShape(10.dp)
                             )
-                            .padding(8.dp)
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Poster(
-                            url = item?.poster ?: "",
-                            modifier = Modifier.size(width = 40.dp, height = 54.dp),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                item?.title ?: event.title,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = p.text,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(meta, fontSize = 11.sp, color = p.primary)
-                            Text(relative, fontSize = 10.sp, color = p.muted)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    item?.title ?: event.title,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = p.text,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(meta, fontSize = 11.sp, color = p.primary)
+                                Text(relative, fontSize = 10.sp, color = p.muted)
+                            }
                         }
                     }
                 }

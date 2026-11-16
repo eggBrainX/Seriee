@@ -3,15 +3,20 @@ package com.seriee.app.ui
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.os.Build
 import android.os.PowerManager
+import java.util.Locale
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -21,11 +26,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
@@ -87,7 +92,9 @@ data class SeriePalette(
     /** Liquid Glass style: enables optical lens refraction & chromatic dispersion. */
     val isLiquidGlass: Boolean = false,
     /** Liquid style: the background gradient slowly drifts. */
-    val animatedGradient: Boolean = false
+    val animatedGradient: Boolean = false,
+    /** Neo-Brutalism style: crisp borders, hard offset shadows, tactile press physics. */
+    val isNeoBrutalist: Boolean = false
 )
 
 /** User-controlled colours for [AppThemeStyle.Custom]. */
@@ -120,7 +127,8 @@ private fun basePalette(
     gradient: List<Color>? = null,
     isGlass: Boolean = false,
     isLiquidGlass: Boolean = false,
-    animatedGradient: Boolean = false
+    animatedGradient: Boolean = false,
+    isNeoBrutalist: Boolean = false
 ) = SeriePalette(
     bg = bg,
     card = card,
@@ -130,8 +138,8 @@ private fun basePalette(
     border = border,
     primary = primary,
     accent = accent,
-    accentSoft = accent.copy(alpha = 0.16f),
-    onAccent = contrastOn(accent),
+    accentSoft = accent.copy(alpha = if (isNeoBrutalist) 1f else 0.16f),
+    onAccent = if (isNeoBrutalist) neoContrastOn(accent) else contrastOn(accent),
     text = text,
     muted = muted,
     success = success,
@@ -144,7 +152,8 @@ private fun basePalette(
     gradient = gradient,
     isGlass = isGlass,
     isLiquidGlass = isLiquidGlass,
-    animatedGradient = animatedGradient
+    animatedGradient = animatedGradient,
+    isNeoBrutalist = isNeoBrutalist
 )
 
 // ------------------------------------------------------------------ palettes
@@ -321,6 +330,48 @@ private val LiquidLight = basePalette(
     animatedGradient = true
 )
 
+private val NeoBrutalistLight = basePalette(
+    bg = NeoBrutalistColors.Cream,
+    card = NeoBrutalistColors.PureWhite,
+    surface = NeoBrutalistColors.PureWhite,
+    elevated = NeoBrutalistColors.OffWhite,
+    chip = NeoBrutalistColors.OffWhite,
+    border = NeoBrutalistColors.Black,
+    primary = NeoBrutalistColors.Yellow,
+    accent = NeoBrutalistColors.Pink,
+    text = NeoBrutalistColors.Black,
+    muted = NeoBrutalistColors.LightMuted,
+    success = NeoBrutalistColors.Mint,
+    warning = NeoBrutalistColors.Yellow,
+    danger = NeoBrutalistColors.CoralRed,
+    info = NeoBrutalistColors.SkyBlue,
+    reminder = NeoBrutalistColors.Pink,
+    star = NeoBrutalistColors.Yellow,
+    isLight = true,
+    isNeoBrutalist = true
+)
+
+private val NeoBrutalistDark = basePalette(
+    bg = NeoBrutalistColors.DarkBackground,
+    card = NeoBrutalistColors.DarkSurface,
+    surface = NeoBrutalistColors.DarkSurface,
+    elevated = NeoBrutalistColors.DarkElevated,
+    chip = NeoBrutalistColors.DarkElevated,
+    border = NeoBrutalistColors.Black,
+    primary = NeoBrutalistColors.Yellow,
+    accent = NeoBrutalistColors.Pink,
+    text = NeoBrutalistColors.Cream,
+    muted = NeoBrutalistColors.DarkMuted,
+    success = NeoBrutalistColors.Mint,
+    warning = NeoBrutalistColors.Yellow,
+    danger = NeoBrutalistColors.CoralRed,
+    info = NeoBrutalistColors.SkyBlue,
+    reminder = NeoBrutalistColors.Pink,
+    star = NeoBrutalistColors.Yellow,
+    isLight = false,
+    isNeoBrutalist = true
+)
+
 // ------------------------------------------------------------------ resolving
 
 /** True when a palette would use translucent surfaces. */
@@ -344,6 +395,10 @@ fun SeriePalette.opaque(): SeriePalette {
 /** WCAG relative-contrast text colour for a filled surface. */
 fun contrastOn(background: Color): Color =
     if (background.luminance() > 0.55f) Color(0xFF0F172A) else Color.White
+
+/** Neo-Brutalist contrast: pure black on all bright & pastel pop surfaces. */
+fun neoContrastOn(background: Color): Color =
+    if (background.luminance() > 0.25f) NeoBrutalistColors.Black else Color.White
 
 /** WCAG contrast ratio between two opaque colours (1..21). */
 fun contrastRatio(a: Color, b: Color): Float {
@@ -392,6 +447,7 @@ fun resolvePalette(
                 } else null
             )
         }
+        AppThemeStyle.NeoBrutalism -> if (dark) NeoBrutalistDark else NeoBrutalistLight
     }
     return if (reduceTransparency) resolved.opaque() else resolved
 }
@@ -453,6 +509,10 @@ private fun Color.onto(base: Color, alpha: Float): Color =
 
 /** Complete Material 3 scheme so stock components never fall back to purple. */
 private fun schemeFor(p: SeriePalette): ColorScheme {
+    if (p.isNeoBrutalist) {
+        return (if (p.isLight) NeoBrutalistLightColorScheme else NeoBrutalistDarkColorScheme)
+            .toMaterialColorScheme()
+    }
     val onPrimary = contrastOn(p.primary)
     val onDanger = contrastOn(p.danger)
     val inverseSurface = if (p.isLight) Color(0xFF0F172A) else Color(0xFFF2F6FC)
@@ -541,7 +601,10 @@ private fun schemeFor(p: SeriePalette): ColorScheme {
 /** Cross-fades every colour token so switching themes never hard-cuts. */
 @Composable
 private fun SeriePalette.animatedColors(): SeriePalette {
-    val spec = tween<Color>(durationMillis = SerieeMotion.standard)
+    val spec = tween<Color>(
+        durationMillis = SerieeMotion.quick,
+        easing = SerieeMotion.StandardEasing
+    )
 
     @Composable
     fun anim(target: Color): Color =
@@ -577,8 +640,8 @@ private fun SeriePalette.animatedColors(): SeriePalette {
         border = aBorder,
         primary = aPrimary,
         accent = aAccent,
-        accentSoft = aAccent.copy(alpha = 0.16f),
-        onAccent = contrastOn(aAccent),
+        accentSoft = if (isNeoBrutalist) aAccent else aAccent.copy(alpha = 0.16f),
+        onAccent = if (isNeoBrutalist) neoContrastOn(aAccent) else contrastOn(aAccent),
         text = aText,
         muted = aMuted,
         success = aSuccess,
@@ -593,7 +656,7 @@ private fun SeriePalette.animatedColors(): SeriePalette {
 
 private val FallbackPalette = ClassicDark
 
-val LocalPalette = staticCompositionLocalOf { FallbackPalette }
+val LocalPalette = compositionLocalOf { FallbackPalette }
 
 /** True while the system is in battery-saver mode; drives the smart theme. */
 @Composable
@@ -665,14 +728,36 @@ fun SerieeTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            val controller = WindowCompat.getInsetsController(window, view)
-            controller.isAppearanceLightStatusBars = p.isLight
-            controller.isAppearanceLightNavigationBars = p.isLight
+            view.context.findActivity()?.window?.let { window ->
+                runCatching {
+                    val controller = WindowCompat.getInsetsController(window, view)
+                    controller.isAppearanceLightStatusBars = p.isLight
+                    controller.isAppearanceLightNavigationBars = p.isLight
+                }
+            }
         }
     }
 
-    CompositionLocalProvider(LocalPalette provides p) {
-        MaterialTheme(colorScheme = schemeFor(p), content = content)
+    val neoScheme = if (p.isLight) NeoBrutalistLightColorScheme else NeoBrutalistDarkColorScheme
+    val materialScheme = remember(p) { schemeFor(p) }
+    CompositionLocalProvider(
+        LocalPalette provides p,
+        LocalNeoBrutalistColors provides neoScheme
+    ) {
+        MaterialTheme(
+            colorScheme = materialScheme,
+            typography = if (p.isNeoBrutalist) NeoBrutalistTypography else Typography(),
+            shapes = if (p.isNeoBrutalist) NeoBrutalistShapes else Shapes(),
+            content = content
+        )
     }
 }
+
+tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext?.findActivity()
+    else -> null
+}
+
+fun Configuration.primaryLocale(): Locale =
+    if (!locales.isEmpty) locales[0] else Locale.getDefault()

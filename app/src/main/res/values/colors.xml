@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Replaced at runtime from the persisted theme in MainActivity. -->
-    <color name="window_bg">#F7F9FC</color>
+    <color name="window_bg">#FFFDF5</color>
     <color name="ic_launcher_background">#2563EB</color>
 </resources>

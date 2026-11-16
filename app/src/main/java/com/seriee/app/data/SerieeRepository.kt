@@ -3,6 +3,7 @@ package com.seriee.app.data
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.UUID
 
 /** Parsed contents of an export file. [history] is null when the file has no history field. */
 data class BackupPayload(
@@ -44,7 +45,9 @@ class SerieeRepository(context: Context) {
         }
         return try {
             val arr = JSONArray(raw)
-            (0 until arr.length()).map { fromJson(arr.getJSONObject(it)) }
+            (0 until arr.length())
+                .map { fromJson(arr.getJSONObject(it)) }
+                .distinctBy { it.id }
         } catch (e: Exception) {
             emptyList()
         }
@@ -86,7 +89,7 @@ class SerieeRepository(context: Context) {
     fun loadThemeMode(): AppThemeMode {
         val stored = prefs.getString(KEY_THEME_MODE, null)
         if (stored != null) return AppThemeMode.fromName(stored)
-        val legacy = prefs.getString(KEY_THEME, null) ?: return AppThemeMode.System
+        val legacy = prefs.getString(KEY_THEME, null) ?: return AppThemeMode.Light
         return LegacyThemeMap.migrate(legacy).first
     }
 
@@ -94,7 +97,7 @@ class SerieeRepository(context: Context) {
     fun loadThemeStyle(): AppThemeStyle {
         val stored = prefs.getString(KEY_THEME_STYLE, null)
         if (stored != null) return AppThemeStyle.fromName(stored)
-        val legacy = prefs.getString(KEY_THEME, null) ?: return AppThemeStyle.Classic
+        val legacy = prefs.getString(KEY_THEME, null) ?: return AppThemeStyle.NeoBrutalism
         return LegacyThemeMap.migrate(legacy).second
     }
 
@@ -269,15 +272,20 @@ class SerieeRepository(context: Context) {
             }
         }.getOrDefault(emptyList())
 
+        val rawId = o.optString("id").trim()
+        val safeId = rawId.ifEmpty { UUID.randomUUID().toString() }
+        val safeTotalEp = o.optInt("totalEp", 1).coerceAtLeast(1)
+        val safeCurrentEp = o.optInt("currentEp", 1).coerceAtLeast(0)
+
         return MediaItem(
-            id = o.optString("id"),
+            id = safeId,
             title = o.optString("title"),
             type = runCatching { MediaType.valueOf(o.optString("type")) }.getOrDefault(MediaType.Series),
             status = runCatching { WatchStatus.valueOf(o.optString("status")) }.getOrDefault(WatchStatus.Watching),
             poster = o.optString("poster"),
-            season = o.optInt("season", 1),
-            currentEp = o.optInt("currentEp", 1),
-            totalEp = o.optInt("totalEp", 1),
+            season = o.optInt("season", 1).coerceAtLeast(1),
+            currentEp = safeCurrentEp,
+            totalEp = safeTotalEp,
             pinned = o.optBoolean("pinned", false),
             streamUrl = o.optString("streamUrl"),
             videoPath = o.optString("videoPath"),
@@ -352,7 +360,9 @@ class SerieeRepository(context: Context) {
         if (!json.startsWith("{")) {
             val arr = JSONArray(json)
             return BackupPayload(
-                items = (0 until arr.length()).map { fromJson(arr.getJSONObject(it)) },
+                items = (0 until arr.length())
+                    .map { fromJson(arr.getJSONObject(it)) }
+                    .distinctBy { it.id },
                 history = null
             )
         }
@@ -382,7 +392,9 @@ class SerieeRepository(context: Context) {
             null
         }
         val itemsArray = root.optJSONArray("items") ?: JSONArray()
-        val items = (0 until itemsArray.length()).map { fromJson(itemsArray.getJSONObject(it)) }
+        val items = (0 until itemsArray.length())
+            .map { fromJson(itemsArray.getJSONObject(it)) }
+            .distinctBy { it.id }
         return BackupPayload(items = items, history = history)
     }
 

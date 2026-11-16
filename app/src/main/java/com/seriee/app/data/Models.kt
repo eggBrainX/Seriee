@@ -44,7 +44,8 @@ enum class AppThemeStyle(
     Frost(R.string.theme_style_frost, R.string.theme_style_frost_desc),
     Liquid(R.string.theme_style_liquid, R.string.theme_style_liquid_desc),
     MaterialYou(R.string.theme_style_material_you, R.string.theme_style_material_you_desc),
-    Custom(R.string.theme_style_custom, R.string.theme_style_custom_desc);
+    Custom(R.string.theme_style_custom, R.string.theme_style_custom_desc),
+    NeoBrutalism(R.string.theme_style_neo_brutalism, R.string.theme_style_neo_brutalism_desc);
 
     companion object {
         fun fromName(name: String?): AppThemeStyle =

@@ -12,6 +12,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.seriee.app.MainActivity
 import com.seriee.app.R
 import com.seriee.app.data.MediaItem
+import com.seriee.app.ui.findActivity
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -27,7 +28,8 @@ object ReminderScheduler {
                 description = descriptionText
                 enableVibration(true)
             }
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
             notificationManager.createNotificationChannel(channel)
         }
     }
@@ -196,6 +198,9 @@ object ReminderScheduler {
         initialDate: Long? = null,
         onDateTimeSelected: (Long) -> Unit
     ) {
+        val activity = context.findActivity() ?: return
+        if (activity.isFinishing || activity.isDestroyed) return
+
         val cal = java.util.Calendar.getInstance()
         if (initialDate != null && initialDate > 0) {
             cal.timeInMillis = initialDate
@@ -207,14 +212,15 @@ object ReminderScheduler {
         }
 
         val datePicker = android.app.DatePickerDialog(
-            context,
+            activity,
             { _, year, month, dayOfMonth ->
+                if (activity.isFinishing || activity.isDestroyed) return@DatePickerDialog
                 cal.set(java.util.Calendar.YEAR, year)
                 cal.set(java.util.Calendar.MONTH, month)
                 cal.set(java.util.Calendar.DAY_OF_MONTH, dayOfMonth)
 
                 val timePicker = android.app.TimePickerDialog(
-                    context,
+                    activity,
                     { _, hourOfDay, minute ->
                         cal.set(java.util.Calendar.HOUR_OF_DAY, hourOfDay)
                         cal.set(java.util.Calendar.MINUTE, minute)
@@ -226,14 +232,14 @@ object ReminderScheduler {
                     cal.get(java.util.Calendar.MINUTE),
                     true
                 )
-                timePicker.setTitle(context.getString(R.string.pick_airing_time))
-                timePicker.show()
+                timePicker.setTitle(activity.getString(R.string.pick_airing_time))
+                runCatching { timePicker.show() }
             },
             cal.get(java.util.Calendar.YEAR),
             cal.get(java.util.Calendar.MONTH),
             cal.get(java.util.Calendar.DAY_OF_MONTH)
         )
-        datePicker.setTitle(context.getString(R.string.pick_release_date_title))
-        datePicker.show()
+        datePicker.setTitle(activity.getString(R.string.pick_release_date_title))
+        runCatching { datePicker.show() }
     }
 }

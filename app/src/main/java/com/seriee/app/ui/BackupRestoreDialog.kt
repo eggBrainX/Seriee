@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -49,6 +51,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -98,11 +102,41 @@ fun BackupRestoreDialog(
         }
     }
 
+    fun sectionCardModifier(): Modifier = if (p.isNeoBrutalist) {
+        Modifier
+            .fillMaxWidth()
+            .neoBrutalist(
+                backgroundColor = p.card,
+                borderColor = p.border,
+                shadowColor = NeoBrutalistColors.Black,
+                borderWidth = 2.5.dp,
+                shadowOffset = 4.dp,
+                cornerRadius = 8.dp
+            )
+            .padding(16.dp)
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .liquidGlass(
+                shape = RoundedCornerShape(20.dp),
+                tint = p.card,
+                blurRadius = 12.dp,
+                refractionHeight = 8.dp,
+                refractionAmount = 14.dp,
+                chromaticAberration = false
+            )
+            .padding(16.dp)
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(
+            topStart = if (p.isNeoBrutalist) 8.dp else 28.dp,
+            topEnd = if (p.isNeoBrutalist) 8.dp else 28.dp
+        ),
         containerColor = if (p.isGlass) p.surface.copy(alpha = if (p.isLight) 0.90f else 0.84f) else p.surface,
+        tonalElevation = if (p.isNeoBrutalist) 0.dp else BottomSheetDefaults.Elevation,
         scrimColor = Color.Black.copy(alpha = 0.55f),
         dragHandle = { SheetDragHandle() }
     ) {
@@ -122,94 +156,163 @@ fun BackupRestoreDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Filled.Storage,
-                        contentDescription = null,
-                        tint = p.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    if (p.isNeoBrutalist) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(NeoBrutalistColors.Yellow)
+                                .border(2.dp, p.border, RoundedCornerShape(6.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Storage,
+                                contentDescription = null,
+                                tint = NeoBrutalistColors.Black,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    } else {
+                        Icon(
+                            Icons.Filled.Storage,
+                            contentDescription = null,
+                            tint = p.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     Spacer(Modifier.width(10.dp))
                     Text(
                         stringResource(R.string.backup_restore),
                         fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
                         color = p.text,
                         modifier = Modifier.weight(1f)
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(50))
-                            .clickable(onClick = onDismiss),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = p.muted)
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            onClick = onDismiss,
+                            role = Role.Button,
+                            backgroundColor = NeoBrutalistColors.OffWhite,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.dp,
+                            shadowOffset = 2.dp,
+                            cornerRadius = 6.dp,
+                            modifier = Modifier.size(38.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = NeoBrutalistColors.Black)
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(50))
+                                .clickable(onClick = onDismiss),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = p.muted)
+                        }
                     }
                 }
 
                 // Info banner
-                Row(
-                    modifier = Modifier
+                val bannerModifier = if (p.isNeoBrutalist) {
+                    Modifier
+                        .fillMaxWidth()
+                        .neoBrutalist(
+                            backgroundColor = NeoBrutalistColors.SkyBlue,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.dp,
+                            shadowOffset = 3.dp,
+                            cornerRadius = 8.dp
+                        )
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                } else {
+                    Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(p.chip)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                }
+                Row(
+                    modifier = bannerModifier,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         stringResource(R.string.current_data, vm.items.size),
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = p.text,
+                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        color = if (p.isNeoBrutalist) NeoBrutalistColors.Black else p.text,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
                         if (vm.streakDays > 0) stringResource(R.string.streak_days, vm.streakDays)
                         else stringResource(R.string.best_streak, vm.bestStreak),
                         fontSize = 11.sp,
-                        color = p.muted
+                        fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
+                        color = if (p.isNeoBrutalist) NeoBrutalistColors.Black else p.muted
                     )
                     if (vm.streakDays > 0 || vm.bestStreak > 0) {
                         Spacer(Modifier.width(8.dp))
-                        Text(
-                            stringResource(R.string.reset_streak),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = p.danger,
-                            modifier = Modifier.clickable {
-                                vm.resetStreak()
-                                android.widget.Toast.makeText(context, context.getString(R.string.streak_reset_done), android.widget.Toast.LENGTH_SHORT).show()
+                        if (p.isNeoBrutalist) {
+                            NeoBrutalistBox(
+                                onClick = {
+                                    vm.resetStreak()
+                                    android.widget.Toast.makeText(context, context.getString(R.string.streak_reset_done), android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                                role = Role.Button,
+                                backgroundColor = NeoBrutalistColors.CoralRed,
+                                borderColor = p.border,
+                                shadowColor = NeoBrutalistColors.Black,
+                                borderWidth = 1.5.dp,
+                                shadowOffset = 2.dp,
+                                cornerRadius = 6.dp,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    stringResource(R.string.reset_streak),
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeoBrutalistColors.Black
+                                )
                             }
-                        )
+                        } else {
+                            Text(
+                                stringResource(R.string.reset_streak),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = p.danger,
+                                modifier = Modifier.clickable {
+                                    vm.resetStreak()
+                                    android.widget.Toast.makeText(context, context.getString(R.string.streak_reset_done), android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
                     }
                 }
 
                 // Section 1: Backup / Export
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .liquidGlass(
-                            shape = RoundedCornerShape(20.dp),
-                            tint = p.card,
-                            blurRadius = 14.dp,
-                            refractionHeight = 8.dp,
-                            refractionAmount = 14.dp
-                        )
-                        .padding(16.dp),
+                    modifier = sectionCardModifier(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Filled.FileDownload,
                             contentDescription = null,
-                            tint = p.primary,
+                            tint = if (p.isNeoBrutalist) p.text else p.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             stringResource(R.string.backup_to_json_title),
                             fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
                             color = p.text
                         )
                     }
@@ -221,61 +324,88 @@ fun BackupRestoreDialog(
                         lineHeight = 17.sp
                     )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(p.primary)
-                            .clickable {
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            onClick = {
                                 val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                                 exportLauncher.launch("seriee_backup_$timeStamp.json")
+                            },
+                            role = Role.Button,
+                            backgroundColor = NeoBrutalistColors.Yellow,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.5.dp,
+                            shadowOffset = 4.dp,
+                            cornerRadius = 8.dp,
+                            contentPadding = PaddingValues(vertical = 12.dp, horizontal = 12.dp),
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Filled.FileDownload,
+                                    contentDescription = null,
+                                    tint = NeoBrutalistColors.Black,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    stringResource(R.string.save_backup_file),
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeoBrutalistColors.Black
+                                )
                             }
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Filled.FileDownload,
-                            contentDescription = null,
-                            tint = p.onAccent,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            stringResource(R.string.save_backup_file),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = p.onAccent
-                        )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(p.primary)
+                                .clickable {
+                                    val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                    exportLauncher.launch("seriee_backup_$timeStamp.json")
+                                }
+                                .padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Filled.FileDownload,
+                                contentDescription = null,
+                                tint = p.onAccent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                stringResource(R.string.save_backup_file),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = p.onAccent
+                            )
+                        }
                     }
                 }
 
                 // Section 2: Restore / Import
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .liquidGlass(
-                            shape = RoundedCornerShape(20.dp),
-                            tint = p.card,
-                            blurRadius = 14.dp,
-                            refractionHeight = 8.dp,
-                            refractionAmount = 14.dp
-                        )
-                        .padding(16.dp),
+                    modifier = sectionCardModifier(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Filled.FileUpload,
                             contentDescription = null,
-                            tint = p.success,
+                            tint = if (p.isNeoBrutalist) p.text else p.success,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             stringResource(R.string.restore_from_json),
                             fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
                             color = p.text
                         )
                     }
@@ -291,14 +421,22 @@ fun BackupRestoreDialog(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(if (p.isNeoBrutalist) 8.dp else 10.dp))
                             .background(p.chip)
+                            .then(
+                                if (p.isNeoBrutalist) {
+                                    Modifier.border(2.dp, p.border, RoundedCornerShape(8.dp))
+                                } else {
+                                    Modifier
+                                }
+                            )
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
                             stringResource(R.string.restore_method),
                             fontSize = 11.sp,
+                            fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
                             fontWeight = FontWeight.Bold,
                             color = p.text
                         )
@@ -306,13 +444,28 @@ fun BackupRestoreDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { replaceMode = false },
+                                .then(
+                                    if (p.isNeoBrutalist) {
+                                        Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (!replaceMode) NeoBrutalistColors.Yellow else p.surface)
+                                            .border(2.dp, p.border, RoundedCornerShape(6.dp))
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .clickable { replaceMode = false }
+                                .padding(horizontal = if (p.isNeoBrutalist) 8.dp else 0.dp, vertical = if (p.isNeoBrutalist) 8.dp else 0.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 if (!replaceMode) Icons.Filled.RadioButtonChecked else Icons.Filled.RadioButtonUnchecked,
                                 contentDescription = null,
-                                tint = if (!replaceMode) p.primary else p.muted,
+                                tint = when {
+                                    p.isNeoBrutalist && !replaceMode -> NeoBrutalistColors.Black
+                                    !replaceMode -> p.primary
+                                    else -> p.muted
+                                },
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(8.dp))
@@ -320,13 +473,13 @@ fun BackupRestoreDialog(
                                 Text(
                                     stringResource(R.string.merge_data),
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = p.text
+                                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (p.isNeoBrutalist && !replaceMode) NeoBrutalistColors.Black else p.text
                                 )
                                 Text(
                                     stringResource(R.string.merge_data_desc),
                                     fontSize = 10.sp,
-                                    color = p.muted
+                                    color = if (p.isNeoBrutalist && !replaceMode) NeoBrutalistColors.Black else p.muted
                                 )
                             }
                         }
@@ -334,13 +487,28 @@ fun BackupRestoreDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { replaceMode = true },
+                                .then(
+                                    if (p.isNeoBrutalist) {
+                                        Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (replaceMode) NeoBrutalistColors.CoralRed else p.surface)
+                                            .border(2.dp, p.border, RoundedCornerShape(6.dp))
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .clickable { replaceMode = true }
+                                .padding(horizontal = if (p.isNeoBrutalist) 8.dp else 0.dp, vertical = if (p.isNeoBrutalist) 8.dp else 0.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 if (replaceMode) Icons.Filled.RadioButtonChecked else Icons.Filled.RadioButtonUnchecked,
                                 contentDescription = null,
-                                tint = if (replaceMode) p.warning else p.muted,
+                                tint = when {
+                                    p.isNeoBrutalist && replaceMode -> NeoBrutalistColors.Black
+                                    replaceMode -> p.warning
+                                    else -> p.muted
+                                },
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(8.dp))
@@ -348,63 +516,91 @@ fun BackupRestoreDialog(
                                 Text(
                                     stringResource(R.string.replace_data),
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = p.text
+                                    fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (p.isNeoBrutalist && replaceMode) NeoBrutalistColors.Black else p.text
                                 )
                                 Text(
                                     stringResource(R.string.replace_data_desc),
                                     fontSize = 10.sp,
-                                    color = p.muted
+                                    color = if (p.isNeoBrutalist && replaceMode) NeoBrutalistColors.Black else p.muted
                                 )
                             }
                         }
                     }
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(p.success)
-                            .clickable {
+                    if (p.isNeoBrutalist) {
+                        NeoBrutalistBox(
+                            onClick = {
                                 importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                            },
+                            role = Role.Button,
+                            backgroundColor = NeoBrutalistColors.Mint,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.5.dp,
+                            shadowOffset = 4.dp,
+                            cornerRadius = 8.dp,
+                            contentPadding = PaddingValues(vertical = 12.dp, horizontal = 12.dp),
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Filled.FileUpload,
+                                    contentDescription = null,
+                                    tint = NeoBrutalistColors.Black,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    stringResource(R.string.pick_backup_file),
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeoBrutalistColors.Black
+                                )
                             }
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Filled.FileUpload,
-                            contentDescription = null,
-                            tint = p.onAccent,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            stringResource(R.string.pick_backup_file),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = p.onAccent
-                        )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(p.success)
+                                .clickable {
+                                    importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                                }
+                                .padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Filled.FileUpload,
+                                contentDescription = null,
+                                tint = p.onAccent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                stringResource(R.string.pick_backup_file),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = p.onAccent
+                            )
+                        }
                     }
                 }
 
                 // TMDB API key — hidden after save
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .liquidGlass(
-                            shape = RoundedCornerShape(20.dp),
-                            tint = p.card,
-                            blurRadius = 14.dp,
-                            refractionHeight = 8.dp,
-                            refractionAmount = 14.dp
-                        )
-                        .padding(16.dp),
+                    modifier = sectionCardModifier(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         stringResource(R.string.tmdb_api_key_title),
-                        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.text
+                        fontSize = 15.sp,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
+                        color = p.text
                     )
                     Text(
                         stringResource(R.string.tmdb_api_key_hint),
@@ -426,19 +622,41 @@ fun BackupRestoreDialog(
                         placeholder = if (isSaved && !showKey) "••••••••••••••••••••" else "API key",
                         visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                         trailing = {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { showKey = !showKey },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (showKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                    contentDescription = if (showKey) "Hide key" else "Show key",
-                                    tint = p.muted,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            if (p.isNeoBrutalist) {
+                                NeoBrutalistBox(
+                                    onClick = { showKey = !showKey },
+                                    role = Role.Button,
+                                    backgroundColor = NeoBrutalistColors.OffWhite,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 1.5.dp,
+                                    shadowOffset = 2.dp,
+                                    cornerRadius = 6.dp,
+                                    modifier = Modifier.size(34.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (showKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (showKey) "Hide key" else "Show key",
+                                        tint = NeoBrutalistColors.Black,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { showKey = !showKey },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (showKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (showKey) "Hide key" else "Show key",
+                                        tint = p.muted,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     )
@@ -457,57 +675,104 @@ fun BackupRestoreDialog(
                             Text(
                                 text = if (showKey) "Visible" else "Key saved — tap eye to reveal",
                                 fontSize = 11.sp,
+                                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                                 color = p.muted
                             )
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(p.primary)
-                                .clickable {
+                        if (p.isNeoBrutalist) {
+                            NeoBrutalistBox(
+                                onClick = {
                                     vm.setTmdbKey(keyInput)
                                     showKey = false
                                     android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_save), android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                                role = Role.Button,
+                                backgroundColor = NeoBrutalistColors.Yellow,
+                                borderColor = p.border,
+                                shadowColor = NeoBrutalistColors.Black,
+                                borderWidth = 2.dp,
+                                shadowOffset = 3.dp,
+                                cornerRadius = 6.dp,
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+                            ) {
+                                Text(
+                                    stringResource(R.string.tmdb_api_key_save),
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeoBrutalistColors.Black
+                                )
+                            }
+                            if (vm.tmdbKey.isNotBlank()) {
+                                NeoBrutalistBox(
+                                    onClick = {
+                                        vm.setTmdbKey("")
+                                        keyInput = ""
+                                        showKey = true
+                                        android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    role = Role.Button,
+                                    backgroundColor = NeoBrutalistColors.CoralRed,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 2.dp,
+                                    shadowOffset = 3.dp,
+                                    cornerRadius = 6.dp,
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+                                ) {
+                                    Text(
+                                        stringResource(R.string.delete),
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = NeoBrutalistColors.Black
+                                    )
                                 }
-                                .padding(horizontal = 14.dp, vertical = 9.dp)
-                        ) { Text(stringResource(R.string.tmdb_api_key_save), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.onAccent) }
-                        if (vm.tmdbKey.isNotBlank()) {
+                            }
+                        } else {
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(p.chip)
+                                    .background(p.primary)
                                     .clickable {
-                                        vm.setTmdbKey("")
-                                        keyInput = ""
-                                        // Empty input is shown in plain text (see showKey init)
-                                        showKey = true
-                                        android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
+                                        vm.setTmdbKey(keyInput)
+                                        showKey = false
+                                        android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_save), android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                     .padding(horizontal = 14.dp, vertical = 9.dp)
-                            ) { Text(stringResource(R.string.delete), fontSize = 12.sp, color = p.muted) }
+                            ) { Text(stringResource(R.string.tmdb_api_key_save), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.onAccent) }
+                            if (vm.tmdbKey.isNotBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(p.chip)
+                                        .clickable {
+                                            vm.setTmdbKey("")
+                                            keyInput = ""
+                                            // Empty input is shown in plain text (see showKey init)
+                                            showKey = true
+                                            android.widget.Toast.makeText(context, context.getString(R.string.tmdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 9.dp)
+                                ) { Text(stringResource(R.string.delete), fontSize = 12.sp, color = p.muted) }
+                            }
                         }
                     }
                 }
 
                 // OMDb API key — hidden after save (same pattern as TMDB)
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .liquidGlass(
-                            shape = RoundedCornerShape(20.dp),
-                            tint = p.card,
-                            blurRadius = 14.dp,
-                            refractionHeight = 8.dp,
-                            refractionAmount = 14.dp
-                        )
-                        .padding(16.dp),
+                    modifier = sectionCardModifier(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         stringResource(R.string.omdb_api_key_title),
-                        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.text
+                        fontSize = 15.sp,
+                        fontWeight = if (p.isNeoBrutalist) FontWeight.ExtraBold else FontWeight.Bold,
+                        color = p.text
                     )
                     Text(
                         stringResource(R.string.omdb_api_key_hint),
@@ -525,19 +790,41 @@ fun BackupRestoreDialog(
                         placeholder = if (omdbSaved && !omdbShow) "••••••••••••••••••••" else "API key",
                         visualTransformation = if (omdbShow) VisualTransformation.None else PasswordVisualTransformation(),
                         trailing = {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { omdbShow = !omdbShow },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (omdbShow) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                    contentDescription = if (omdbShow) "Hide key" else "Show key",
-                                    tint = p.muted,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            if (p.isNeoBrutalist) {
+                                NeoBrutalistBox(
+                                    onClick = { omdbShow = !omdbShow },
+                                    role = Role.Button,
+                                    backgroundColor = NeoBrutalistColors.OffWhite,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 1.5.dp,
+                                    shadowOffset = 2.dp,
+                                    cornerRadius = 6.dp,
+                                    modifier = Modifier.size(34.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (omdbShow) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (omdbShow) "Hide key" else "Show key",
+                                        tint = NeoBrutalistColors.Black,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { omdbShow = !omdbShow },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (omdbShow) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (omdbShow) "Hide key" else "Show key",
+                                        tint = p.muted,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     )
@@ -555,35 +842,89 @@ fun BackupRestoreDialog(
                             Text(
                                 text = if (omdbShow) "Visible" else "Key saved — tap eye to reveal",
                                 fontSize = 11.sp,
+                                fontFamily = if (p.isNeoBrutalist) FontFamily.Monospace else FontFamily.Default,
+                                fontWeight = if (p.isNeoBrutalist) FontWeight.Bold else FontWeight.Normal,
                                 color = p.muted
                             )
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(p.primary)
-                                .clickable {
+                        if (p.isNeoBrutalist) {
+                            NeoBrutalistBox(
+                                onClick = {
                                     vm.setOmdbKey(omdbInput)
                                     omdbShow = false
                                     android.widget.Toast.makeText(context, context.getString(R.string.omdb_api_key_save), android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                                .padding(horizontal = 14.dp, vertical = 9.dp)
-                        ) { Text(stringResource(R.string.omdb_api_key_save), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.onAccent) }
-                        if (vm.omdbKey.isNotBlank()) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(p.chip)
-                                    .clickable {
+                                },
+                                role = Role.Button,
+                                backgroundColor = NeoBrutalistColors.Yellow,
+                                borderColor = p.border,
+                                shadowColor = NeoBrutalistColors.Black,
+                                borderWidth = 2.dp,
+                                shadowOffset = 3.dp,
+                                cornerRadius = 6.dp,
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+                            ) {
+                                Text(
+                                    stringResource(R.string.omdb_api_key_save),
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeoBrutalistColors.Black
+                                )
+                            }
+                            if (vm.omdbKey.isNotBlank()) {
+                                NeoBrutalistBox(
+                                    onClick = {
                                         vm.setOmdbKey("")
                                         omdbInput = ""
                                         omdbShow = true
                                         android.widget.Toast.makeText(context, context.getString(R.string.omdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    role = Role.Button,
+                                    backgroundColor = NeoBrutalistColors.CoralRed,
+                                    borderColor = p.border,
+                                    shadowColor = NeoBrutalistColors.Black,
+                                    borderWidth = 2.dp,
+                                    shadowOffset = 3.dp,
+                                    cornerRadius = 6.dp,
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+                                ) {
+                                    Text(
+                                        stringResource(R.string.delete),
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = NeoBrutalistColors.Black
+                                    )
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(p.primary)
+                                    .clickable {
+                                        vm.setOmdbKey(omdbInput)
+                                        omdbShow = false
+                                        android.widget.Toast.makeText(context, context.getString(R.string.omdb_api_key_save), android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                     .padding(horizontal = 14.dp, vertical = 9.dp)
-                            ) { Text(stringResource(R.string.delete), fontSize = 12.sp, color = p.muted) }
+                            ) { Text(stringResource(R.string.omdb_api_key_save), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = p.onAccent) }
+                            if (vm.omdbKey.isNotBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(p.chip)
+                                        .clickable {
+                                            vm.setOmdbKey("")
+                                            omdbInput = ""
+                                            omdbShow = true
+                                            android.widget.Toast.makeText(context, context.getString(R.string.omdb_api_key_cleared), android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 9.dp)
+                                ) { Text(stringResource(R.string.delete), fontSize = 12.sp, color = p.muted) }
+                            }
                         }
                     }
                 }

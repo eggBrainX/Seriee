@@ -322,6 +322,8 @@
     <string name="theme_style_material_you_desc">Colours from your wallpaper (Android 12+)</string>
     <string name="theme_style_custom">Custom</string>
     <string name="theme_style_custom_desc">Your own accent and background</string>
+    <string name="theme_style_neo_brutalism">Neo-Brutalism</string>
+    <string name="theme_style_neo_brutalism_desc">High-contrast borders, pop colors, hard shadows</string>
     <string name="theme_customize">Customize Theme…</string>
     <string name="customize_theme_title">Customize</string>
     <string name="accent">Accent</string>

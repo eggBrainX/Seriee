@@ -309,6 +309,8 @@
     <string name="theme_style_material_you_desc">Warna dari wallpaper (Android 12+)</string>
     <string name="theme_style_custom">Kustom</string>
     <string name="theme_style_custom_desc">Aksen dan latar pilihanmu</string>
+    <string name="theme_style_neo_brutalism">Neo-Brutalism</string>
+    <string name="theme_style_neo_brutalism_desc">Garis tegas kontras tinggi, warna pop, bayangan solid</string>
     <string name="theme_customize">Sesuaikan Tema…</string>
     <string name="customize_theme_title">Sesuaikan</string>
     <string name="accent">Aksen</string>

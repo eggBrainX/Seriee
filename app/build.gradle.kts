@@ -87,6 +87,10 @@ android {
         // version fallbacks in Kotlin code.
         buildConfig = true
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 // `kotlinOptions` was removed from the Kotlin Android plugin; configure the
@@ -113,7 +117,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("io.github.kyant0:backdrop:1.0.6")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
 }

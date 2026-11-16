@@ -1,6 +1,7 @@
 package com.seriee.app
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
@@ -14,6 +15,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.seriee.app.data.SerieeRepository
@@ -30,7 +32,7 @@ class MainActivity : AppCompatActivity() {
             AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(savedTag))
         }
         super.onCreate(savedInstanceState)
-        applyWindowBackground()
+        runCatching { applyWindowBackground() }
         enableEdgeToEdge()
         setContent {
             val vm: SerieeViewModel = viewModel()
@@ -40,7 +42,12 @@ class MainActivity : AppCompatActivity() {
             ) { _ -> }
 
             LaunchedEffect(Unit) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
