@@ -1,0 +1,45 @@
+version: 2
+
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # androidx.core 1.17+ requires AGP 9.1 and compileSdk 37, which this project
+    # does not use yet. Remove these ignores as part of the AGP 9 migration;
+    # until then Dependabot would only open PRs that cannot build.
+    ignore:
+      - dependency-name: "androidx.core:core"
+      - dependency-name: "androidx.core:core-ktx"
+      # Compose 1.10+ (BOM 2025.xx+) requires AGP 9.1 and compileSdk 37.
+      - dependency-name: "androidx.compose:compose-bom"
+      # AGP 9 is a breaking migration (built-in Kotlin, new DSL).
+      - dependency-name: "com.android.application"
+        versions: [">= 9.0.0"]
+      # Gradle 9.6 removed a Gradle internal API that AGP 8.13 still uses.
+      - dependency-name: "gradle-wrapper"
+        versions: [">= 9.6.0"]
+    groups:
+      androidx:
+        patterns:
+          - androidx.*
+      kotlin:
+        patterns:
+          - org.jetbrains.kotlin*
+      other:
+        patterns:
+          - '*'
+        exclude-patterns:
+          - androidx.*
+          - org.jetbrains.kotlin*
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns:
+          - '*'
