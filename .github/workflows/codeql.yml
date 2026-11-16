@@ -39,6 +39,9 @@ jobs:
           languages: java-kotlin
           build-mode: manual
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       - name: Build debug variant
         run: ./gradlew --no-daemon assembleDebug
 
