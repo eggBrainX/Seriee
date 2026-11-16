@@ -384,4 +384,27 @@
     <string name="crash_dialog_open_overlay">Overlay Debug</string>
     <string name="crash_dialog_continue">Lanjutkan</string>
     <string name="crash_copied_toast">Detail error disalin ke papan klip</string>
+    <string name="crash_safe_mode_notice">Terdeteksi beberapa kali crash — Anda dapat mereset tema atau mengekspor cadangan di bawah.</string>
+    <string name="crash_reset_theme">Reset Tema</string>
+    <string name="crash_theme_reset_done">Tema direset ke bawaan</string>
+    <string name="crash_export_backup">Ekspor Cadangan</string>
+    <string name="debug_share_logs">Bagikan Log</string>
+    <string name="debug_share_title">Bagikan Log Debug Seriee</string>
+    <string name="debug_share_failed">Tidak dapat membagikan file log</string>
+    <string name="mark_season_complete">Selesaikan Musim</string>
+    <string name="jump_to_episode">Lompat ke Episode</string>
+    <string name="watched_prompt_title">Sudah selesai menonton S%1$d E%2$d?</string>
+    <string name="watched_prompt_action">Tandai Ditonton</string>
+    <string name="sort_recent">Terbaru</string>
+    <string name="sort_title">Judul A–Z</string>
+    <string name="sort_rating">Rating Tertinggi</string>
+    <string name="sort_progress">Progres</string>
+    <string name="all_tags">Semua Tag</string>
+    <string name="backup_reminder_title">Cadangkan pustaka terbaru Anda</string>
+    <string name="backup_reminder_desc">Anda baru saja menambah atau mengimpor judul. Simpan file JSON agar data tetap aman.</string>
+    <string name="backup_now">Cadangkan sekarang</string>
+    <string name="exact_alarm_disabled_hint">Alarm tepat waktu dinonaktifkan oleh Android. Aktifkan agar pengingat akurat.</string>
+    <string name="enable_exact_alarm">Izinkan Alarm Tepat</string>
+    <string name="widget_description">Progres Sedang Ditonton dan tombol cepat +1 episode</string>
+    <string name="widget_empty">Belum ada tayangan Sedang Ditonton</string>
 </resources>

@@ -14,23 +14,29 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,10 +44,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,12 +62,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.seriee.app.R
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
+import com.seriee.app.data.Season
 import com.seriee.app.data.WatchStatus
 import com.seriee.app.reminder.ReminderScheduler
 
@@ -79,6 +95,32 @@ fun DetailDialog(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var jumpPickerSeason by remember { mutableStateOf<Season?>(null) }
+
+    var pendingWatchedEpisode by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var launchedExternalPlayer by remember { mutableStateOf(false) }
+    var showWatchedPrompt by remember { mutableStateOf(false) }
+    var resumeTick by remember { mutableIntStateOf(0) }
+
+    val lifecycleOwner = context as? LifecycleOwner
+    DisposableEffect(lifecycleOwner) {
+        val lifecycle = lifecycleOwner?.lifecycle
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                resumeTick++
+                if (launchedExternalPlayer && pendingWatchedEpisode != null) {
+                    launchedExternalPlayer = false
+                    showWatchedPrompt = true
+                }
+            }
+        }
+        lifecycle?.addObserver(observer)
+        onDispose { lifecycle?.removeObserver(observer) }
+    }
+
+    val hasExactAlarmPermission = remember(item.reminderEnabled, resumeTick) {
+        ReminderScheduler.canScheduleExactAlarms(context)
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -146,6 +188,48 @@ fun DetailDialog(
 
             if (item.description.isNotBlank()) {
                 Text(item.description, fontSize = 13.sp, color = p.muted, lineHeight = 19.sp)
+            }
+
+            val pending = pendingWatchedEpisode
+            if (showWatchedPrompt && pending != null) {
+                SerieeCard(containerColor = p.accent.copy(alpha = 0.14f), modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                    ) {
+                        Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = p.accent, modifier = Modifier.size(20.dp))
+                        Text(
+                            text = stringResource(R.string.watched_prompt_title, pending.first, pending.second),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = p.text,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Button(
+                            onClick = {
+                                onSeasonEpisodeChange(pending.first, pending.second)
+                                showWatchedPrompt = false
+                                pendingWatchedEpisode = null
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = p.onAccent),
+                        ) {
+                            Text(stringResource(R.string.watched_prompt_action), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                        }
+                        IconButton(
+                            onClick = {
+                                showWatchedPrompt = false
+                                pendingWatchedEpisode = null
+                            },
+                            modifier = Modifier.size(28.dp),
+                        ) {
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.close), tint = p.muted, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -222,12 +306,45 @@ fun DetailDialog(
                                     }
                                 }
                                 GradientProgressBar(fraction = frac, color = p.accent, height = 8.dp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                    OutlinedButton(
+                                        onClick = { jumpPickerSeason = sec },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.2.dp, p.border),
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Icon(Icons.Rounded.FastForward, contentDescription = null, tint = p.text, modifier = Modifier.size(15.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(stringResource(R.string.jump_to_episode), color = p.text, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { onSeasonEpisodeChange(sec.number, sec.totalEp) },
+                                        enabled = sec.currentEp < sec.totalEp,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.2.dp, p.border),
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Icon(Icons.Rounded.DoneAll, contentDescription = null, tint = if (sec.currentEp < sec.totalEp) p.accent else p.muted, modifier = Modifier.size(15.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            stringResource(R.string.mark_season_complete),
+                                            color = if (sec.currentEp < sec.totalEp) p.text else p.muted,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
                                 if (sec.episodes.isNotEmpty()) {
                                     val nextEp = sec.episodes.firstOrNull { it.number == (sec.currentEp + 1).coerceAtMost(sec.totalEp) }
                                         ?: sec.episodes.firstOrNull()
                                     if (nextEp != null) {
                                         OutlinedButton(
-                                            onClick = { openVideoUri(context, nextEp.uri) },
+                                            onClick = {
+                                                pendingWatchedEpisode = sec.number to nextEp.number
+                                                launchedExternalPlayer = true
+                                                openVideoUri(context, nextEp.uri)
+                                            },
                                             shape = RoundedCornerShape(8.dp),
                                             border = BorderStroke(1.5.dp, p.border),
                                             modifier = Modifier.fillMaxWidth(),
@@ -314,6 +431,35 @@ fun DetailDialog(
                             Text(stringResource(R.string.test_alarm_now), color = p.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
+                    if (item.reminderEnabled && !hasExactAlarmPermission) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(p.warning.copy(alpha = 0.16f))
+                                .padding(10.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = p.warning, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = stringResource(R.string.exact_alarm_disabled_hint),
+                                    fontSize = 12.sp,
+                                    color = p.text,
+                                    fontWeight = FontWeight.SemiBold,
+                                    lineHeight = 16.sp,
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { ReminderScheduler.openExactAlarmSettings(context) },
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.5.dp, p.border),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(stringResource(R.string.enable_exact_alarm), color = p.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -334,7 +480,19 @@ fun DetailDialog(
                     }
                     if (item.videoUri.isNotBlank()) {
                         OutlinedButton(
-                            onClick = { openVideo(context, item) },
+                            onClick = {
+                                if (item.type == MediaType.Movie) {
+                                    pendingWatchedEpisode = 1 to 1
+                                } else {
+                                    val targetSec = item.effectiveSeasons.firstOrNull { it.currentEp < it.totalEp }
+                                        ?: item.effectiveSeasons.firstOrNull()
+                                    if (targetSec != null) {
+                                        pendingWatchedEpisode = targetSec.number to (targetSec.currentEp + 1).coerceAtMost(targetSec.totalEp)
+                                    }
+                                }
+                                launchedExternalPlayer = true
+                                openVideo(context, item)
+                            },
                             shape = RoundedCornerShape(10.dp),
                             border = BorderStroke(if (p.isNeoBrutalist) 2.dp else 1.dp, p.border),
                             modifier = Modifier.fillMaxWidth(),
@@ -379,6 +537,17 @@ fun DetailDialog(
         }
     }
 
+    jumpPickerSeason?.let { sec ->
+        JumpToEpisodeDialog(
+            season = sec,
+            onDismiss = { jumpPickerSeason = null },
+            onSelectEpisode = { targetEp ->
+                onSeasonEpisodeChange(sec.number, targetEp)
+                jumpPickerSeason = null
+            },
+        )
+    }
+
     if (showDeleteConfirm) {
         NeoBrutalistConfirmDialog(
             title = stringResource(R.string.delete_media_title),
@@ -390,5 +559,131 @@ fun DetailDialog(
                 onDismiss()
             },
         )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun JumpToEpisodeDialog(
+    season: Season,
+    onDismiss: () -> Unit,
+    onSelectEpisode: (Int) -> Unit,
+) {
+    val p = LocalPalette.current
+    var inputText by remember(season.number, season.currentEp) {
+        mutableStateOf(season.currentEp.toString())
+    }
+    val total = season.totalEp.coerceAtLeast(1)
+
+    Dialog(onDismissRequest = onDismiss) {
+        NeoBrutalistBox(
+            containerColor = p.surface,
+            borderColor = p.border,
+            shadowOffset = 6.dp,
+            cornerRadius = 14.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+            ) {
+                Text(
+                    text = "${stringResource(R.string.jump_to_episode)} · ${stringResource(R.string.season_format, season.number)}",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = p.text,
+                )
+
+                if (total <= 40) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 260.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        for (ep in 0..total) {
+                            val selected = ep == season.currentEp
+                            val watched = ep in 1..season.currentEp
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(width = 44.dp, height = 36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        when {
+                                            selected -> p.accent
+                                            watched -> p.accent.copy(alpha = 0.2f)
+                                            else -> p.cardAlt
+                                        }
+                                    )
+                                    .border(1.2.dp, if (selected) p.border else p.border.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .clickable { onSelectEpisode(ep) },
+                            ) {
+                                Text(
+                                    text = "$ep",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (selected) p.onAccent else p.text,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = { v -> inputText = v.filter { it.isDigit() }.take(4) },
+                        label = { Text("0 – $total", fontSize = 12.sp, color = p.muted) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = p.accent,
+                            unfocusedBorderColor = p.border,
+                            focusedTextColor = p.text,
+                            unfocusedTextColor = p.text,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(0, total / 4, total / 2, (total * 3) / 4, total).distinct().forEach { milestone ->
+                            FilterChipButton(
+                                label = "E$milestone",
+                                selected = season.currentEp == milestone,
+                                accent = p.accent,
+                                onClick = { onSelectEpisode(milestone) },
+                            )
+                        }
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.5.dp, p.border),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.cancel), color = p.text, fontWeight = FontWeight.Bold)
+                    }
+                    if (total > 40) {
+                        Button(
+                            onClick = {
+                                val parsed = (inputText.toIntOrNull() ?: season.currentEp).coerceIn(0, total)
+                                onSelectEpisode(parsed)
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = p.onAccent),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(stringResource(R.string.save), fontWeight = FontWeight.ExtraBold)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -24,6 +24,7 @@ import com.seriee.app.data.ImportedEntry
 import com.seriee.app.data.MalXmlParser
 import com.seriee.app.data.MediaItem
 import com.seriee.app.data.MediaType
+import com.seriee.app.data.PosterStore
 import com.seriee.app.data.SerieeRepository
 import com.seriee.app.data.StreakState
 import com.seriee.app.data.ThemePreset
@@ -32,6 +33,7 @@ import com.seriee.app.data.WatchHistoryRules
 import com.seriee.app.data.WatchStatus
 import com.seriee.app.debug.AppLogger
 import com.seriee.app.reminder.ReminderScheduler
+import com.seriee.app.widget.SerieeWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -78,6 +80,9 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     var showChangelogAuto by mutableStateOf(repo.loadLastSeenVersionCode() < BuildConfig.VERSION_CODE)
         private set
 
+    var showBackupReminder by mutableStateOf(repo.loadPendingBackupPrompt())
+        private set
+
     init {
         ReminderScheduler.rescheduleAll(app, items)
     }
@@ -87,9 +92,37 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         showChangelogAuto = false
     }
 
+    fun dismissBackupReminder() {
+        repo.savePendingBackupPrompt(false)
+        showBackupReminder = false
+    }
+
+    fun refreshFromStorage() {
+        val storedItems = repo.loadItems()
+        val storedHistory = repo.loadHistory()
+        val storedStreak = repo.loadStreak()
+        if (storedItems != items) items = storedItems
+        if (storedHistory != history) history = storedHistory
+        if (storedStreak != streak) streak = storedStreak
+    }
+
+    private fun maybeTriggerBackupReminder(itemCount: Int, importedDelta: Int = 0) {
+        val sevenDaysMs = 7L * 86_400_000L
+        val lastBackup = repo.loadLastBackupAt()
+        val backupIsStale = lastBackup == 0L || (System.currentTimeMillis() - lastBackup) > sevenDaysMs
+        if (backupIsStale && (importedDelta >= 3 || (itemCount >= 10 && itemCount % 10 == 0))) {
+            repo.savePendingBackupPrompt(true)
+            showBackupReminder = true
+        }
+    }
+
     private fun persistItems(next: List<MediaItem>) {
         items = next
         repo.saveItems(next)
+        val ctx = getApplication<Application>()
+        val activePosters = next.mapNotNull { it.poster.takeIf { p -> p.startsWith("/") } }.toSet()
+        PosterStore.pruneUnused(ctx, activePosters)
+        SerieeWidgetProvider.notifyChanged(ctx)
     }
 
     private fun logWatch(item: MediaItem, season: Int, ep: Int, delta: Int) {
@@ -110,6 +143,9 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         val next = if (idx >= 0) items.map { if (it.id == item.id) item else it } else listOf(item) + items
         persistItems(next)
         ReminderScheduler.schedule(getApplication(), item)
+        if (idx < 0) {
+            maybeTriggerBackupReminder(next.size)
+        }
     }
 
     fun deleteItem(id: String) {
@@ -205,6 +241,12 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         if (delta > 0 && nextSec != null) logWatch(updated, seasonNum, nextSec.currentEp, delta)
     }
 
+    fun markSeasonComplete(id: String, seasonNum: Int) {
+        val target = items.firstOrNull { it.id == id } ?: return
+        val sec = target.effectiveSeasons.firstOrNull { it.number == seasonNum } ?: return
+        setSeasonEpisode(id, seasonNum, sec.totalEp)
+    }
+
     fun setStatus(id: String, status: WatchStatus) {
         persistItems(items.map { if (it.id == id) it.copy(status = status, updatedAt = System.currentTimeMillis()) else it })
     }
@@ -277,6 +319,14 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         updateCustomBackground(preset.bgStartArgb, preset.bgEndArgb, preset.useGradient)
     }
 
+    fun resetThemeToDefault() {
+        updateThemeMode(AppThemeMode.Light)
+        updateThemeStyle(AppThemeStyle.NeoBrutalism)
+        updateReduceTransparency(false)
+        val ctx = getApplication<Application>()
+        Toast.makeText(ctx, ctx.getString(R.string.crash_theme_reset_done), Toast.LENGTH_SHORT).show()
+    }
+
     fun updateReduceTransparency(v: Boolean) {
         reduceTransparency = v
         repo.saveReduceTransparency(v)
@@ -311,7 +361,7 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun exportBackupToUri(uri: Uri, onDone: (Result<Int>) -> Unit) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppLogger.coroutineExceptionHandler("Backup")) {
             val ctx = getApplication<Application>()
             val result = withContext(Dispatchers.IO) {
                 runCatching {
@@ -322,7 +372,11 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
                     items.size
                 }
             }
-            result.onFailure { err ->
+            result.onSuccess {
+                repo.saveLastBackupAt(System.currentTimeMillis())
+                repo.savePendingBackupPrompt(false)
+                showBackupReminder = false
+            }.onFailure { err ->
                 AppLogger.e("Backup", "Failed to export backup", err)
             }
             onDone(result)
@@ -330,7 +384,7 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun restoreBackupFromUri(uri: Uri, merge: Boolean, onDone: (Result<Int>) -> Unit) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppLogger.coroutineExceptionHandler("Restore")) {
             val ctx = getApplication<Application>()
             val parsedResult = withContext(Dispatchers.IO) {
                 runCatching {
@@ -375,7 +429,7 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun fetchAniListEntries(username: String, onResult: (Result<List<ImportedEntry>>) -> Unit) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppLogger.coroutineExceptionHandler("AniListImport")) {
             val ctx = getApplication<Application>()
             val res = runCatching {
                 val rows = AniListListClient.fetch(username)
@@ -397,7 +451,7 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun parseMalUri(uri: Uri, onResult: (Result<List<ImportedEntry>>) -> Unit) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppLogger.coroutineExceptionHandler("MalImport")) {
             val ctx = getApplication<Application>()
             val res = withContext(Dispatchers.IO) {
                 runCatching {
@@ -420,6 +474,7 @@ class SerieeViewModel(app: Application) : AndroidViewModel(app) {
         }
         persistItems(nextItems)
         ReminderScheduler.rescheduleAll(getApplication(), nextItems)
+        maybeTriggerBackupReminder(nextItems.size, importedDelta = summary.added + summary.updated)
         return summary
     }
 }

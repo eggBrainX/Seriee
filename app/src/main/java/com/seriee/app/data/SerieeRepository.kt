@@ -152,6 +152,12 @@ class SerieeRepository(context: Context) {
     fun loadLastSeenVersionCode(): Int = prefs.getInt("last_seen_version_code", 0)
     fun saveLastSeenVersionCode(code: Int) = prefs.edit().putInt("last_seen_version_code", code).apply()
 
+    fun loadLastBackupAt(): Long = prefs.getLong("last_backup_at", 0L)
+    fun saveLastBackupAt(ms: Long) = prefs.edit().putLong("last_backup_at", ms).apply()
+
+    fun loadPendingBackupPrompt(): Boolean = prefs.getBoolean("pending_backup_prompt", false)
+    fun savePendingBackupPrompt(v: Boolean) = prefs.edit().putBoolean("pending_backup_prompt", v).apply()
+
     fun exportBackupJson(items: List<MediaItem>, history: List<WatchEvent>): String {
         val st = loadStreak()
         return JSONObject().apply {

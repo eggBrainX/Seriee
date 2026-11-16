@@ -23,12 +23,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -114,6 +117,12 @@ fun DebugOverlay(
                     modifier = Modifier.size(30.dp),
                 ) {
                     Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.debug_copy_logs), tint = Color(0xFFCBD5E1), modifier = Modifier.size(16.dp))
+                }
+                IconButton(
+                    onClick = { AppLogger.shareLogs(context) },
+                    modifier = Modifier.size(30.dp),
+                ) {
+                    Icon(Icons.Rounded.Share, contentDescription = stringResource(R.string.debug_share_logs), tint = Color(0xFF93C5FD), modifier = Modifier.size(16.dp))
                 }
                 IconButton(
                     onClick = {
@@ -280,6 +289,8 @@ fun CrashErrorDialog(
     report: CrashReport,
     onDismiss: () -> Unit,
     onOpenOverlay: () -> Unit,
+    onResetTheme: () -> Unit = {},
+    onExportBackup: () -> Unit = {},
 ) {
     val p = LocalPalette.current
     val context = LocalContext.current
@@ -301,6 +312,7 @@ fun CrashErrorDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(18.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -331,6 +343,42 @@ fun CrashErrorDialog(
                     color = p.muted,
                     lineHeight = 19.sp,
                 )
+
+                if (report.consecutiveCount >= 2) {
+                    SerieeCard(containerColor = p.warning.copy(alpha = 0.16f), modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = stringResource(R.string.crash_safe_mode_notice),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.text,
+                                lineHeight = 17.sp,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = onResetTheme,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.5.dp, p.border),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(Icons.Rounded.Palette, contentDescription = null, tint = p.text, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(stringResource(R.string.crash_reset_theme), color = p.text, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                }
+                                OutlinedButton(
+                                    onClick = onExportBackup,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.5.dp, p.border),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(Icons.Rounded.Backup, contentDescription = null, tint = p.text, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(stringResource(R.string.crash_export_backup), color = p.text, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
 
                 SerieeCard(containerColor = p.cardAlt, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -399,6 +447,19 @@ fun CrashErrorDialog(
                         Text(stringResource(R.string.crash_dialog_copy), color = p.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     OutlinedButton(
+                        onClick = { AppLogger.shareLogs(context) },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.5.dp, p.border),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Rounded.Share, contentDescription = null, tint = p.text, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.debug_share_logs), color = p.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
                         onClick = onOpenOverlay,
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.5.dp, p.border),
@@ -408,16 +469,15 @@ fun CrashErrorDialog(
                         Spacer(Modifier.width(4.dp))
                         Text(stringResource(R.string.crash_dialog_open_overlay), color = p.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
-                }
-
-                Button(
-                    onClick = onDismiss,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = p.onAccent),
-                    border = if (p.isNeoBrutalist) BorderStroke(2.dp, p.border) else null,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.crash_dialog_continue), fontWeight = FontWeight.ExtraBold)
+                    Button(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = p.onAccent),
+                        border = if (p.isNeoBrutalist) BorderStroke(2.dp, p.border) else null,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.crash_dialog_continue), fontWeight = FontWeight.ExtraBold)
+                    }
                 }
             }
         }

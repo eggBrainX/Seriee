@@ -3,6 +3,7 @@ package com.seriee.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
@@ -62,6 +64,13 @@ import com.seriee.app.data.MediaType
 import com.seriee.app.data.WatchStatus
 import com.seriee.app.reminder.ReminderScheduler
 
+private enum class LibrarySort(val labelRes: Int) {
+    RECENT(R.string.sort_recent),
+    TITLE(R.string.sort_title),
+    RATING(R.string.sort_rating),
+    PROGRESS(R.string.sort_progress),
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LibraryScreen(
@@ -81,20 +90,35 @@ fun LibraryScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var typeFilter by rememberSaveable { mutableStateOf<MediaType?>(null) }
     var statusFilter by rememberSaveable { mutableStateOf<WatchStatus?>(null) }
+    var tagFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    var sortBy by rememberSaveable { mutableStateOf(LibrarySort.RECENT) }
 
-    val filtered = remember(items, query, typeFilter, statusFilter) {
+    val availableTags = remember(items) {
+        items.flatMap { it.tags }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinctBy { it.lowercase() }
+            .sortedBy { it.lowercase() }
+    }
+
+    val filtered = remember(items, query, typeFilter, statusFilter, tagFilter, sortBy) {
         val q = query.trim().lowercase()
-        items.filter { item ->
+        val matched = items.filter { item ->
             val mType = typeFilter == null || item.type == typeFilter
             val mStatus = statusFilter == null || item.status == statusFilter
+            val mTag = tagFilter == null || item.tags.any { it.equals(tagFilter, ignoreCase = true) }
             val mQuery = q.isEmpty() ||
                 item.title.lowercase().contains(q) ||
                 item.tags.any { it.lowercase().contains(q) }
-            mType && mStatus && mQuery
-        }.sortedWith(
-            compareByDescending<MediaItem> { it.pinned }
-                .thenByDescending { it.updatedAt }
-        )
+            mType && mStatus && mTag && mQuery
+        }
+        val secondary: Comparator<MediaItem> = when (sortBy) {
+            LibrarySort.RECENT -> compareByDescending { it.updatedAt }
+            LibrarySort.TITLE -> compareBy { it.title.lowercase() }
+            LibrarySort.RATING -> compareByDescending<MediaItem> { it.rating }.thenByDescending { it.updatedAt }
+            LibrarySort.PROGRESS -> compareByDescending<MediaItem> { it.fraction }.thenByDescending { it.updatedAt }
+        }
+        matched.sortedWith(compareByDescending<MediaItem> { it.pinned }.then(secondary))
     }
 
     @Composable
@@ -202,6 +226,46 @@ fun LibraryScreen(
                     )
                 }
             }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+            ) {
+                LibrarySort.entries.forEach { option ->
+                    FilterChipButton(
+                        label = stringResource(option.labelRes),
+                        selected = sortBy == option,
+                        accent = p.accent,
+                        onClick = { sortBy = option },
+                    )
+                }
+            }
+
+            if (availableTags.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                ) {
+                    FilterChipButton(
+                        label = stringResource(R.string.all_tags),
+                        selected = tagFilter == null,
+                        accent = p.accent,
+                        onClick = { tagFilter = null },
+                    )
+                    availableTags.forEach { tag ->
+                        FilterChipButton(
+                            label = "#$tag",
+                            selected = tagFilter.equals(tag, ignoreCase = true),
+                            accent = p.accent,
+                            onClick = { tagFilter = if (tagFilter.equals(tag, ignoreCase = true)) null else tag },
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -246,6 +310,7 @@ fun LibraryScreen(
                         query = ""
                         typeFilter = null
                         statusFilter = null
+                        tagFilter = null
                     },
                 )
             }

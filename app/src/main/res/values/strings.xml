@@ -430,4 +430,35 @@
     <string name="crash_dialog_open_overlay">Debug Overlay</string>
     <string name="crash_dialog_continue">Continue</string>
     <string name="crash_copied_toast">Error details copied to clipboard</string>
+    <string name="crash_safe_mode_notice">Multiple crashes detected — you can reset your theme or export a safe backup below.</string>
+    <string name="crash_reset_theme">Reset Theme</string>
+    <string name="crash_theme_reset_done">Theme reset to default</string>
+    <string name="crash_export_backup">Export Backup</string>
+    <string name="debug_share_logs">Share Logs</string>
+    <string name="debug_share_title">Share Seriee Debug Logs</string>
+    <string name="debug_share_failed">Could not share log file</string>
+
+    <!-- Batch episodes & playback -->
+    <string name="mark_season_complete">Finish Season</string>
+    <string name="jump_to_episode">Jump to Episode</string>
+    <string name="watched_prompt_title">Finished watching S%1$d E%2$d?</string>
+    <string name="watched_prompt_action">Mark Watched</string>
+
+    <!-- Library sort & tags -->
+    <string name="sort_recent">Recent</string>
+    <string name="sort_title">Title A–Z</string>
+    <string name="sort_rating">Top Rated</string>
+    <string name="sort_progress">Progress</string>
+    <string name="all_tags">All Tags</string>
+
+    <!-- Backup reminder -->
+    <string name="backup_reminder_title">Back up your updated library</string>
+    <string name="backup_reminder_desc">You recently added or imported titles. Save a JSON backup to keep them safe.</string>
+    <string name="backup_now">Back up now</string>
+
+    <!-- Exact alarm & widget -->
+    <string name="exact_alarm_disabled_hint">Exact alarms are disabled by Android. Enable for on-time reminders.</string>
+    <string name="enable_exact_alarm">Allow Exact Alarms</string>
+    <string name="widget_description">Active Watching progress and quick +1 episode tracker</string>
+    <string name="widget_empty">No active Watching titles yet</string>
 </resources>

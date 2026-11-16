@@ -1,5 +1,8 @@
 package com.seriee.app.ui
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -30,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Insights
@@ -41,6 +45,8 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -62,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -79,8 +86,24 @@ import kotlinx.coroutines.launch
 @Composable
 fun SerieeApp(viewModel: SerieeViewModel) {
     val p = LocalPalette.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val uiExceptionHandler = remember { AppLogger.coroutineExceptionHandler("UI") }
     val pagerState = rememberPagerState(pageCount = { 3 })
+
+    val crashBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            viewModel.exportBackupToUri(uri) { res ->
+                val msg = res.fold(
+                    onSuccess = { count -> context.getString(R.string.backup_success, count) },
+                    onFailure = { err -> context.getString(R.string.backup_failed, err.localizedMessage ?: "error") },
+                )
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     val progressListState = rememberLazyListState()
     val libraryListState = rememberLazyListState()
@@ -173,6 +196,42 @@ fun SerieeApp(viewModel: SerieeViewModel) {
                     onOpenAbout = { overflowOpen = false; showAboutDialog = true },
                 )
 
+                if (viewModel.showBackupReminder) {
+                    SerieeCard(
+                        containerColor = p.cardAlt,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Icon(Icons.Rounded.Backup, contentDescription = null, tint = p.accent, modifier = Modifier.size(20.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.backup_reminder_title), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = p.text)
+                                Text(stringResource(R.string.backup_reminder_desc), fontSize = 11.sp, color = p.muted, lineHeight = 14.sp)
+                            }
+                            Button(
+                                onClick = {
+                                    viewModel.dismissBackupReminder()
+                                    showBackupDialog = true
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = p.onAccent),
+                            ) {
+                                Text(stringResource(R.string.backup_now), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                            }
+                            IconButton(onClick = { viewModel.dismissBackupReminder() }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.close), tint = p.muted, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
@@ -223,7 +282,7 @@ fun SerieeApp(viewModel: SerieeViewModel) {
 
             FloatingBottomNav(
                 currentPage = pagerState.currentPage,
-                onSelectPage = { idx -> scope.launch { pagerState.animateScrollToPage(idx) } },
+                onSelectPage = { idx -> scope.launch(uiExceptionHandler) { pagerState.animateScrollToPage(idx) } },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
@@ -299,7 +358,7 @@ fun SerieeApp(viewModel: SerieeViewModel) {
         ImportSheet(
             viewModel = viewModel,
             onDismiss = { showImportSheet = false },
-            onViewLibrary = { scope.launch { pagerState.animateScrollToPage(1) } },
+            onViewLibrary = { scope.launch(uiExceptionHandler) { pagerState.animateScrollToPage(1) } },
         )
     }
 
@@ -342,6 +401,10 @@ fun SerieeApp(viewModel: SerieeViewModel) {
             onOpenOverlay = {
                 AppLogger.dismissPendingCrash()
                 showDebugOverlay = true
+            },
+            onResetTheme = { viewModel.resetThemeToDefault() },
+            onExportBackup = {
+                crashBackupLauncher.launch("seriee-safe-backup-${System.currentTimeMillis() / 1000}.json")
             },
         )
     }
