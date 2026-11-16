@@ -7,8 +7,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,11 +30,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -71,7 +72,6 @@ private enum class LibrarySort(val labelRes: Int) {
     PROGRESS(R.string.sort_progress),
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LibraryScreen(
     items: List<MediaItem>,
@@ -199,71 +199,44 @@ fun LibraryScreen(
                 )
             }
 
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChipButton(
-                    label = stringResource(R.string.all_types),
-                    selected = typeFilter == null,
-                    accent = p.accent,
-                    onClick = { typeFilter = null },
-                )
-                MediaType.entries.forEach { t ->
-                    FilterChipButton(
-                        label = stringResource(t.labelRes),
-                        selected = typeFilter == t,
-                        accent = p.accent,
-                        onClick = { typeFilter = if (typeFilter == t) null else t },
-                    )
-                }
-                WatchStatus.entries.forEach { st ->
-                    FilterChipButton(
-                        label = stringResource(st.labelRes),
-                        selected = statusFilter == st,
-                        accent = statusColor(st, p),
-                        onClick = { statusFilter = if (statusFilter == st) null else st },
-                    )
-                }
-            }
-
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
             ) {
-                LibrarySort.entries.forEach { option ->
-                    FilterChipButton(
-                        label = stringResource(option.labelRes),
-                        selected = sortBy == option,
+                FilterDropdown(
+                    label = typeFilter?.let { stringResource(it.labelRes) } ?: stringResource(R.string.all_types),
+                    active = typeFilter != null,
+                    accent = p.accent,
+                    options = listOf<Pair<String, MediaType?>>(stringResource(R.string.all_types) to null) +
+                        MediaType.entries.map { stringResource(it.labelRes) to it },
+                    onSelect = { typeFilter = it },
+                )
+                FilterDropdown(
+                    label = statusFilter?.let { stringResource(it.labelRes) } ?: stringResource(R.string.all_status),
+                    active = statusFilter != null,
+                    accent = statusFilter?.let { statusColor(it, p) } ?: p.accent,
+                    options = listOf<Pair<String, WatchStatus?>>(stringResource(R.string.all_status) to null) +
+                        WatchStatus.entries.map { stringResource(it.labelRes) to it },
+                    onSelect = { statusFilter = it },
+                )
+                FilterDropdown(
+                    label = stringResource(sortBy.labelRes),
+                    active = sortBy != LibrarySort.RECENT,
+                    accent = p.accent,
+                    options = LibrarySort.entries.map { stringResource(it.labelRes) to it },
+                    onSelect = { sortBy = it ?: LibrarySort.RECENT },
+                )
+                if (availableTags.isNotEmpty()) {
+                    FilterDropdown(
+                        label = tagFilter?.let { "#$it" } ?: stringResource(R.string.all_tags),
+                        active = tagFilter != null,
                         accent = p.accent,
-                        onClick = { sortBy = option },
+                        options = listOf<Pair<String, String?>>(stringResource(R.string.all_tags) to null) +
+                            availableTags.map { "#$it" to it },
+                        onSelect = { tagFilter = it },
                     )
-                }
-            }
-
-            if (availableTags.isNotEmpty()) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                ) {
-                    FilterChipButton(
-                        label = stringResource(R.string.all_tags),
-                        selected = tagFilter == null,
-                        accent = p.accent,
-                        onClick = { tagFilter = null },
-                    )
-                    availableTags.forEach { tag ->
-                        FilterChipButton(
-                            label = "#$tag",
-                            selected = tagFilter.equals(tag, ignoreCase = true),
-                            accent = p.accent,
-                            onClick = { tagFilter = if (tagFilter.equals(tag, ignoreCase = true)) null else tag },
-                        )
-                    }
                 }
             }
         }
@@ -501,6 +474,64 @@ private fun LibraryListCard(
                     Icons.Rounded.PushPin,
                     contentDescription = stringResource(R.string.pin),
                     tint = if (item.pinned) p.accent else p.muted,
+                )
+            }
+        }
+    }
+}
+
+/** Compact filter button that opens a dropdown menu; `null` selects the "all" option. */
+@Composable
+private fun <T> FilterDropdown(
+    label: String,
+    active: Boolean,
+    accent: Color,
+    options: List<Pair<String, T?>>,
+    onSelect: (T?) -> Unit,
+) {
+    val p = LocalPalette.current
+    var expanded by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(9.dp)
+    val fg = when {
+        !active -> p.text
+        p.isNeoBrutalist -> Color.White
+        accent == p.accent -> p.onAccent
+        else -> Color.White
+    }
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(shape)
+                .background(if (active) accent else p.card)
+                .border(
+                    if (p.isNeoBrutalist) 2.dp else 1.dp,
+                    if (active && !p.isNeoBrutalist) accent else p.border,
+                    shape,
+                )
+                .clickable { expanded = true }
+                .padding(start = 11.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+        ) {
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = fg, maxLines = 1)
+            Icon(
+                Icons.Rounded.ExpandMore,
+                contentDescription = null,
+                tint = fg,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(p.card),
+        ) {
+            options.forEach { (text, value) ->
+                DropdownMenuItem(
+                    text = { Text(text, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = p.text) },
+                    onClick = {
+                        onSelect(value)
+                        expanded = false
+                    },
                 )
             }
         }
