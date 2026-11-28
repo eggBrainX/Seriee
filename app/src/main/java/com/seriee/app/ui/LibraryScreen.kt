@@ -430,7 +430,8 @@ fun LibraryScreen(
                             title = stringResource(R.string.empty_library_title),
                             hint = stringResource(R.string.empty_library_hint),
                             ctaLabel = stringResource(R.string.add_first_title),
-                            onCta = onAdd
+                            onCta = onAdd,
+                            mascot = true
                         )
                     } else {
                         EmptyState(
