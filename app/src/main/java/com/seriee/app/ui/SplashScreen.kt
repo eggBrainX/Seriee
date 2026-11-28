@@ -11,8 +11,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,7 +55,9 @@ private const val LOGO_REST_ANGLE = -17f
 /**
  * Full-screen animated splash shown once per cold start: the leaf sweeps in,
  * the clapper snaps shut and springs back open, the play triangle pulses and
- * the "Seriee" letters spring in one by one. Tap anywhere to skip.
+ * the "Seriee" letters spring in one by one. It is deliberately NOT clickable:
+ * touches pass through to the UI underneath (a covering clickable layer also
+ * breaks the MainActivity UI tests, which tap through the splash).
  */
 @Composable
 fun SerieeSplash(onFinished: () -> Unit, modifier: Modifier = Modifier) {
@@ -110,11 +110,7 @@ fun SerieeSplash(onFinished: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(p.bg)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { onFinished() },
+            .background(p.bg),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
