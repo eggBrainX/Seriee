@@ -186,6 +186,7 @@ fun ProgressScreen(
                         hint = stringResource(R.string.empty_progress_hint),
                         ctaLabel = stringResource(R.string.add_first_title),
                         onCta = onAdd,
+                        mascot = true,
                         modifier = Modifier.padding(top = 20.dp)
                     )
                 } else {

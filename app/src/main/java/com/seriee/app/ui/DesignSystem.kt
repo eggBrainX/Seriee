@@ -1190,7 +1190,8 @@ fun EmptyState(
     hint: String,
     ctaLabel: String? = null,
     onCta: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    mascot: Boolean = false
 ) {
     val p = LocalPalette.current
     Column(
@@ -1201,20 +1202,24 @@ fun EmptyState(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (p.isNeoBrutalist) {
-            Box(
-                modifier = Modifier
-                    .size(68.dp)
-                    .neoBrutalist(
-                        backgroundColor = NeoBrutalistColors.SkyBlue,
-                        borderColor = p.border,
-                        shadowColor = NeoBrutalistColors.Black,
-                        borderWidth = 2.5.dp,
-                        shadowOffset = 4.dp,
-                        cornerRadius = 8.dp
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = NeoBrutalistColors.Black, modifier = Modifier.size(28.dp))
+            if (mascot) {
+                SerieeMascot()
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(68.dp)
+                        .neoBrutalist(
+                            backgroundColor = NeoBrutalistColors.SkyBlue,
+                            borderColor = p.border,
+                            shadowColor = NeoBrutalistColors.Black,
+                            borderWidth = 2.5.dp,
+                            shadowOffset = 4.dp,
+                            cornerRadius = 8.dp
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = NeoBrutalistColors.Black, modifier = Modifier.size(28.dp))
+                }
             }
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = p.text, textAlign = TextAlign.Center)
             Text(hint, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = p.muted, textAlign = TextAlign.Center, lineHeight = 17.sp)
@@ -1244,22 +1249,26 @@ fun EmptyState(
             }
             return
         }
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .liquidGlass(
-                    shape = CircleShape,
-                    tint = if (p.isGlass) {
-                        if (p.isLight) Color.White.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.12f)
-                    } else p.chip,
-                    blurRadius = 16.dp,
-                    refractionHeight = 14.dp,
-                    refractionAmount = 24.dp,
-                    elevated = true
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
+        if (mascot) {
+            SerieeMascot()
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .liquidGlass(
+                        shape = CircleShape,
+                        tint = if (p.isGlass) {
+                            if (p.isLight) Color.White.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.12f)
+                        } else p.chip,
+                        blurRadius = 16.dp,
+                        refractionHeight = 14.dp,
+                        refractionAmount = 24.dp,
+                        elevated = true
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
+            }
         }
         Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.text, textAlign = TextAlign.Center)
         Text(hint, fontSize = 12.sp, color = p.muted, textAlign = TextAlign.Center, lineHeight = 17.sp)

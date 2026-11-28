@@ -13,9 +13,19 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
@@ -25,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.seriee.app.data.SerieeRepository
 import com.seriee.app.ui.CustomThemeColors
 import com.seriee.app.ui.SerieeApp
+import com.seriee.app.ui.SerieeSplash
 import com.seriee.app.ui.SerieeTheme
 import com.seriee.app.ui.WelcomeScreen
 import com.seriee.app.ui.resolvePalette
@@ -77,15 +88,25 @@ class MainActivity : AppCompatActivity() {
                 reduceTransparency = vm.reduceTransparency,
                 batterySaverAmoled = vm.batterySaverAmoled
             ) {
-                Crossfade(targetState = vm.showWelcome, label = "welcome") { welcome ->
-                    if (welcome) {
-                        WelcomeScreen(onFinish = vm::finishWelcome)
-                    } else {
-                        SerieeApp(
-                            vm = vm,
-                            openItemId = pendingWidgetItem.value,
-                            onOpenItemHandled = { pendingWidgetItem.value = null },
-                        )
+                var splashDone by rememberSaveable { mutableStateOf(false) }
+                Box(Modifier.fillMaxSize()) {
+                    Crossfade(targetState = vm.showWelcome, label = "welcome") { welcome ->
+                        if (welcome) {
+                            WelcomeScreen(onFinish = vm::finishWelcome)
+                        } else {
+                            SerieeApp(
+                                vm = vm,
+                                openItemId = pendingWidgetItem.value,
+                                onOpenItemHandled = { pendingWidgetItem.value = null },
+                            )
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = !splashDone,
+                        enter = EnterTransition.None,
+                        exit = fadeOut(tween(240))
+                    ) {
+                        SerieeSplash(onFinished = { splashDone = true })
                     }
                 }
             }
